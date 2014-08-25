@@ -3,7 +3,7 @@ INC   := -I/usr/include -I.
 C_SRCS:= $(wildcard *.c)
 CXSRCS:= $(wildcard *.cpp)
 OBJ   := $(patsubst %.c,%.o,$(C_SRCS)) $(patsubst %.cpp,%.o,$(CXSRCS))
-DEFS  := -D_REENTRANT -D_THREAD_SAFE
+DEFS  := -D_REENTRANT -D_THREAD_SAFE -D__STDC_FORMAT_MACROS
 
 all: $(OBJ)
 

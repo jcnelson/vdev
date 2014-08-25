@@ -50,7 +50,7 @@ ancil_recv_fds_with_buffer(int sock, int *fds, unsigned n_fds, void *buffer)
     char nothing;
     struct iovec nothing_ptr;
     struct cmsghdr *cmsg;
-    int i;
+    unsigned int i;
 
     nothing_ptr.iov_base = &nothing;
     nothing_ptr.iov_len = 1;
@@ -65,13 +65,16 @@ ancil_recv_fds_with_buffer(int sock, int *fds, unsigned n_fds, void *buffer)
     cmsg->cmsg_len = msghdr.msg_controllen;
     cmsg->cmsg_level = SOL_SOCKET;
     cmsg->cmsg_type = SCM_RIGHTS;
-    for(i = 0; i < n_fds; i++)
-	((int *)CMSG_DATA(cmsg))[i] = -1;
+    for(i = 0; i < n_fds; i++) {
+   	((int *)CMSG_DATA(cmsg))[i] = -1;
+    }
     
-    if(recvmsg(sock, &msghdr, 0) < 0)
-	return(-1);
-    for(i = 0; i < n_fds; i++)
-	fds[i] = ((int *)CMSG_DATA(cmsg))[i];
+    if(recvmsg(sock, &msghdr, 0) < 0) {
+   	return(-1);
+    }
+    for(i = 0; i < n_fds; i++) {
+    	fds[i] = ((int *)CMSG_DATA(cmsg))[i];
+    }
     n_fds = (msghdr.msg_controllen - sizeof(struct cmsghdr)) / sizeof(int);
     return(n_fds);
 }

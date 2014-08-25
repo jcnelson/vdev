@@ -50,7 +50,7 @@ ancil_send_fds_with_buffer(int sock, const int *fds, unsigned n_fds, void *buffe
     char nothing = '!';
     struct iovec nothing_ptr;
     struct cmsghdr *cmsg;
-    int i;
+    unsigned int i;
 
     nothing_ptr.iov_base = &nothing;
     nothing_ptr.iov_len = 1;
@@ -65,8 +65,9 @@ ancil_send_fds_with_buffer(int sock, const int *fds, unsigned n_fds, void *buffe
     cmsg->cmsg_len = msghdr.msg_controllen;
     cmsg->cmsg_level = SOL_SOCKET;
     cmsg->cmsg_type = SCM_RIGHTS;
-    for(i = 0; i < n_fds; i++)
-	((int *)CMSG_DATA(cmsg))[i] = fds[i];
+    for(i = 0; i < n_fds; i++) {
+   	((int *)CMSG_DATA(cmsg))[i] = fds[i];
+    }
     return(sendmsg(sock, &msghdr, 0) >= 0 ? 0 : -1);
 }
 

@@ -19,10 +19,9 @@
 #ifndef _LOGINFS_H_
 #define _LOGINFS_H_
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
+#include "debug.h"
 
+#define FUSE_USE_VERSION 28
 #include <fuse.h>
 
 #include <map>
@@ -79,7 +78,7 @@ int loginfs_access(const char *path, int mask);
 int loginfs_create(const char *path, mode_t mode, struct fuse_file_info *fi);
 int loginfs_ftruncate(const char *path, off_t offset, struct fuse_file_info *fi);
 int loginfs_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi);
-void *loginfs_init(struct fuse_conn_info *conn);
+void *loginfs_fuse_init(struct fuse_conn_info *conn);
 void loginfs_destroy(void *userdata);
 
 struct fuse_operations loginfs_get_opers();

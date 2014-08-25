@@ -153,7 +153,7 @@ int loginfs_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_in
    return 0;
 }
 
-void *loginfs_init(struct fuse_conn_info *conn) {
+void *loginfs_fuse_init(struct fuse_conn_info *conn) {
    return loginfs_get_state();
 }
 
@@ -193,13 +193,11 @@ struct fuse_operations loginfs_get_opers() {
    fo.readdir = loginfs_readdir;
    fo.releasedir = loginfs_releasedir;
    fo.fsyncdir = loginfs_fsyncdir;
-   fo.init = loginfs_init;
+   fo.init = loginfs_fuse_init;
    fo.access = loginfs_access;
    fo.create = loginfs_create;
    fo.ftruncate = loginfs_ftruncate;
    fo.fgetattr = loginfs_fgetattr;
 
    return fo;
-}
-
 }
