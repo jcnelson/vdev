@@ -1,5 +1,5 @@
 /*
-   loginfs: a FUSE filesystem to allow unprivileged users to access privileged files on UNIX-like systems.
+   vdev: a FUSE filesystem to allow unprivileged users to access privileged files on UNIX-like systems.
    Copyright (C) 2014  Jude Nelson
 
    This program is free software: you can redistribute it and/or modify
