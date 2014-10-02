@@ -1,5 +1,5 @@
 /*
-   loginfs: a FUSE filesystem to allow unprivileged users to access privileged files on UNIX-like systems.
+   vdev: a FUSE filesystem to allow unprivileged users to access privileged files on UNIX-like systems.
    Copyright (C) 2014  Jude Nelson
 
    This program is free software: you can redistribute it and/or modify
@@ -16,9 +16,9 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef _LOGINFS_MAIN_H_
-#define _LOGINFS_MAIN_H_
+#ifndef _VDEV_MAIN_H_
+#define _VDEV_MAIN_H_
 
-#include "loginfs.h"
+#include "vdev.h"
 
 #endif
