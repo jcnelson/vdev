@@ -19,7 +19,7 @@
 #ifndef _VDEV_H_
 #define _VDEV_H_
 
-#include "debug.h"
+#include "fskit/fskit.h"
 
 #define FUSE_USE_VERSION 28
 #include <fuse.h>
@@ -30,22 +30,40 @@
 
 using namespace std;
 
+// vdev global state
 struct vdev_state {
    
+   struct fskit_core* core;
 };
 
-extern "C" {
+// handle to a file or directory in the filesystem
+struct vdev_file_info {
    
-// init/shutdown 
-int vdev_init( struct vdev_state* state );
-int vdev_start( struct vdev_state* state );
-int vdev_stop( struct vdev_state* state );
-int vdev_free( struct vdev_state* state );
+   // file or directory?  determines how to access handle
+   int type;
+   
+   // handle data
+   union {
+      struct fskit_file_handle* fh;
+      struct fskit_dir_handle* dh;
+   } handle;
+};
+
+
+extern "C" {
 
 // access
 struct vdev_state* vdev_get_state();
+uint64_t vdev_get_uid();
+uint64_t vdev_get_gid();
+pid_t vdev_get_pid();
+mode_t vdev_get_umask();
+
+// handle management
+struct vdev_file_info* vdev_make_file_handle( struct fskit_file_handle* fh );
+struct vdev_file_info* vdev_make_dir_handle( struct fskit_dir_handle* dh );
    
-// fs methods
+// FUSE methods
 int vdev_getattr(const char *path, struct stat *statbuf);
 int vdev_readlink(const char *path, char *link, size_t size);
 int vdev_mknod(const char *path, mode_t mode, dev_t dev);
