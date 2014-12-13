@@ -1,5 +1,5 @@
 /*
-   vdev: a FUSE filesystem for accessing privileged device nodes
+   vdev: a virtual device manager for *nix
    Copyright (C) 2014  Jude Nelson
 
    This program is free software: you can redistribute it and/or modify
@@ -17,7 +17,7 @@
 */
 
 #include "vdev.h"
-
+/*
 // get running state
 struct vdev_state* vdev_get_state() {
    return (struct vdev_state*)fuse_get_context()->private_data;
@@ -543,3 +543,54 @@ struct fuse_operations vdev_get_opers() {
 
    return fo;
 }
+*/
+
+// initialize an inode
+static int vdev_inode_init( struct vdev_inode* inode, struct vdev_state* state, char const* path ) {
+   
+   return 0;
+}
+
+
+int vdev_mknod( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, mode_t mode, dev_t dev, void** inode_data ) {
+   
+   int rc = 0;
+   struct vdev_state* state = (struct vdev_state*)fskit_core_get_user_data( core );
+   struct vdev_inode* inode = NULL;
+   
+   inode = VDEV_CALLOC( struct vdev_inode, 1 );
+   if( inode == NULL ) {
+      
+      return -ENOMEM;
+   }
+   
+   rc = vdev_inode_init( inode, state, grp->path );
+   
+   // TODO
+   return rc;
+}
+
+int vdev_mkdir( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* dent, mode_t mode, void** inode_data ) {
+   
+   // TODO
+   return -ENOSYS;
+}
+
+int vdev_detach( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, void* inode_data ) {
+   
+   // TODO
+   return -ENOSYS;
+}
+
+int vdev_stat( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct stat* sb ) {
+   
+   // TODO
+   return -ENOSYS;
+}
+
+int vdev_readdir( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct fskit_dir_entry** dirents, size_t num_dirents ) {
+   
+   // TODO
+   return -ENOSYS;
+}
+

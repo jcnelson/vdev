@@ -16,11 +16,28 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef _VDEV_MAIN_H_
-#define _VDEV_MAIN_H_
+#ifndef _VDEV_OS_METHODS_H_
+#define _VDEV_OS_METHODS_H_
 
 #include "vdev.h"
-#include "acl.h"
-#include "config.h"
 
+// add OS-specific headers here
+#ifdef _VDEV_OS_LINUX
+#include "linux.h"
 #endif
+
+extern "C" {
+
+int vdev_os_init( struct vdev_state* state, void** cls );
+int vdev_os_shutdown( void* cls );
+
+int vdev_os_add_device( struct vdev_device_request* request, void* cls );
+int vdev_os_remove_device( struct vdev_device_request* request, void* cls );
+int vdev_os_change_device( struct vdev_device_request* request, void* cls );
+int vdev_os_move_device( struct vdev_device_request* request, void* cls );
+int vdev_os_online_device( struct vdev_device_request* request, void* cls );
+int vdev_os_offline_device( struct vdev_device_request* request, void* cls );
+
+}
+
+#endif 

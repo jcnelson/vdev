@@ -16,11 +16,10 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef _VDEV_MAIN_H_
-#define _VDEV_MAIN_H_
-
-#include "vdev.h"
-#include "acl.h"
 #include "config.h"
 
-#endif
+#define INI_MAX_LINE 4096
+#define INI_STOP_ON_FIRST_ERROR 1
+
+#include "ini.h"
+

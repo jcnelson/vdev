@@ -16,11 +16,26 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef _VDEV_MAIN_H_
-#define _VDEV_MAIN_H_
+#ifndef _VDEV_CONFIG_H_
+#define _VDEV_CONFIG_H_
 
-#include "vdev.h"
-#include "acl.h"
-#include "config.h"
+#include "fskit/fskit.h"
+
+typedef map<string, string> vdev_config_map_t;
+
+struct vdev_config {
+   
+   // firmware directory 
+   char* firmware_dir;
+   
+   // OS-specific configuration (for keys that start with OS_
+   vdev_config_map_t* os_config;
+};
+
+extern "C" {
+ 
+int vdev_config_load_file( struct vdev_config* conf, char const* path );
+
+};
 
 #endif
