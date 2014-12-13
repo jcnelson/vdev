@@ -605,6 +605,8 @@ int vdev_os_add_device( struct vdev_device_request* request, void* cls ) {
    int rc = 0;
    struct vdev_linux_context* ctx = (struct vdev_linux_context*)cls;
    
+   // TODO 
+   
    return rc;
 }
 
@@ -615,6 +617,8 @@ int vdev_os_remove_device( struct vdev_device_request* request, void* cls ) {
    
    int rc = 0;
    struct vdev_linux_context* ctx = (struct vdev_linux_context*)cls;
+   
+   // TODO 
    
    return rc;
 }
@@ -628,6 +632,8 @@ int vdev_os_change_device( struct vdev_device_request* request, void* cls ) {
    int rc = 0;
    struct vdev_linux_context* ctx = (struct vdev_linux_context*)cls;
    
+   // TODO 
+   
    return rc;
 }
 
@@ -640,6 +646,8 @@ int vdev_os_move_device( struct vdev_device_request* request, void* cls )  {
    int rc = 0;
    struct vdev_linux_context* ctx = (struct vdev_linux_context*)cls;
    
+   // TODO 
+   
    return rc;
 }
 
@@ -651,6 +659,8 @@ int vdev_os_online_device( struct vdev_device_request* request, void* cls )  {
    int rc = 0;
    struct vdev_linux_context* ctx = (struct vdev_linux_context*)cls;
    
+   // TODO 
+   
    return rc;
 }
 
@@ -661,6 +671,8 @@ int vdev_os_offline_device( struct vdev_device_request* request, void* cls ) {
    
    int rc = 0;
    struct vdev_linux_context* ctx = (struct vdev_linux_context*)cls;
+   
+   // TODO 
    
    return rc;
 }
