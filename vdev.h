@@ -25,10 +25,16 @@
 #include "acl.h"
 #include "config.h"
 #include "util.h"
+#include "os/common.h"
+#include "workqueue.h"
 
 #include <map>
 #include <string>
 #include <set>
+
+#define VDEV_CONFIG_DEFAULT_PATH                "/etc/vdev.conf"
+#define VDEV_CONFIG_DEFAULT_DEBUG_LEVEL         2
+#define VDEV_CONFIG_DEFAULT_LOGFILE_PATH        NULL
 
 using namespace std;
 
@@ -36,26 +42,44 @@ using namespace std;
 struct vdev_state {
    
    // device processing workqueue
-   struct fskit_wq* device_wq;
+   struct fskit_wq device_wq;
    
    // configuration 
    struct vdev_config* config;
    
-   // mountpoint 
-   char* mountpoint;
+   // OS context 
+   struct vdev_os_context* os;
+   
+   // fskit state 
+   struct fskit_fuse_state* fs;
+   
+   // acls 
+   struct vdev_acl* acls;
+   size_t num_acls;
+   
+   // actions 
+   struct vdev_action* acts;
+   size_t num_acts;
+   
+   // pending requests 
+   struct vdev_pending_context* pending;
+   
+   // are we taking events from the OS?
+   bool running;
+   
+   // arguments 
+   int argc;
+   char** argv;
 };
 
-struct vdev_inode {
-   
-   // ACLs that apply to this device node
-   vdev_acl_list_t* acls;
-};
 
 extern "C" {
 
-int vdev_mknod( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, mode_t mode, dev_t dev, void** inode_data );
-int vdev_mkdir( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* dent, mode_t mode, void** inode_data );
-int vdev_detach( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, void* inode_data );
+int vdev_init( struct vdev_state* vdev, struct fskit_fuse_state* fs, int argc, char** argv );
+int vdev_start( struct vdev_state* state );
+int vdev_stop( struct vdev_state* state );
+int vdev_free( struct vdev_state* state );
+
 int vdev_stat( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct stat* sb );
 int vdev_readdir( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct fskit_dir_entry** dirents, size_t num_dirents );
 

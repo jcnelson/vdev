@@ -17,580 +17,303 @@
 */
 
 #include "vdev.h"
-/*
-// get running state
-struct vdev_state* vdev_get_state() {
-   return (struct vdev_state*)fuse_get_context()->private_data;
-}
+#include "action.h"
+#include "opts.h"
 
-// get caller UID 
-uint64_t vdev_get_uid() {
-   return fuse_get_context()->uid;
-}
-
-// get caller GID 
-uint64_t vdev_get_gid() {
-   return fuse_get_context()->gid;
-}
-
-// get caller PID 
-pid_t vdev_get_pid() {
-   return fuse_get_context()->pid;
-}
-
-// get caller umask 
-mode_t vdev_get_umask() {
-   return fuse_get_context()->umask;
-}
-
-// make a FUSE file info for a file handle
-struct vdev_file_info* vdev_make_file_handle( struct fskit_file_handle* fh ) {
+// global vdev initialization 
+int vdev_init( struct vdev_state* vdev, struct fskit_fuse_state* fs, int argc, char** argv ) {
    
-   struct vdev_file_info* ffi = CALLOC_LIST( struct vdev_file_info, 1 );
-   if( ffi == NULL ) {
-      return NULL;
+   int rc = 0;
+   struct vdev_opts opts;
+   
+   // parse opts 
+   rc = vdev_opts_parse( &opts, argc, argv );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_opts_parse rc = %d\n", rc );
+      vdev_usage( argv[0] );
+      return rc;
    }
    
-   ffi->type = FSKIT_ENTRY_TYPE_FILE;
-   ffi->handle.fh = fh;
-   
-   return ffi;
-}
-
-// make a FUSE file info for a dir handle
-struct vdev_file_info* vdev_make_dir_handle( struct fskit_dir_handle* dh ) {
-   
-   struct vdev_file_info* ffi = CALLOC_LIST( struct vdev_file_info, 1 );
-   if( ffi == NULL ) {
-      return NULL;
+   // load config 
+   vdev->config = VDEV_CALLOC( struct vdev_config, 1 );
+   if( vdev->config == NULL ) {
+      
+      vdev_opts_free( &opts );
+      return -ENOMEM;
    }
    
-   ffi->type = FSKIT_ENTRY_TYPE_DIR;
-   ffi->handle.dh = dh;
+   vdev_debug("Config file: %s\n", opts.config_file_path );
    
-   return ffi;
-}
-
-int vdev_getattr(const char *path, struct stat *statbuf) {
+   rc = vdev_config_init( vdev->config );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_config_init rc = %d\n", rc );
+      
+      vdev_free( vdev );
+      vdev_opts_free( &opts );
+      return rc;
+   }
    
-   dbprintf("getattr(%s, %p)\n", path, statbuf );
+   rc = vdev_config_load( opts.config_file_path, vdev->config );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_config_load('%s') rc = %d\n", opts.config_file_path, rc );
+      
+      vdev_free( vdev );
+      vdev_opts_free( &opts );
+      return rc;
+   }
    
-   struct vdev_state* state = vdev_get_state();
-   uint64_t uid = vdev_get_uid();
-   uint64_t gid = vdev_get_gid();
+   vdev_debug("vdev ACLs dir:    %s\n", vdev->config->acls_dir );
+   vdev_debug("vdev actions dir: %s\n", vdev->config->acts_dir );
+   vdev_debug("firmware dir:     %s\n", vdev->config->firmware_dir );
    
-   int rc = fskit_stat( state->core, path, uid, gid, statbuf );
+   // load ACLs 
+   rc = vdev_acl_load_all( vdev->config->acls_dir, &vdev->acls, &vdev->num_acls );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_acl_load_all('%s') rc = %d\n", vdev->config->acls_dir, rc );
+      
+      vdev_free( vdev );
+      vdev_opts_free( &opts );
+      return rc;
+   }
    
-   dbprintf("getattr(%s, %p) rc = %d\n", path, statbuf, rc );
-   return rc;
-}
-
-
-int vdev_readlink(const char *path, char *link, size_t size) {
+   // load actions 
+   rc = vdev_action_load_all( vdev->config->acts_dir, &vdev->acts, &vdev->num_acts );
+   if( rc != 0) {
+      
+      vdev_error("vdev_action_load_all('%s') rc = %d\n", vdev->config->acts_dir, rc );
+      
+      vdev_free( vdev );
+      vdev_opts_free( &opts );
+      return rc;
+   }
    
-   // not supported by fskit, so not supported by vdev
-   return -ENOSYS;
-}
-
-
-int vdev_mknod(const char *path, mode_t mode, dev_t dev) {
+   // initialize OS-specific state 
+   vdev->os = VDEV_CALLOC( struct vdev_os_context, 1 );
    
-   dbprintf("mknod(%s, %o, %d, %d)\n", path, mode, major(dev), minor(dev) );
+   if( vdev->os == NULL ) {
+      
+      vdev_free( vdev );
+      vdev_opts_free( &opts );
+      return -ENOMEM;
+   }
    
-   struct vdev_state* state = vdev_get_state();
-   uint64_t uid = vdev_get_uid();
-   uint64_t gid = vdev_get_gid();
+   rc = vdev_os_context_init( vdev->os, vdev );
    
-   int rc = fskit_mknod( state->core, path, mode, dev, uid, gid );
+   if( rc != 0 ) {
    
-   dbprintf("mknod(%s, %o, %d, %d) rc = %d\n", path, mode, major(dev), minor(dev), rc );
+      vdev_error("vdev_os_context_init rc = %d\n", rc );
+      
+      vdev_free( vdev );
+      vdev_opts_free( &opts );
+      return rc;
+   }
    
-   return rc;
-}
-
-int vdev_mkdir(const char *path, mode_t mode) {
+   // initialize request work queue 
+   rc = fskit_wq_init( &vdev->device_wq );
+   if( rc != 0 ) {
+      
+      vdev_error("fskit_wq_init rc = %d\n", rc );
+      
+      vdev_free( vdev );
+      vdev_opts_free( &opts );
+      return rc;
+   }
    
-   dbprintf("mkdir(%s, %o)\n", path, mode );
+   vdev_opts_free( &opts );
    
-   struct vdev_state* state = vdev_get_state();
-   uint64_t uid = vdev_get_uid();
-   uint64_t gid = vdev_get_gid();
+   vdev->argc = argc;
+   vdev->argv = argv;
    
-   int rc = fskit_mkdir( state->core, path, mode, uid, gid );
-   
-   dbprintf("mkdir(%s, %o) rc = %d\n", path, mode, rc );
-   
-   return rc;
-}
-
-int vdev_unlink(const char *path) {
-   
-   dbprintf("unlink(%s)\n", path );
-   
-   struct vdev_state* state = vdev_get_state();
-   uint64_t uid = vdev_get_uid();
-   uint64_t gid = vdev_get_gid();
-   
-   int rc = fskit_unlink( state->core, path, uid, gid );
-   
-   dbprintf("unlink(%s) rc = %d\n", path, rc );
-   
-   return rc;
-}
-
-int vdev_rmdir(const char *path) {
-   
-   dbprintf("rmdir(%s)\n", path );
-   
-   struct vdev_state* state = vdev_get_state();
-   uint64_t uid = vdev_get_uid();
-   uint64_t gid = vdev_get_gid();
-   
-   int rc = fskit_rmdir( state->core, path, uid, gid );
-   
-   dbprintf("rmdir(%s) rc = %d\n", path, rc );
-   
-   return rc;
-}
-
-int vdev_symlink(const char *path, const char *link) {
-   
-   dbprintf("symlink(%s, %s)\n", path, link );
-   
-   // not supported by fskit
-   dbprintf("symlink(%s, %s) rc = %d\n", path, link, -ENOSYS );
-   return -ENOSYS;
-}
-
-int vdev_rename(const char *path, const char *newpath) {
-   
-   dbprintf("rename(%s, %s)\n", path, newpath );
-   
-   struct vdev_state* state = vdev_get_state();
-   uint64_t uid = vdev_get_uid();
-   uint64_t gid = vdev_get_gid();
-   
-   int rc = fskit_rename( state->core, path, newpath, uid, gid );
-   
-   dbprintf("rename(%s, %s) rc = %d\n", path, newpath, rc );
-   
-   return rc;
-}
-
-int vdev_link(const char *path, const char *newpath) {
-   
-   // not supported by fskit, so not supported by vdev
-   return -ENOSYS;
-}
-
-int vdev_chmod(const char *path, mode_t mode) {
-   
-   dbprintf("chmod(%s, %o)\n", path, mode );
-   
-   struct vdev_state* state = vdev_get_state();
-   uint64_t uid = vdev_get_uid();
-   uint64_t gid = vdev_get_gid();
-   
-   int rc = fskit_chmod( state->core, path, uid, gid, mode );
-   
-   dbprintf("chmod(%s, %o) rc = %d\n", path, mode, rc );
-   
-   return rc;
-}
-
-int vdev_chown(const char *path, uid_t new_uid, gid_t new_gid) {
-   
-   dbprintf("chown(%s, %d, %d)\n", path, new_uid, new_gid );
-   
-   struct vdev_state* state = vdev_get_state();
-   uint64_t uid = vdev_get_uid();
-   uint64_t gid = vdev_get_gid();
-   
-   int rc = fskit_chown( state->core, path, uid, gid, new_uid, new_gid );
-   
-   dbprintf("chown(%s, %d, %d) rc = %d\n", path, new_uid, new_gid, rc );
-   
-   return rc;
-}
-
-int vdev_truncate(const char *path, off_t newsize) {
-   
-   dbprintf("truncate(%s, %jd)\n", path, newsize );
-   
-   struct vdev_state* state = vdev_get_state();
-   uint64_t uid = vdev_get_uid();
-   uint64_t gid = vdev_get_gid();
-   
-   int rc = fskit_trunc( state->core, path, uid, gid, newsize );
-   
-   dbprintf("truncate(%s, %jd) rc = %d\n", path, newsize, rc );
-   
-   return rc;
-}
-
-int vdev_utime(const char *path, struct utimbuf *ubuf) {
-   
-   dbprintf("utime(%s, %ld.%ld)\n", path, ubuf->actime, ubuf->modtime );
-   
-   struct vdev_state* state = vdev_get_state();
-   uint64_t uid = vdev_get_uid();
-   uint64_t gid = vdev_get_gid();
-   
-   int rc = fskit_utime( state->core, path, uid, gid, ubuf );
-   
-   dbprintf("utime(%s, %ld.%ld) rc = %d\n", path, ubuf->actime, ubuf->modtime, rc );
-   
-   return rc;
-}
-
-int vdev_open(const char *path, struct fuse_file_info *fi) {
-   
-   // vdev does not support regular files 
-   return -ENOSYS;
-}
-
-int vdev_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
-   
-   // vdev does not support regular files 
-   return -ENOSYS;
-}
-
-int vdev_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
-   
-   // vdev does not support regular files 
-   return -ENOSYS;
-}
-
-int vdev_statfs(const char *path, struct statvfs *statv) {
-   
-   dbprintf("statfs(%s, %p)\n", path, statv );
-   
-   struct vdev_state* state = vdev_get_state();
-   uint64_t uid = vdev_get_uid();
-   uint64_t gid = vdev_get_gid();
-   
-   int rc = fskit_statvfs( state->core, path, uid, gid, statv );
-   
-   dbprintf("statfs(%s, %p) rc = %d\n", path, statv, rc );
-   
-   return rc;
-}
-
-int vdev_flush(const char *path, struct fuse_file_info *fi) {
-   
-   // vdev does not support regular files 
    return 0;
 }
 
-int vdev_release(const char *path, struct fuse_file_info *fi) {
+// start up vdev
+// NOTE: if this fails, there's not really a way to recover.
+int vdev_start( struct vdev_state* state ) {
    
-   // vdev does not support regular files 
-   return 0;
-}
-
-int vdev_fsync(const char *path, int datasync, struct fuse_file_info *fi) {
-   
-   // vdev does not support regular files 
-   return 0;
-}
-
-int vdev_setxattr(const char *path, const char *name, const char *value, size_t size, int flags) {
-   
-   dbprintf("setxattr(%s, %s, %p, %zu, %X)\n", path, name, value, size, flags );
-   
-   struct vdev_state* state = vdev_get_state();
-   uint64_t uid = vdev_get_uid();
-   uint64_t gid = vdev_get_gid();
-   
-   int rc = fskit_setxattr( state->core, path, uid, gid, name, value, size, flags );
-   
-   dbprintf("setxattr(%s, %s, %p, %zu, %X) rc = %d\n", path, name, value, size, flags, rc );
-   return rc;
-}
-
-int vdev_getxattr(const char *path, const char *name, char *value, size_t size) {
-   
-   dbprintf("getxattr(%s, %s, %p, %zu)\n", path, name, value, size );
-   
-   struct vdev_state* state = vdev_get_state();
-   uint64_t uid = vdev_get_uid();
-   uint64_t gid = vdev_get_gid();
-   
-   int rc = fskit_getxattr( state->core, path, uid, gid, name, value, size );
-   
-   dbprintf("getxattr(%s, %s, %p, %zu) rc = %d\n", path, name, value, size, rc );
-   return rc;
-}
-
-int vdev_listxattr(const char *path, char *list, size_t size) {
-   
-   dbprintf("listxattr(%s, %p, %zu)\n", path, list, size );
-   
-   struct vdev_state* state = vdev_get_state();
-   uint64_t uid = vdev_get_uid();
-   uint64_t gid = vdev_get_gid();
-   
-   int rc = fskit_listxattr( state->core, path, uid, gid, list, size );
-   
-   dbprintf("listxattr(%s, %p, %zu) rc = %d\n", path, list, size, rc );
-   return rc;
-}
-
-int vdev_removexattr(const char *path, const char *name) {
-   
-   dbprintf("removexattr(%s, %s)\n", path, name );
-   
-   struct vdev_state* state = vdev_get_state();
-   uint64_t uid = vdev_get_uid();
-   uint64_t gid = vdev_get_gid();
-   
-   int rc = fskit_removexattr( state->core, path, uid, gid, name );
-   
-   dbprintf("removexattr(%s, %s) rc = %d\n", path, name, rc );
-   return rc;
-}
-
-int vdev_opendir(const char *path, struct fuse_file_info *fi) {
-   
-   dbprintf("opendir(%s, %p)\n", path, fi );
-   
-   struct vdev_state* state = vdev_get_state();
-   uint64_t uid = vdev_get_uid();
-   uint64_t gid = vdev_get_gid();
-   struct vdev_file_info* ffi = NULL;
    int rc = 0;
    
-   struct fskit_dir_handle* dh = fskit_opendir( state->core, path, uid, gid, &rc );
+   if( state->running ) {
+      return -EINVAL;
+   }
+   
+   state->running = true;
+   
+   // start taking requests 
+   rc = fskit_wq_start( &state->device_wq );
+   if( rc != 0 ) {
+      
+      vdev_error("fskit_wq_start rc = %d\n", rc );
+      return rc;
+   }
+   
+   // start generating and listening for device events 
+   rc = vdev_os_context_start( state->os );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_os_context_start rc = %d\n", rc );
+      return rc;
+   }
+   
+   return 0;
+}
+
+
+// stop vdev 
+// NOTE: if this fails, there's not really a way to recover
+int vdev_stop( struct vdev_state* state ) {
+   
+   int rc = 0;
+   
+   if( !state->running ) {
+      return -EINVAL;
+   }
+   
+   state->running = false;
+   
+   // stop listening to the OS 
+   rc = vdev_os_context_stop( state->os );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_os_context_stop rc = %d\n", rc );
+      return rc;
+   }
+   
+   // stop processing requests 
+   rc = fskit_wq_stop( &state->device_wq );
+   if( rc != 0 ) {
+      
+      vdev_error("fskit_wq_stop rc = %d\n", rc );
+      return rc;
+   }
+   
+   return rc;
+}
+
+// free up vdev 
+int vdev_free( struct vdev_state* state ) {
+   
+   if( state->running ) {
+      return -EINVAL;
+   }
+   
+   vdev_acl_free_all( state->acls, state->num_acls );
+   vdev_action_free_all( state->acts, state->num_acts );
+   
+   vdev_os_context_free( state->os, NULL );
+   free( state->os );
+   
+   vdev_config_free( state->config );
+   free( state->config );
+   
+   fskit_wq_free( &state->device_wq );
+   
+   return 0;
+}
+
+
+// stat: equvocate about which devices exist, depending on who's asking
+int vdev_stat( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct stat* sb ) {
+   
+   vdev_debug("vdev_stat(%s)\n", grp->path );
+   
+   int rc = 0;
+   struct pstat ps;
+   pid_t pid = 0;
+   uid_t uid = 0;
+   gid_t gid = 0;
+   struct vdev_state* state = (struct vdev_state*)fskit_core_get_user_data( core );
+   struct fskit_fuse_state* fs_state = fskit_fuse_get_state();
+   
+   // stat the calling process
+   pid = fskit_fuse_get_pid();
+   uid = fskit_fuse_get_uid( fs_state );
+   gid = fskit_fuse_get_gid( fs_state );
+   rc = pstat( pid, &ps, state->config->pstat_discipline );
    
    if( rc != 0 ) {
       
-      dbprintf("opendir(%s, %p) rc = %d\n", path, fi, rc );
+      vdev_error("pstat(%d) rc = %d\n", pid, rc );
       return rc;
    }
    
-   ffi = vdev_make_dir_handle( dh );
-   
-   if( ffi == NULL ) {
-      fskit_closedir( state->core, dh );
+   // apply the ACLs on the stat buffer
+   rc = vdev_acl_apply_all( state->acls, state->num_acls, grp->path, &ps, uid, gid, sb );
+   if( rc < 0 ) {
       
-      dbprintf("opendir(%s, %p) rc = %d\n", path, fi, -ENOMEM );
-      return -ENOMEM;
+      vdev_error("vdev_acl_apply_all(%s) rc = %d\n", grp->path, rc );
+      return -EIO;
    }
    
-   fi->fh = (uint64_t)ffi; 
-   
-   dbprintf("opendir(%s, %p) rc = %d\n", path, fi, 0 );
-   return 0;
-}
-
-int vdev_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
-   
-   dbprintf("readdir(%s, %jd, %p, %p)\n", path, offset, buf, fi );
-   
-   struct vdev_state* state = vdev_get_state();
-   struct fskit_dir_handle* fdh = NULL;
-   struct vdev_file_info* ffi = NULL;
-   int rc = 0;
-   uint64_t num_read = 0;
-   
-   ffi = (struct vdev_file_info*)fi->fh;
-   fdh = ffi->handle.dh;
-   
-   struct fskit_dir_entry** dirents = fskit_listdir( state->core, fdh, &num_read, &rc );
-   
-   if( dirents == NULL || rc != 0 ) {
-      dbprintf("readdir(%s, %jd, %p, %p) rc = %d\n", path, offset, buf, fi, rc );
-      return rc;
-   }
-   
-   for( uint64_t i = 0; i < num_read; i++ ) {
-      
-      rc = filler( buf, dirents[i]->name, NULL, 0 );
-      if( rc != 0 ) {
-         rc = -ENOMEM;
-         break;
-      }
-   }
-   
-   fskit_dir_entry_free_list( dirents );
-   
-   dbprintf("readdir(%s, %jd, %p, %p) rc = %d\n", path, offset, buf, fi, rc );
-   return rc;
-}
-
-int vdev_releasedir(const char *path, struct fuse_file_info *fi) {
-   
-   dbprintf("releasedir(%s, %p)\n", path, fi );
-   
-   struct vdev_state* state = vdev_get_state();
-   struct vdev_file_info* ffi = NULL;
-   int rc = 0;
-   
-   ffi = (struct vdev_file_info*)fi->fh;
-   
-   rc = fskit_closedir( state->core, ffi->handle.dh );
-   
+   // omit entirely?
    if( rc == 0 ) {
-      safe_free( ffi );
-   }
-   
-   dbprintf("releasedir(%s, %p) rc = %d\n", path, fi, rc );
-   
-   return rc;
-}
-
-int vdev_fsyncdir(const char *path, int datasync, struct fuse_file_info *fi) {
-   
-   // vdev does not support fsyncdir
-   return 0;
-}
-
-int vdev_access(const char *path, int mask) {
-   
-   dbprintf("access(%s, %X)\n", path, mask );
-   
-   struct vdev_state* state = vdev_get_state();
-   uint64_t uid = vdev_get_uid();
-   uint64_t gid = vdev_get_gid();
-   
-   int rc = fskit_access( state->core, path, uid, gid, mask );
-   
-   dbprintf("access(%s, %X) rc = %d\n", path, mask, rc );
-   
-   return rc;
-}
-
-int vdev_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
-   
-   // vdev does not support regular files 
-   return -ENOSYS;
-}
-
-int vdev_ftruncate(const char *path, off_t new_size, struct fuse_file_info *fi) {
-   
-   // vdev does not support regular files 
-   return -ENOSYS;
-}
-
-int vdev_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi) {
-   
-   dbprintf("fgetattr(%s, %p, %p)\n", path, statbuf, fi );
-   
-   struct vdev_state* state = vdev_get_state();
-   struct vdev_file_info* ffi = NULL;
-   
-   ffi = (struct vdev_file_info*)fi->fh;
-   
-   int rc = 0;
-   
-   if( ffi->type == FSKIT_ENTRY_TYPE_FILE ) {
-      rc = fskit_fstat( state->core, ffi->handle.fh->fent, statbuf );
+      
+      // filter
+      return -ENOENT;
    }
    else {
-      rc = fskit_fstat( state->core, ffi->handle.dh->dent, statbuf );
-   }
-   
-   dbprintf("fgetattr(%s, %p, %p) rc = %d\n", path, statbuf, fi, rc );
-   
-   return rc;
-}
-
-void *vdev_fuse_init(struct fuse_conn_info *conn) {
-   return vdev_get_state();
-}
-
-void vdev_destroy(void *userdata) {
-   return;
-}
-
-struct fuse_operations vdev_get_opers() {
-   struct fuse_operations fo;
-   memset(&fo, 0, sizeof(fo));
-
-   fo.getattr = vdev_getattr;
-   fo.readlink = vdev_readlink;
-   fo.mknod = vdev_mknod;
-   fo.mkdir = vdev_mkdir;
-   fo.unlink = vdev_unlink;
-   fo.rmdir = vdev_rmdir;
-   fo.symlink = vdev_symlink;
-   fo.rename = vdev_rename;
-   fo.link = vdev_link;
-   fo.chmod = vdev_chmod;
-   fo.chown = vdev_chown;
-   fo.truncate = vdev_truncate;
-   fo.utime = vdev_utime;
-   fo.open = vdev_open;
-   fo.read = vdev_read;
-   fo.write = vdev_write;
-   fo.statfs = vdev_statfs;
-   fo.flush = vdev_flush;
-   fo.release = vdev_release;
-   fo.fsync = vdev_fsync;
-   fo.setxattr = vdev_setxattr;
-   fo.getxattr = vdev_getxattr;
-   fo.listxattr = vdev_listxattr;
-   fo.removexattr = vdev_removexattr;
-   fo.opendir = vdev_opendir;
-   fo.readdir = vdev_readdir;
-   fo.releasedir = vdev_releasedir;
-   fo.fsyncdir = vdev_fsyncdir;
-   fo.init = vdev_fuse_init;
-   fo.access = vdev_access;
-   fo.create = vdev_create;
-   fo.ftruncate = vdev_ftruncate;
-   fo.fgetattr = vdev_fgetattr;
-
-   return fo;
-}
-*/
-
-// initialize an inode
-static int vdev_inode_init( struct vdev_inode* inode, struct vdev_state* state, char const* path ) {
-   
-   return 0;
-}
-
-
-int vdev_mknod( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, mode_t mode, dev_t dev, void** inode_data ) {
-   
-   int rc = 0;
-   struct vdev_state* state = (struct vdev_state*)fskit_core_get_user_data( core );
-   struct vdev_inode* inode = NULL;
-   
-   inode = VDEV_CALLOC( struct vdev_inode, 1 );
-   if( inode == NULL ) {
       
-      return -ENOMEM;
+      // accept!
+      return 0;
    }
-   
-   rc = vdev_inode_init( inode, state, grp->path );
-   
-   // TODO
-   return rc;
 }
 
-int vdev_mkdir( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* dent, mode_t mode, void** inode_data ) {
-   
-   // TODO
-   return -ENOSYS;
-}
 
-int vdev_detach( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, void* inode_data ) {
-   
-   // TODO
-   return -ENOSYS;
-}
-
-int vdev_stat( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct stat* sb ) {
-   
-   // TODO
-   return -ENOSYS;
-}
-
+// readdir: equivocate about which devices exist, depending on who's asking
 int vdev_readdir( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct fskit_dir_entry** dirents, size_t num_dirents ) {
    
-   // TODO
-   return -ENOSYS;
+   pid_t pid = 0;
+   uid_t uid = 0;
+   gid_t gid = 0;
+   
+   struct vdev_state* state = (struct vdev_state*)fskit_core_get_user_data( core );
+   struct fskit_fuse_state* fs_state = fskit_fuse_get_state();
+   
+   pid = fskit_fuse_get_pid();
+   uid = fskit_fuse_get_uid( fs_state );
+   gid = fskit_fuse_get_gid( fs_state );
+   
+   int rc = 0;
+   struct fskit_entry* child = NULL;
+   
+   vdev_debug("vdev_readdir(%s, %zu) from %d\n", grp->path, num_dirents, pid );
+   
+   // entries to omit in the listing
+   vector<int> omitted_idx;
+   
+   for( unsigned int i = 0; i < num_dirents; i++ ) {
+      
+      // skip . and ..
+      if( strcmp(dirents[i]->name, ".") == 0 || strcmp(dirents[i]->name, "..") == 0 ) {
+         continue;
+      }
+      
+      // find the associated fskit_entry
+      child = fskit_entry_set_find_name( fent->children, dirents[i]->name );
+      
+      if( child == NULL ) {
+         // strange, shouldn't happen...
+         continue;
+      }
+      
+      fskit_entry_rlock( child );
+      
+      // rewrite stat buffers
+      // TODO
+      
+      fskit_entry_unlock( child );
+   }
+   
+   // skip ACL'ed entries
+   for( unsigned int i = 0; i < omitted_idx.size(); i++ ) {
+      
+      fskit_readdir_omit( dirents, omitted_idx[i] );
+   }
+   
+   return rc;
 }
 
