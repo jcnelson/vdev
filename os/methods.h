@@ -20,6 +20,7 @@
 #define _VDEV_OS_METHODS_H_
 
 #include "vdev.h"
+#include "common.h"
 
 // add OS-specific headers here
 #ifdef _VDEV_OS_LINUX
@@ -28,15 +29,11 @@
 
 extern "C" {
 
-int vdev_os_init( struct vdev_state* state, void** cls );
+int vdev_os_init( struct vdev_os_context* ctx, void** cls );
 int vdev_os_shutdown( void* cls );
 
-int vdev_os_add_device( struct vdev_device_request* request, void* cls );
-int vdev_os_remove_device( struct vdev_device_request* request, void* cls );
-int vdev_os_change_device( struct vdev_device_request* request, void* cls );
-int vdev_os_move_device( struct vdev_device_request* request, void* cls );
-int vdev_os_online_device( struct vdev_device_request* request, void* cls );
-int vdev_os_offline_device( struct vdev_device_request* request, void* cls );
+// yield the next device 
+int vdev_os_next_device( struct vdev_device_request* request, void* cls );
 
 }
 
