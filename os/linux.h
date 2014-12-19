@@ -33,7 +33,11 @@
 #include <linux/types.h>
 #include <linux/netlink.h>
 
-#define VDEV_LINUX_NETLINK_BUF_MAX 4096
+#define VDEV_LINUX_NETLINK_BUF_MAX 4097
+#define VDEV_LINUX_NETLINK_RECV_BUF_MAX 128 * 1024 * 1024
+
+#define VDEV_LINUX_NETLINK_UDEV_HEADER "libudev"
+#define VDEV_LINUX_NETLINK_UDEV_HEADER_LEN 8
 
 // connection to the linux kernel for hotplug
 struct vdev_linux_context {
@@ -44,28 +48,21 @@ struct vdev_linux_context {
    // poll on the netlink socket
    struct pollfd pfd;
    
-   // thread listening to events 
-   bool running;
-   pthread_t thread;
-   
    // path to mounted sysfs 
    char sysfs_mountpoint[ PATH_MAX+1 ];
    
-   // reference to global state 
-   struct vdev_state* state;
+   // ref to OS context 
+   struct vdev_os_context* os_ctx;
 };
 
 extern "C" {
 
-int vdev_os_init( struct vdev_state* state, void** cls );
+int vdev_os_init( struct vdev_os_context* ctx, void** cls );
+int vdev_os_start( void* cls );
+int vdev_os_stop( void* cls );
 int vdev_os_shutdown( void* cls );
 
-int vdev_os_add_device( struct vdev_device_request* request, void* cls );
-int vdev_os_remove_device( struct vdev_device_request* request, void* cls );
-int vdev_os_change_device( struct vdev_device_request* request, void* cls );
-int vdev_os_move_device( struct vdev_device_request* request, void* cls );
-int vdev_os_online_device( struct vdev_device_request* request, void* cls );
-int vdev_os_offline_device( struct vdev_device_request* request, void* cls );
+int vdev_os_next_device( struct vdev_device_request* request, void* cls );
 
 }
 

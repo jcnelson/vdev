@@ -31,18 +31,6 @@ vdev_device_request_t vdev_linux_parse_device_request_type( char const* type ) {
    else if( strcmp(type, "remove") == 0 ) {
       return VDEV_DEVICE_REMOVE;
    }
-   else if( strcmp(type, "change") == 0 ) {
-      return VDEV_DEVICE_CHANGE;
-   }
-   else if( strcmp(type, "move") == 0 ) {
-      return VDEV_DEVICE_MOVE;
-   }
-   else if( strcmp(type, "online") == 0 ) {
-      return VDEV_DEVICE_ONLINE;
-   }
-   else if( strcmp(type, "offline") == 0 ) {
-      return VDEV_DEVICE_OFFLINE;
-   }
    
    return VDEV_DEVICE_INVALID;
 }
@@ -59,6 +47,10 @@ static int vdev_linux_parse_request( struct vdev_device_request* vreq, char* nlb
    char* value = NULL;
    int offset = 0;
    int rc = 0;
+   unsigned int major = 0;
+   unsigned int minor = 0;
+   bool have_major = false;
+   bool have_minor = true;
    
    vdev_device_request_t reqtype = VDEV_DEVICE_INVALID;
    
@@ -111,6 +103,42 @@ static int vdev_linux_parse_request( struct vdev_device_request* vreq, char* nlb
             return -EINVAL;
          }
       }
+      
+      // is this the recommended path?
+      else if( strcmp(key, "PATH") == 0 ) {
+         
+         vdev_device_request_set_path( vreq, value );
+      }
+      
+      // is this the major device number?
+      else if( strcmp(key, "MAJOR") == 0 && !have_major ) {
+         
+         char* tmp = NULL;
+         major = (int)strtol( value, &tmp, 10 );
+         
+         if( tmp == NULL ) {
+            
+            vdev_error("Invalid 'MAJOR' value '%s'\n", value);
+            return -EINVAL;
+         }
+         
+         have_major = true;
+      }
+      
+      // is this the minor device number?
+      else if( strcmp(key, "MINOR") == 0 && !have_minor ) {
+         
+         char* tmp = NULL;
+         minor = (int)strtol( value, &tmp, 10 ) ;
+         
+         if( tmp == NULL ) {
+            
+            vdev_error("Invalid 'MINOR' value '%s'\n", value );
+            return -EINVAL;
+         }
+         
+         have_minor = true;
+      }
    }
    
    if( reqtype == VDEV_DEVICE_INVALID ) {
@@ -120,96 +148,127 @@ static int vdev_linux_parse_request( struct vdev_device_request* vreq, char* nlb
       return -EINVAL;
    }
    
+   if( have_major && have_minor ) {
+      
+      vdev_device_request_set_dev( vreq, makedev(major, minor) );
+   }
+   
    vdev_device_request_set_type( vreq, reqtype );
    
    return 0;
 }
 
 
-// uevent listening thread 
-static void* vdev_linux_uevent_thread_main( void* cls ) {
+// yield the next device event
+int vdev_os_next_device( struct vdev_device_request* vreq, void* cls ) {
    
    int rc = 0;
    struct vdev_linux_context* ctx = (struct vdev_linux_context*)cls;
    char buf[VDEV_LINUX_NETLINK_BUF_MAX];
    ssize_t len = 0;
    
-   while( ctx->running ) {
+   char cbuf[CMSG_SPACE(sizeof(struct ucred))];
+   struct cmsghdr *chdr = NULL;
+   struct ucred *cred = NULL;
+   struct msghdr hdr;
+   struct iovec iov;
+   struct sockaddr_nl cnls;
+   
+   memset(&hdr, 0, sizeof(struct msghdr));
+   
+   // next event (wait forever)
+   // NOTE: this is a cancellation point!
+   rc = poll( &ctx->pfd, 1, -1 );
+   
+   if( rc != 0 ) {
       
-      // next event (wait forever)
-      // NOTE: this is a cancellation point!
-      rc = poll( &ctx->pfd, 1, -1 );
+      rc = -errno;
       
-      if( rc != 0 ) {
-         
-         rc = -errno;
-         
-         if( rc == -EINTR ) {
-            // try again 
-            continue;
-         }
-         
-         vdev_error("poll(%d) rc = %d\n", ctx->pfd.fd, rc );
-         
-         break;
+      if( rc == -EINTR ) {
+         // try again 
+         return -EAGAIN;
       }
       
-      // get the event 
-      len = recv( ctx->pfd.fd, buf, VDEV_LINUX_NETLINK_BUF_MAX, MSG_DONTWAIT );
+      vdev_error("poll(%d) rc = %d\n", ctx->pfd.fd, rc );
       
-      if( len < 0 ) {
-         
-         rc = -errno;
-         vdev_error("recv(%d) rc = %d\n", ctx->pfd.fd, rc );
-         
-         break;
-      }
-      
-      // make a device request
-      struct vdev_device_request* vreq = VDEV_CALLOC( struct vdev_device_request, 1 );
-      
-      if( vreq == NULL ) {
-         // OOM
-         break;
-      }
-      
-      rc = vdev_device_request_init( vreq, VDEV_DEVICE_INVALID );
-      if( rc != 0 ) {
-         
-         free( vreq );
-         
-         vdev_error("vdev_device_request_init rc = %d\n", rc );
-         break;
-      }
-      
-      // parse the event buffer
-      rc = vdev_linux_parse_request( vreq, buf, len );
-      
-      if( rc != 0 ) {
-         
-         vdev_device_request_free( vreq );
-         free( vreq );
-         
-         vdev_error("vdev_linux_parse_request rc = %d\n", rc );
-         
-         continue;
-      }
-      
-      // post the event to the device work queue
-      rc = vdev_device_request_add( ctx->state->device_wq, vreq );
-      
-      if( rc != 0 ) {
-         
-         vdev_device_request_free( vreq );
-         free( vreq );
-         
-         vdev_error("vdev_device_request_add rc = %d\n", rc );
-         
-         continue;
-      }
+      return rc;
    }
    
-   return NULL;
+   // get the event 
+   iov.iov_base = buf;
+   iov.iov_len = VDEV_LINUX_NETLINK_BUF_MAX;
+   
+                
+   hdr.msg_iov = &iov;
+   hdr.msg_iovlen = 1;
+   
+   // get control-plane messages
+   hdr.msg_control = cbuf;
+   hdr.msg_controllen = sizeof(cbuf);
+   
+   hdr.msg_name = &cnls;
+   hdr.msg_namelen = sizeof(cnls);
+
+   // get the event 
+   len = recvmsg( ctx->pfd.fd, &hdr, 0 );
+   if( len < 0 ) {
+      
+      rc = -errno;
+      vdev_error("recvmsg(%d) rc = %d\n", ctx->pfd.fd, rc );
+      
+      return rc;
+   }
+   
+   // big enough?
+   if( len < 32 || len >= VDEV_LINUX_NETLINK_BUF_MAX ) {
+      
+      vdev_error("Netlink message is %zd bytes; ignoring...\n", len );
+      return 0;
+   }
+   
+   // control message, for credentials
+   chdr = CMSG_FIRSTHDR( &hdr );
+   if( chdr == NULL || chdr->cmsg_type != SCM_CREDENTIALS ) {
+      
+      vdev_error("%s", "Netlink message has no credentials\n");
+      return 0;
+   }
+   
+   // get the credentials
+   cred = (struct ucred *)CMSG_DATA(chdr);
+   
+   // if not root, ignore 
+   if( cred->uid != 0 ) {
+      
+      vdev_error("Ignoring message from non-root ID %d\n", cred->uid );
+      return 0;
+   }
+   
+   // if udev, ignore 
+   if( memcmp( buf, VDEV_LINUX_NETLINK_UDEV_HEADER, VDEV_LINUX_NETLINK_UDEV_HEADER_LEN ) == 0 ) {
+      
+      // message from udev; ignore 
+      return 0;
+   }
+   
+   // kernel messages don't come from userspace 
+   if( cnls.nl_pid > 0 ) {
+      
+      // from userspace???
+      return 0;
+   }
+   
+   // parse the event buffer
+   rc = vdev_linux_parse_request( vreq, buf, len );
+   
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_linux_parse_request rc = %d\n", rc );
+      
+      return rc;
+   }
+   
+   return 0;
 }
 
 
@@ -349,15 +408,14 @@ static int vdev_linux_seed_requests_from_sysfs( struct vdev_linux_context* ctx )
 
 
 // start listening for kernel events via netlink
-static int vdev_linux_context_init( struct vdev_state* state, struct vdev_linux_context* ctx ) {
+static int vdev_linux_context_init( struct vdev_os_context* os_ctx, struct vdev_linux_context* ctx ) {
    
    int rc = 0;
-   pthread_attr_t attrs;
+   size_t slen = VDEV_LINUX_NETLINK_RECV_BUF_MAX;
    
-   memset( &attrs, 0, sizeof(pthread_attr_t) );
    memset( &ctx, 0, sizeof(struct vdev_linux_context) );
    
-   ctx->state = state;
+   ctx->os_ctx = os_ctx;
    
    ctx->nl_addr.nl_family = AF_NETLINK;
    ctx->nl_addr.nl_pid = getpid();
@@ -373,6 +431,30 @@ static int vdev_linux_context_init( struct vdev_state* state, struct vdev_linux_
    
    ctx->pfd.events = POLLIN;
    
+   // big receive buffer 
+   rc = setsockopt( ctx->pfd.fd, SOL_SOCKET, SO_RCVBUFFORCE, &slen, sizeof(slen) );
+   if( rc < 0 ) {
+      
+      rc = -errno;
+      vdev_error("setsockopt(SO_RCVBUFFORCE) rc = %d\n", rc);
+      
+      close( ctx->pfd.fd );
+      return rc;
+   }
+   
+   // check credentials of message--only root should be able talk to us
+   rc = setsockopt( ctx->pfd.fd, SOL_SOCKET, SO_PASSCRED, &slen, sizeof(slen) );
+   if( rc < 0 ) {
+      
+      rc = -errno;
+      vdev_error("setsockopt(SO_PASSCRED) rc = %d\n", rc );
+      
+      close( ctx->pfd.fd );
+      return rc;
+      
+   }
+        
+   // bind to the address
    rc = bind( ctx->pfd.fd, (struct sockaddr*)&ctx->nl_addr, sizeof(struct sockaddr_nl) );
    if( rc != 0 ) {
       
@@ -383,22 +465,11 @@ static int vdev_linux_context_init( struct vdev_state* state, struct vdev_linux_
       return rc;
    }
    
+   // lookup sysfs
    rc = vdev_linux_find_sysfs_mountpoint( ctx->sysfs_mountpoint, PATH_MAX );
    if( rc != 0 ) {
       
       vdev_error("vdev_linux_find_sysfs_mountpoint rc = %d\n", rc );
-      
-      close( ctx->pfd.fd );
-      return rc;
-   }
-      
-   ctx->running = true;
-   rc = pthread_create( &ctx->thread, &attrs, vdev_linux_uevent_thread_main, ctx );
-   
-   if( rc != 0 ) {
-      
-      rc = -errno;
-      vdev_error("pthread_create rc = %d\n", rc );
       
       close( ctx->pfd.fd );
       return rc;
@@ -408,13 +479,25 @@ static int vdev_linux_context_init( struct vdev_state* state, struct vdev_linux_
 }
 
 
+// start up 
+int vdev_linux_context_start( struct vdev_linux_context* ctx ) {
+   
+   int rc = 0;
+   
+   // seed initial requests from sysfs
+   rc = vdev_linux_seed_requests_from_sysfs( ctx );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_linux_seed_requests_from_sysfs rc = %d\n", rc );
+      return rc;
+   }
+   
+   return 0;
+}
+
+
 // stop listening 
 static int vdev_linux_context_shutdown( struct vdev_linux_context* ctx ) {
-   
-   // cancel and join with the listener
-   ctx->running = false;
-   pthread_cancel( ctx->thread );
-   pthread_join( ctx->thread, NULL );
    
    // shut down 
    close( ctx->pfd.fd );
@@ -457,7 +540,7 @@ static int vdev_linux_load_firmware( struct vdev_linux_context* ctx, char const*
    ssize_t nr = 0;
    
    // build firmware path
-   fskit_fullpath( ctx->state->config->firmware_dir, firmware_name, fw_path );
+   fskit_fullpath( ctx->os_ctx->state->config->firmware_dir, firmware_name, fw_path );
    
    // build sysfs firmware output path
    fskit_fullpath( ctx->sysfs_mountpoint, devpath, sysfs_fw_path );
@@ -562,8 +645,9 @@ static int vdev_linux_load_firmware( struct vdev_linux_context* ctx, char const*
 }
 
 
-// set up Linux-specific vdev state
-int vdev_os_init( struct vdev_state* state, void** cls ) {
+// set up Linux-specific vdev state.
+// this is early initialization, so don't start anything yet
+int vdev_os_init( struct vdev_os_context* os_ctx, void** cls ) {
    
    int rc = 0;
    struct vdev_linux_context* ctx = NULL;
@@ -573,7 +657,7 @@ int vdev_os_init( struct vdev_state* state, void** cls ) {
       return -ENOMEM;
    }
    
-   rc = vdev_linux_context_init( state, ctx );
+   rc = vdev_linux_context_init( os_ctx, ctx );
    if( rc != 0 ) {
       
       free( ctx );
@@ -584,6 +668,21 @@ int vdev_os_init( struct vdev_state* state, void** cls ) {
    return 0;
 }
 
+// late initialization.
+// start feeding device notifications, since the vdev work queue and FUSE will be ready to take them
+int vdev_os_start( void* cls ) {
+   
+   struct vdev_linux_context* ctx = (struct vdev_linux_context*)cls;
+   
+   return vdev_linux_context_start( ctx );
+}
+
+
+// stop feeding device notifications (no-op)
+int vdev_os_stop( void* cls ) {
+   // no-op
+   return 0;
+}
 
 // shut down Linux-specific vdev state 
 int vdev_os_shutdown( void* cls ) {
@@ -596,85 +695,5 @@ int vdev_os_shutdown( void* cls ) {
    return 0;
 }
 
-
-// add a device
-// return 0 on success
-// return negative on error 
-int vdev_os_add_device( struct vdev_device_request* request, void* cls ) {
-   
-   int rc = 0;
-   struct vdev_linux_context* ctx = (struct vdev_linux_context*)cls;
-   
-   // TODO 
-   
-   return rc;
-}
-
-// remove a device 
-// return 0 on success
-// return negative on error 
-int vdev_os_remove_device( struct vdev_device_request* request, void* cls ) {
-   
-   int rc = 0;
-   struct vdev_linux_context* ctx = (struct vdev_linux_context*)cls;
-   
-   // TODO 
-   
-   return rc;
-}
-
-
-// change a device 
-// return 0 on success
-// return negative on error 
-int vdev_os_change_device( struct vdev_device_request* request, void* cls ) {
-   
-   int rc = 0;
-   struct vdev_linux_context* ctx = (struct vdev_linux_context*)cls;
-   
-   // TODO 
-   
-   return rc;
-}
-
-
-// move a device 
-// return 0 on success
-// return negative on error 
-int vdev_os_move_device( struct vdev_device_request* request, void* cls )  {
-   
-   int rc = 0;
-   struct vdev_linux_context* ctx = (struct vdev_linux_context*)cls;
-   
-   // TODO 
-   
-   return rc;
-}
-
-// put a device online
-// return 0 on success
-// return negative on error 
-int vdev_os_online_device( struct vdev_device_request* request, void* cls )  {
-   
-   int rc = 0;
-   struct vdev_linux_context* ctx = (struct vdev_linux_context*)cls;
-   
-   // TODO 
-   
-   return rc;
-}
-
-// put a device offline 
-// return 0 on success
-// return negative on error 
-int vdev_os_offline_device( struct vdev_device_request* request, void* cls ) {
-   
-   int rc = 0;
-   struct vdev_linux_context* ctx = (struct vdev_linux_context*)cls;
-   
-   // TODO 
-   
-   return rc;
-}
 
 #endif
