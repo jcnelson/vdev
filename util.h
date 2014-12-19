@@ -58,6 +58,9 @@
 #include <math.h>
 #include <sys/mman.h>
 
+#include "fskit/fskit.h"
+#include "pstat/libpstat.h"
+
 #define WHERESTR "%05d:%05d: [%16s:%04u] %s: "
 #define WHEREARG (int)getpid(), (int)vdev_os_gettid(), __FILE__, __LINE__, __func__
 
@@ -70,15 +73,15 @@ extern int _ERROR_MESSAGES;
 #define VDEV_CALLOC(type, count) (type*)calloc( sizeof(type) * (count), 1 )
 #define VDEV_FREE_LIST(list) do { if( (list) != NULL ) { for(unsigned int __i = 0; (list)[__i] != NULL; ++ __i) { if( (list)[__i] != NULL ) { free( (list)[__i] ); (list)[__i] = NULL; }} free( (list) ); } } while(0)
 #define VDEV_SIZE_LIST(sz, list) for( *(sz) = 0; (list)[*(sz)] != NULL; ++ *(sz) );
-#define VDEV_VECTOR_TO_LIST(ret, vec, type) do { ret = CALLOC_LIST(type, ((vec).size() + 1)); for( vector<type>::size_type __i = 0; __i < (vec).size(); ++ __i ) ret[__i] = (vec).at(__i); } while(0)
 #define VDEV_COPY_LIST(dst, src, duper) do { for( unsigned int __i = 0; (src)[__i] != NULL; ++ __i ) { (dst)[__i] = duper((src)[__i]); } } while(0)
-#define VDEV_DUP_LIST(type, dst, src, duper) do { unsigned int sz = 0; SIZE_LIST( &sz, src ); dst = CALLOC_LIST( type, sz + 1 ); COPY_LIST( dst, src, duper ); } while(0)
 
 #define vdev_strdup_or_null( str )  (str) != NULL ? strdup(str) : NULL
 
 #ifndef MAX
 #define MAX(x,y) ((x) > (y) ? (x) : (y))
 #endif
+
+typedef int (*vdev_dirent_loader_t)( char const*, void* );
 
 extern "C" {
 
@@ -89,10 +92,13 @@ int vdev_get_debug_level();
 int vdev_get_error_level();
 
 // shell functions 
-int vdev_subprocess( char const* cmd, char** output, size_t max_output );
+int vdev_subprocess( char const* cmd, char** output, size_t max_output, int* exit_status );
 
 // I/O functions 
 ssize_t vdev_write_uninterrupted( int fd, char const* buf, size_t len );
+
+// directory I/O
+int vdev_load_all( char const* dir_path, vdev_dirent_loader_t loader, void* cls );
 
 }
 

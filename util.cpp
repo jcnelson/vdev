@@ -48,17 +48,20 @@ int vdev_get_error_level() {
 // return 0 on success
 // return 1 on truncate 
 // return negative on error
-int vdev_subprocess( char const* cmd, char** output, size_t max_output ) {
+// set the subprocess exit status in *exit_status
+int vdev_subprocess( char const* cmd, char** output, size_t max_output, int* exit_status ) {
    
    FILE* pipe = NULL;
    int rc = 0;
    
    // read up to max_output
-   if( *output == NULL ) {
-      
-      *output = VDEV_CALLOC( char, max_output );
-      if( *output == NULL ) {
-         return -ENOMEM;
+   if( output != NULL ) {
+      if( *output == NULL && max_output > 0 ) {
+         
+         *output = VDEV_CALLOC( char, max_output );
+         if( *output == NULL ) {
+            return -ENOMEM;
+         }
       }
    }
    
@@ -68,8 +71,10 @@ int vdev_subprocess( char const* cmd, char** output, size_t max_output ) {
       rc = -errno;
       vdev_error("popen(%s) rc = %d\n", cmd, rc );
       
-      free( *output );
-      *output = NULL;
+      if( output != NULL && *output != NULL ) {
+         free( *output );
+         *output = NULL;
+      }
       
       return rc;
    }
@@ -83,13 +88,23 @@ int vdev_subprocess( char const* cmd, char** output, size_t max_output ) {
       
       size_t nr = 0;
       size_t len = 4096;
+      char static_buf[4096];
+      char* buf = NULL;
+      
+      if( output != NULL && *output != NULL ) {
+         buf = *output;
+      }
+      else {
+         // dummy output 
+         buf = static_buf;
+      }
       
       if( num_read + len >= max_output ) {
          // truncate
          len = max_output - num_read;
       }
       
-      nr = fread( pipe, 1, len, pipe );
+      nr = fread( buf, 1, len, pipe );
       
       num_read += nr;
       
@@ -115,13 +130,16 @@ int vdev_subprocess( char const* cmd, char** output, size_t max_output ) {
       truncate = true;
    }
    
-   fclose( pipe );
+   *exit_status = pclose( pipe );
    
    if( rc != 0 ) {
       
       // clean up 
-      free( *output );
-      *output = NULL;
+      if( output != NULL && *output != NULL ) {
+         free( *output );
+         *output = NULL;
+      }
+      
       return rc;
    }
    else {
@@ -133,6 +151,7 @@ int vdev_subprocess( char const* cmd, char** output, size_t max_output ) {
       }
    }
 }
+
 
 // write, but mask EINTR
 ssize_t vdev_write_uninterrupted( int fd, char const* buf, size_t len ) {
@@ -159,3 +178,63 @@ ssize_t vdev_write_uninterrupted( int fd, char const* buf, size_t len ) {
    return num_written;
 }
 
+
+// free a list of dirents 
+static void vdev_dirents_free( struct dirent** dirents, int num_entries ) {
+   
+   for( int i = 0; i < num_entries; i++ ) {
+      
+      if( dirents[i] == NULL ) {
+         continue;
+      }
+      
+      free( dirents[i] );
+      dirents[i] = NULL;
+   }
+   
+   free( dirents );
+}
+
+// process everything in a directory
+// return 0 on success, negative on error
+int vdev_load_all( char const* dir_path, vdev_dirent_loader_t loader, void* cls ) {
+   
+   struct dirent** dirents = NULL;
+   int num_entries = 0;
+   int rc = 0;
+   
+   num_entries = scandir( dir_path, &dirents, NULL, alphasort );
+   if( num_entries < 0 ) {
+      
+      vdev_error("scandir(%s) rc = %d\n", dir_path, num_entries );
+      return num_entries;
+   }
+   
+   for( int i = 0; i < num_entries; i++ ) {
+      
+      // full path...
+      char* fp = fskit_fullpath( dir_path, dirents[i]->d_name, NULL );
+      if( fp == NULL ) {
+         
+         vdev_dirents_free( dirents, num_entries );
+         return -ENOMEM;
+      }
+      
+      // process this 
+      rc = (*loader)( fp, cls );
+      if( rc != 0 ) {
+         
+         vdev_error("loader(%s) rc = %d\n", fp, rc );
+         
+         free( fp );
+         vdev_dirents_free( dirents, num_entries );
+         return rc;
+      }
+      
+      free( fp );
+   }
+   
+   vdev_dirents_free( dirents, num_entries );
+   
+   return 0;
+}
