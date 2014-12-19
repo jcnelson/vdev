@@ -21,20 +21,22 @@
 
 #include "util.h"
 
+#include <map>
+using namespace std;
+
 #define VDEV_NAME_MAX 256
 
 // device request type 
 enum vdev_device_request_t {
    VDEV_DEVICE_INVALID = 0,             // invalid request
    VDEV_DEVICE_ADD,
-   VDEV_DEVICE_CHANGE,
    VDEV_DEVICE_REMOVE,   
-   VDEV_DEVICE_MOVE,
-   VDEV_DEVICE_ONLINE,
-   VDEV_DEVICE_OFFLINE
+   VDEV_DEVICE_ANY                      // only useful for actions
 };
 
 typedef map<string, string> vdev_device_params_t;
+
+struct vdev_state;
 
 // device request 
 struct vdev_device_request {
@@ -42,18 +44,33 @@ struct vdev_device_request {
    // type of request (always initialized)
    vdev_device_request_t type;
    
+   // path to the device node 
+   char* path;
+   
+   // device information, for mknod (can't be 0)
+   dev_t dev;
+   
    // OS-specific driver parameters 
    vdev_device_params_t* params;
+   
+   // reference to vdev state, so we can call other methods when working
+   struct vdev_state* state;
 };
 
+
 extern "C" {
- 
-int vdev_device_request_init( struct vdev_device_request* req, vdev_device_request_t type );
+
+// memory management
+int vdev_device_request_init( struct vdev_device_request* req, struct vdev_state* state, vdev_device_request_t type, char const* path );
 int vdev_device_request_free( struct vdev_device_request* req );
 
-int vdev_device_request_set_type( struct vdev_device_request* req, vdev_device_request_t req_type ) ;
+// setters for device requests (so the OS can build one up)
+int vdev_device_request_set_type( struct vdev_device_request* req, vdev_device_request_t req_type );
+int vdev_device_request_set_dev( struct vdev_device_request* req, dev_t dev );
+int vdev_device_request_set_path( struct vdev_device_request* req, char const* path );
 int vdev_device_request_add_param( struct vdev_device_request* req, char const* key, char const* value );
 
+// add a device request
 int vdev_device_request_add( struct fskit_wq* wq, struct vdev_device_request* req );
 
 }
