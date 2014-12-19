@@ -23,6 +23,7 @@
 
 #include "ini.h"
 #include "vdev.h"
+#include "match.h"
 
 // parse an unsigned 64-bit number 
 static uint64_t vdev_parse_uint64( char const* uint64_str, bool* success ) {
@@ -329,39 +330,6 @@ static int vdev_acl_parse_mode( mode_t* mode, char const* mode_str ) {
 }
 
 
-// parse a regex and append it to a list of regexes and strings
-static int vdev_acl_append_regex( char*** strings, regex_t** regexes, size_t len, char const* next ) {
-   
-   // verify that this is a valid regex 
-   regex_t reg;
-   int rc = 0;
-   
-   rc = regcomp( &reg, next, REG_EXTENDED | REG_NEWLINE );
-   if( rc != 0 ) {
-      
-      vdev_error("regcomp(%s) rc = %d\n", next, rc );
-      return -EINVAL;
-   }
-   
-   char** new_strings = (char**)realloc( *strings, sizeof(char**) * (len + 2) );
-   regex_t* new_regexes = (regex_t*)realloc( *regexes, sizeof(regex_t) * (len + 1) );
-   
-   if( new_strings == NULL || new_regexes == NULL ) {
-      return -ENOMEM;
-   }
-   
-   new_strings[len] = vdev_strdup_or_null( next );
-   new_strings[len + 1] = NULL;
-   
-   new_regexes[len] = reg;
-   
-   *strings = new_strings;
-   *regexes = new_regexes;
-   
-   return 0;
-}
-
-
 // convert a printable sha256 to a binary sha256 of length SHA256_DIGEST_LENGTH
 // return 0 on success and fill in *sha256_bin to point to an allocated buffer
 // return negative on error
@@ -408,6 +376,8 @@ static int vdev_sha256_to_bin( char const* sha256_printable, unsigned char** sha
 
 
 // callback from inih to parse an acl 
+// return 1 on success
+// return 0 on failure
 static int vdev_acl_ini_parser( void* userdata, char const* section, char const* name, char const* value ) {
    
    struct vdev_acl* acl = (struct vdev_acl*)userdata;
@@ -510,13 +480,13 @@ static int vdev_acl_ini_parser( void* userdata, char const* section, char const*
       return 1;
    }
    
-   if( strcmp(name, VDEV_ACL_NAME_PROC_PATH ) == 0 ) {
+   if( strcmp(name, VDEV_ACL_DEVICE_REGEX ) == 0 ) {
       
       // parse and preserve this value 
-      int rc = vdev_acl_append_regex( &acl->paths, &acl->regexes, acl->num_paths, value );
+      int rc = vdev_match_regex_append( &acl->paths, &acl->regexes, acl->num_paths, value );
       
       if( rc != 0 ) {
-         vdev_error("vdev_acl_append_regex(%s) rc = %d\n", value, rc );
+         vdev_error("vdev_match_regex_append(%s) rc = %d\n", value, rc );
          
          fprintf(stderr, "Invalid regex '%s'\n", value );
          return 0;
@@ -535,7 +505,8 @@ static int vdev_acl_ini_parser( void* userdata, char const* section, char const*
          return 0;
       }
       
-      acl->proc_path = strdup(value);
+      acl->has_proc = true;
+      acl->proc_path = vdev_strdup_or_null(value);
       return 1;
    }
    
@@ -555,6 +526,8 @@ static int vdev_acl_ini_parser( void* userdata, char const* section, char const*
          return 0;
       }
       
+      acl->has_proc = true;
+      
       return 1;
    }
    
@@ -567,7 +540,26 @@ static int vdev_acl_ini_parser( void* userdata, char const* section, char const*
          return 0;
       }
       
-      acl->proc_pidlist_cmd = strdup(value);
+      acl->has_proc = true;
+      acl->proc_pidlist_cmd = vdev_strdup_or_null(value);
+      return 1;
+   }
+   
+   if( strcmp(name, VDEV_ACL_NAME_PROC_INODE ) == 0 ) {
+      
+      // preserve this value 
+      ino_t inode = 0;
+      bool success = false;
+      
+      inode = vdev_parse_uint64( value, &success );
+      if( !success ) {
+         
+         fprintf(stderr, "Failed to parse inode '%s'\n", value );
+         return 0;
+      }
+      
+      acl->has_proc = true;
+      acl->proc_inode = inode;
       return 1;
    }
    
@@ -576,48 +568,61 @@ static int vdev_acl_ini_parser( void* userdata, char const* section, char const*
 }
 
 
+// acl sanity check 
+int vdev_acl_sanity_check( struct vdev_acl* acl ) {
+   
+   int rc = 0;
+   
+   if( acl->has_gid ) {
+      
+      rc = vdev_acl_validate_gid( acl->gid );
+      if( rc != 0 ) {
+         
+         return rc;
+      }
+   }
+   
+   if( acl->has_setgid ) {
+      
+      rc = vdev_acl_validate_gid( acl->gid );
+      if( rc != 0 ) {
+         
+         return rc;
+      }
+   }
+   
+   if( acl->has_uid ) {
+      
+      rc = vdev_acl_validate_uid( acl->uid );
+      if( rc != 0 ) {
+         
+         return rc;
+      }
+   }
+   
+   if( acl->has_setuid ) {
+      
+      rc = vdev_acl_validate_uid( acl->uid );
+      if( rc != 0 ) {
+         
+         return rc;
+      }
+   }
+   
+   return rc;
+}
+
 // initialize an acl 
 int vdev_acl_init( struct vdev_acl* acl ) {
    memset( acl, 0, sizeof(struct vdev_acl) );
    return 0;
 }
 
-// free regex-related data 
-static int vdev_acl_regexes_free( char** regex_strs, regex_t* regexes, size_t len ) {
-   
-   if( regex_strs != NULL || regexes != NULL ) {
-      
-      for( unsigned int i = 0; i < len; i++ ) {
-         
-         if( regex_strs != NULL && regex_strs[i] != NULL ) {
-            
-            free( regex_strs[i] );
-            regex_strs[i] = NULL;
-         }
-         
-         if( regexes != NULL ) {
-            regfree( &regexes[i] );
-         }
-      }
-      
-      if( regex_strs != NULL ) {
-         
-         free( regex_strs );
-      }
-      
-      if( regexes != NULL ) {
-         
-         free( regexes );
-      }
-   }
-   
-   return 0;
-}
 
 // free an acl 
 int vdev_acl_free( struct vdev_acl* acl ) {
    
-   vdev_acl_regexes_free( acl->paths, acl->regexes, acl->num_paths );
+   vdev_match_regexes_free( acl->paths, acl->regexes, acl->num_paths );
    
    if( acl->proc_path != NULL ) {
       free( acl->proc_path );
@@ -642,7 +647,7 @@ int vdev_acl_load_file( FILE* file, struct vdev_acl* acl ) {
    
    rc = ini_parse_file( file, vdev_acl_ini_parser, acl );
    if( rc != 0 ) {
-      vdev_error("ini_parse_file rc = %d\n", rc );
+      vdev_error("ini_parse_file(ACL) rc = %d\n", rc );
    }
    
    return rc;
@@ -674,173 +679,124 @@ int vdev_acl_load( char const* path, struct vdev_acl* acl ) {
    return rc;
 }
 
-// free a list of dirents 
-static void vdev_acl_dirents_free( struct dirent** dirents, int num_entries ) {
-   
-   for( int i = 0; i < num_entries; i++ ) {
-      
-      if( dirents[i] == NULL ) {
-         continue;
-      }
-      
-      free( dirents[i] );
-      dirents[i] = NULL;
-   }
-   
-   free( dirents );
-}
 
 // free a vector of acls
-static void vdev_acl_free_vector( vector<struct vdev_acl*>* acls ) {
+static void vdev_acl_free_vector( vector<struct vdev_acl>* acls ) {
    
    for( unsigned int i = 0; i < acls->size(); i++ ) {
       
-      if( acls->at(i) != NULL ) {
-         
-         vdev_acl_free( acls->at(i) );
-      }
+      vdev_acl_free( &acls->at(i) );
    }
    
    acls->clear();
 }
 
 // free a C-style list of acls (including the list itself)
-void vdev_acl_free_all( struct vdev_acl* acl_list, size_t num_acls ) {
+int vdev_acl_free_all( struct vdev_acl* acl_list, size_t num_acls ) {
+   
+   int rc = 0;
    
    for( unsigned int i = 0; i < num_acls; i++ ) {
       
-      vdev_acl_free( &acl_list[i] );
+      rc = vdev_acl_free( &acl_list[i] );
+      if( rc != 0 ) {
+         
+         return rc;
+      }
    }
    
    free( acl_list );
+   
+   return rc;
 }
 
 
-// load all ACLs from a directory, in lexographic order 
-// return 0 on success, negative on error
-int vdev_acl_load_all( char const* dir_path, vdev_acl_list_t* ret_acls ) {
+// loader for an acl 
+int vdev_acl_loader( char const* fp, void* cls ) {
    
-   struct dirent** dirents = NULL;
-   int num_entries = 0;
+   struct vdev_acl acl;
    int rc = 0;
    
-   num_entries = scandir( dir_path, &dirents, NULL, alphasort );
-   if( num_entries < 0 ) {
+   vector<struct vdev_acl>* acls = (vector<struct vdev_acl>*)cls;
+
+   memset( &acl, 0, sizeof(struct vdev_acl) );
+   
+   rc = vdev_acl_load( fp, &acl );
+   if( rc != 0 ) {
       
-      vdev_error("scandir(%s) rc = %d\n", dir_path, num_entries );
-      return num_entries;
+      vdev_error("vdev_acl_load(%s) rc = %d\n", fp, rc );
+      return rc;
    }
    
-   vector<struct vdev_acl*> acls;
-   
-   for( int i = 0; i < num_entries; i++ ) {
+   // sanity check 
+   rc = vdev_acl_sanity_check( &acl );
+   if( rc != 0 ) {
       
-      // full path...
-      char* fp = fskit_fullpath( dir_path, dirents[i]->d_name, NULL );
-      if( fp == NULL ) {
-         
-         vdev_acl_dirents_free( dirents, num_entries );
-         return -ENOMEM;
-      }
-      
-      // load this acl 
-      struct vdev_acl* acl = VDEV_CALLOC( struct vdev_acl, 1 );
-      if( acl == NULL ) {
-         
-         free( fp );
-         vdev_acl_dirents_free( dirents, num_entries );
-         vdev_acl_free_vector( &acls );
-         return -ENOMEM;
-      }
-      
-      rc = vdev_acl_load( fp, acl );
-      if( rc != 0 ) {
-         
-         vdev_error("vdev_acl_load(%s) rc = %d\n", fp, rc );
-         
-         free( fp );
-         vdev_acl_dirents_free( dirents, num_entries );
-         vdev_acl_free_vector( &acls );
-         return rc;
-      }
-      
-      // save this acl 
-      try {
-         acls.push_back( acl );
-      }
-      catch( bad_alloc& ba ) {
-         
-         free( fp );
-         vdev_acl_dirents_free( dirents, num_entries );
-         vdev_acl_free_vector( &acls );
-         return -ENOMEM;
-      }
-      
-      free( fp );
+      vdev_error("vdev_acl_sanity_check(%s) rc = %d\n", fp, rc );
+      return rc;
    }
    
-   vdev_acl_dirents_free( dirents, num_entries );
+   // save this acl 
+   try {
+      acls->push_back( acl );
+   }
+   catch( bad_alloc& ba ) {
+      
+      return -ENOMEM;
+   }
    
-   // extract values
-   ret_acls->swap( acls );
+   return 0;
+}
+
+// load all ACLs from a directory, in lexographic order 
+// return 0 on success, negative on error
+int vdev_acl_load_all( char const* dir_path, struct vdev_acl** ret_acls, size_t* ret_num_acls ) {
+   
+   int rc = 0;
+   vector<struct vdev_acl> acls;
+   
+   rc = vdev_load_all( dir_path, vdev_acl_loader, &acls );
+   
+   if( rc != 0 ) {
+      
+      vdev_acl_free_vector( &acls );
+      return rc;
+   }
+   else {
+         
+      if( acls.size() == 0 ) {
+         
+         // nothing 
+         *ret_acls = NULL;
+         *ret_num_acls = 0;
+      }
+      else {
+      
+         // extract values
+         struct vdev_acl* acl_list = VDEV_CALLOC( struct vdev_acl, acls.size() );
+         if( acl_list == NULL ) {
+            
+            vdev_acl_free_vector( &acls );
+            return -ENOMEM;   
+         }
+         
+         // NOTE: vectors are contiguous in memory 
+         memcpy( acl_list, &acls[0], sizeof(struct vdev_acl) * acls.size() );
+         
+         *ret_acls = acl_list;
+         *ret_num_acls = acls.size();
+      }
+   }
    
    return 0;
 }
 
 
-// does a path match a regex?
-// return 1 if so, 0 if not, negative on error 
-int vdev_acl_regex_match( char const* path, regex_t* regex ) {
-   
-   regmatch_t matches[1];
-   int rc = 0;
-   
-   rc = regexec( regex, path, 1, matches, REG_EXTENDED | REG_NEWLINE );
-   
-   if( rc != 0 ) {
-      if( rc == REG_NOMATCH ) {
-         
-         // no match 
-         return 0;
-      }
-      else {
-         vdev_error("regexec(%s) rc = %d\n", path, rc );
-         return -abs(rc);
-      }
-   }
-   
-   // match!
-   return 1;
-}
-
-// does a path match any regexes in a list?
-// return the index of the match if so (>= 0)
-// return the size if not
-// return negative on error
-int vdev_acl_regex_match_any( char const* path, regex_t* regexes, size_t num_regexes ) {
-   
-   int matched = 0;
-   
-   for( unsigned int i = 0; i < num_regexes; i++ ) {
-      
-      matched = vdev_acl_regex_match( path, &regexes[i] );
-      if( matched > 0 ) {
-         return i;
-      }
-      else if( matched < 0 ) {
-         vdev_error("vdev_acl_regex_match(%s) rc = %d\n", path, matched );
-         return matched;
-      }
-   }
-   
-   return num_regexes;
-}
-
 // given a list of access control lists, find the index of the first one that applies to the given path 
 // return >= 0 with the index
 // return num_acls if not found
 // return negative on error
-int vdev_acl_find_in_list( char const* path, struct vdev_acl** acls, size_t num_acls ) {
+int vdev_acl_find_next( char const* path, struct vdev_acl* acls, size_t num_acls ) {
    
    int matched = 0;
    bool found = false;
@@ -848,15 +804,15 @@ int vdev_acl_find_in_list( char const* path, struct vdev_acl** acls, size_t num_
    
    for( unsigned int i = 0; i < num_acls; i++ ) {
       
-      matched = vdev_acl_regex_match_any( path, acls[i]->regexes, acls[i]->num_paths );
+      matched = vdev_match_first_regex( path, acls[i].regexes, acls[i].num_paths );
       
-      if( matched >= (signed)acls[i]->num_paths ) {
+      if( matched >= (signed)acls[i].num_paths ) {
          // no match
          continue;
       }
       
       if( matched < 0 ) {
-         vdev_error("vdev_acl_regex_match_any(%s) rc = %d\n", path );
+         vdev_error("vdev_match_first_regex(%s) rc = %d\n", path );
          return matched;
       }
       
@@ -878,8 +834,8 @@ int vdev_acl_find_in_list( char const* path, struct vdev_acl** acls, size_t num_
    }
 }
 
-// modify a stat buffer to apply a user access control list
-int vdev_acl_set_user( char const* path, struct vdev_acl* acl, uid_t caller_uid, struct stat* sb ) {
+// modify a stat buffer to apply a user access control list, if the acl says so
+int vdev_acl_do_set_user( struct vdev_acl* acl, uid_t caller_uid, struct stat* sb ) {
    
    if( acl->has_setuid && acl->has_uid ) {
       
@@ -893,7 +849,7 @@ int vdev_acl_set_user( char const* path, struct vdev_acl* acl, uid_t caller_uid,
 }
 
 // modify a stat buffer to apply a group access control list 
-int vdev_acl_set_group( char const* path, struct vdev_acl* acl, gid_t caller_gid, struct stat* sb ) {
+int vdev_acl_do_set_group( struct vdev_acl* acl, gid_t caller_gid, struct stat* sb ) {
    
    if( acl->has_setgid && acl->has_gid ) {
       
@@ -907,7 +863,7 @@ int vdev_acl_set_group( char const* path, struct vdev_acl* acl, gid_t caller_gid
 }
 
 // modify a stat buffer to apply the mode
-int vdev_acl_set_mode( char const* path, struct vdev_acl* acl, struct stat* sb ) {
+int vdev_acl_do_set_mode( struct vdev_acl* acl, struct stat* sb ) {
    
    if( acl->has_setmode ) {
       
@@ -983,35 +939,24 @@ int vdev_parse_pids( char const* pid_list_str, size_t pid_list_len, pid_t** pids
    return 0;
 }
 
-
 // check that the caller PID is matched by the given ACL.
 // every process match criterion must be satisfied.
 // return 1 if all ACL criteria match
 // return 0 if at least one ACL criterion does not match 
 // return negative on error
-int vdev_acl_match_process( struct vdev_acl* acl, pid_t caller_pid ) {
+int vdev_acl_match_process( struct vdev_acl* acl, struct pstat* ps ) {
    
    int rc = 0;
-   int flags = 0;
    
-   struct pstat ps;
+   if( !acl->has_proc ) {
+      // applies to anyone 
+      return 1;
+   }
    
    if( acl->proc_path != NULL || acl->proc_sha256 != NULL || acl->has_proc_inode ) {
-         
-      // filter on the PID's SHA256?
-      if( acl->proc_sha256 != NULL ) {
-         flags |= PSTAT_HASH;
-      }
-      
-      rc = pstat( caller_pid, &ps, flags );
-      
-      if( rc != 0 ) {
-         vdev_error("pstat(%d) rc = %d\n", caller_pid, rc );
-         return rc;
-      }
       
       if( acl->proc_path != NULL ) {
-         if( strcmp( acl->proc_path, ps.path ) != 0 ) {
+         if( strcmp( acl->proc_path, ps->path ) != 0 ) {
             
             // doesn't match 
             return 0;
@@ -1019,7 +964,23 @@ int vdev_acl_match_process( struct vdev_acl* acl, pid_t caller_pid ) {
       }
       
       if( acl->proc_sha256 != NULL ) {
-         if( memcmp( acl->proc_sha256, ps.sha256, SHA256_DIGEST_LENGTH ) != 0 ) {
+         
+         // do we need to get the SHA256?
+         unsigned char blank_sha256[SHA256_DIGEST_LENGTH];
+         memset( blank_sha256, 0, SHA256_DIGEST_LENGTH );
+         
+         if( memcmp( blank_sha256, ps->sha256, SHA256_DIGEST_LENGTH ) == 0 ) {
+            
+            // we don't have the hash.  Go get it
+            rc = pstat_sha256( ps );
+            if( rc != 0 ) {
+               
+               vdev_error("Failed to SHA256 the process binary for %d, rc = %d\n", ps->pid, rc );
+               return rc;
+            }
+         }
+         
+         if( memcmp( acl->proc_sha256, ps->sha256, SHA256_DIGEST_LENGTH ) != 0 ) {
             
             // doesn't match 
             return 0;
@@ -1027,7 +988,7 @@ int vdev_acl_match_process( struct vdev_acl* acl, pid_t caller_pid ) {
       }
       
       if( acl->has_proc_inode ) {
-         if( acl->proc_inode != ps.bin_stat.st_ino ) {
+         if( acl->proc_inode != ps->bin_stat.st_ino ) {
             
             // doesn't match 
             return 0;
@@ -1043,14 +1004,21 @@ int vdev_acl_match_process( struct vdev_acl* acl, pid_t caller_pid ) {
       size_t pid_list_maxlen = VDEV_ACL_PROC_BUFLEN;
       pid_t* pids = NULL;
       int num_pids = 0;
+      int exit_status = 0;
       bool found = false;
       
-      rc = vdev_subprocess( acl->proc_pidlist_cmd, &pid_list_str, pid_list_maxlen );
+      rc = vdev_subprocess( acl->proc_pidlist_cmd, &pid_list_str, pid_list_maxlen, &exit_status );
       
       if( rc != 0 ) {
          
          vdev_error("vdev_subprocess(%s) rc = %d\n", acl->proc_pidlist_cmd, rc );
          return rc;
+      }
+      
+      if( exit_status != 0 ) {
+         
+         vdev_error("vdev_subprocess(%s) exit status %d\n", acl->proc_pidlist_cmd, exit_status );
+         return -EPERM;
       }
       
       // lex the pids
@@ -1067,7 +1035,7 @@ int vdev_acl_match_process( struct vdev_acl* acl, pid_t caller_pid ) {
       // is the caller in the list?
       for( int i = 0; i < num_pids; i++ ) {
          
-         if( caller_pid == pids[i] ) {
+         if( ps->pid == pids[i] ) {
             found = true;
             break;
          }
@@ -1086,29 +1054,82 @@ int vdev_acl_match_process( struct vdev_acl* acl, pid_t caller_pid ) {
 }
 
 
-// see if the given caller matches the ACL
-// return 1 if matched
-// return 0 if not matched
-// return negative on error 
-int vdev_acl_match( char const* path, struct vdev_acl* acl, uid_t caller_t, gid_t caller_gid, pid_t caller_pid ) {
+// apply the acl to the stat buf, filtering on caller uid, gid, and process information
+int vdev_acl_apply( struct vdev_acl* acl, struct pstat* caller_proc, uid_t caller_uid, gid_t caller_gid, struct stat* sb ) {
    
-   // TODO 
+   int rc = 0;
+   
+   // does this apply to our process?
+   rc = vdev_acl_match_process( acl, caller_proc );
+   if( rc < 0 ) {
+      
+      vdev_error("vdev_acl_match_process(%d) rc = %d\n", caller_proc->pid );
+      return rc;
+   }
+   
+   if( rc > 0 ) {
+      
+      // apply!
+      // set user, group, mode (if given)
+      vdev_acl_do_set_user( acl, caller_uid, sb );
+      vdev_acl_do_set_group( acl, caller_gid, sb );
+      vdev_acl_do_set_mode( acl, sb );
+   }
    
    return 0;
 }
 
-// modify a stat buffer to apply an access control list's effect.
-// path should match one of the given acl's regexes
-// return 0 on success
-// return 1 if the file should be filtered outright 
+
+// go through the list of acls and apply any modifications to the given stat buffer
+// return 1 on success
+// return 0 if there are no matches (i.e. this device node should be hidden)
 // return negative on error 
-int vdev_acl_apply( char const* path, struct vdev_acl* acl, uid_t caller_uid, gid_t caller_gid, pid_t caller_pid, struct stat* sb ) {
+int vdev_acl_apply_all( struct vdev_acl* acls, size_t num_acls, char const* path, struct pstat* caller_proc, uid_t caller_uid, gid_t caller_gid, struct stat* sb ) {
    
    int rc = 0;
-   int matched = 0;
+   int acl_offset = 0;
+   int i = 0;
+   bool found = false;
    
-   // TODO
+   while( acl_offset < (signed)num_acls ) {
+      
+      // find the next acl 
+      rc = vdev_acl_find_next( path, acls + acl_offset, num_acls - acl_offset );
+      
+      if( rc == (signed)(num_acls - acl_offset) ) {
+         
+         // not found 
+         break;
+      }
+      else if( rc < 0 ) {
+         
+         vdev_error("vdev_acl_find_next(%s, offset = %d) rc = %d\n", path, acl_offset, rc );
+         break;
+      }
+      else {
+         
+         // matched! advance offset to next acl
+         i = acl_offset + rc;
+         acl_offset += rc + 1;
+         found = true;
+         
+         // apply the ACL 
+         rc = vdev_acl_apply( &acls[i], caller_proc, caller_uid, caller_gid, sb );
+         if( rc != 0 ) {
+            
+            vdev_error("vdev_acl_apply(%s, offset = %d) rc = %d\n", path, acl_offset, rc );
+            break;
+         }
+      }
+   }
    
+   if( rc == 0 ) {
+      // no error reported 
+      if( found ) {
+         rc = 1;
+      }
+   }
    
    return rc;
 }
+

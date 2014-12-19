@@ -19,9 +19,6 @@
 #ifndef _VDEV_ACL_H_
 #define _VDEV_ACL_H_
 
-#include "fskit/fskit.h"
-#include "pstat/libpstat.h"
-
 #include "util.h"
 
 #include <pwd.h>
@@ -30,7 +27,8 @@
 #include <regex.h>
 #include <dirent.h>
 
-#define VDEV_ACL_NAME                   "vdev-acl"
+// acl fields
+#define VDEV_ACL_NAME                   "acl"
 
 #define VDEV_ACL_NAME_UID               "uid"
 #define VDEV_ACL_NAME_GID               "gid"
@@ -39,12 +37,13 @@
 #define VDEV_ACL_NAME_PROC_SHA256       "sha256"
 #define VDEV_ACL_NAME_PROC_INODE        "inode"
 
+#define VDEV_ACL_DEVICE_REGEX           "devices"
+
 #define VDEV_ACL_NAME_SETUID            "setuid"
 #define VDEV_ACL_NAME_SETGID            "setgid"
 #define VDEV_ACL_NAME_SETMODE           "setmode"
 
 #define VDEV_ACL_PROC_BUFLEN            65536
-
 
 // vdev access control list.
 struct vdev_acl {
@@ -58,6 +57,7 @@ struct vdev_acl {
    gid_t gid;
    
    // process info to match (set at least one; all must match for the ACL to apply)
+   bool has_proc;               // if true, at least one of the following is filled in (and the ACL will only apply if the request is from one of the indicated processes)
    char* proc_path;             // path to the allowed process
    unsigned char* proc_sha256;  // sha256 of the allowed process binary
    char* proc_pidlist_cmd;      // command string to run to get the list of PIDs
@@ -82,11 +82,15 @@ struct vdev_acl {
    size_t num_paths;
 };
 
-typedef vector<struct vdev_acl*> vdev_acl_list_t;
+extern "C" {
 
 int vdev_acl_init( struct vdev_acl* acl );
-int vdev_acl_load( char const* path, struct vdev_acl* acl );
-int vdev_acl_load_file( FILE* file, struct vdev_acl* acl );
+int vdev_acl_load_all( char const* dir_path, struct vdev_acl** ret_acls, size_t* ret_num_acls );
 int vdev_acl_free( struct vdev_acl* acl );
+int vdev_acl_free_all( struct vdev_acl* acl_list, size_t num_acls );
+
+int vdev_acl_apply_all( struct vdev_acl* acls, size_t num_acls, char const* path, struct pstat* caller_proc, uid_t caller_uid, gid_t caller_gid, struct stat* sb );
+
+}
 
 #endif
