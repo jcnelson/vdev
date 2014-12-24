@@ -10,7 +10,7 @@ Project Goals
 * **Portable Architecture**.  Unlike devfs or udev, vdev is designed to be portable across (modern) *nix.  As such, all OS-specific functionality is abstracted out of the core logic, and the core logic makes minimal assumptions about the underlying OS's device API.  In addition, the architecture supports multiple hardware event sources, including non-OS sources (such as another vdev instance, or modifications to an existing /dev tree).
 * **Event-driven**.  Like devfs and udev, vdev leverages the underlying OS's hardware event-notification APIs.  Device nodes appear and disappear as the devices themselves become available or unavailable.
 * **Advanced Access Control**.  Unlike existing systems, vdev filters access to device nodes based on which process is asking, in addition to filtering on user ID, group ID, and mode.  This obviates the need for using setuid/setgid to allow otherwise-unprivileged binaries to access privileged device nodes.  It also obviates the need for a session manager (such as systemd-logind) to mediate access to device nodes.
-* **Container-Friendly**.  vdev runs without modification within containers and jails.  Like devfs, it exposes only the devices the root context wishes the contained process to see.
+* **Container-Friendly**.  vdev runs without modification within containers and jails.  Like devfs, it exposes only the devices the root context wishes the contained process to see.  In addition, it is possible to run multiple instances of vdev concurrently, and alongside devfs or udev.
 
 Project Non-Goals
 -----------------
