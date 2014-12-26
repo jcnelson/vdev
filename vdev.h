@@ -32,8 +32,8 @@
 #include <string>
 #include <set>
 
-#define VDEV_CONFIG_DEFAULT_PATH                "/etc/vdev.conf"
-#define VDEV_CONFIG_DEFAULT_DEBUG_LEVEL         2
+#define VDEV_CONFIG_DEFAULT_PATH                "/etc/vdev.d/vdev.conf"
+#define VDEV_CONFIG_DEFAULT_DEBUG_LEVEL         0
 #define VDEV_CONFIG_DEFAULT_LOGFILE_PATH        NULL
 
 using namespace std;
@@ -41,43 +41,63 @@ using namespace std;
 // global vdev state 
 struct vdev_state {
    
-   // device processing workqueue
-   struct fskit_wq device_wq;
-   
    // configuration 
    struct vdev_config* config;
-   
-   // OS context 
-   struct vdev_os_context* os;
-   
-   // fskit state 
-   struct fskit_fuse_state* fs;
-   
-   // acls 
-   struct vdev_acl* acls;
-   size_t num_acls;
-   
-   // actions 
-   struct vdev_action* acts;
-   size_t num_acts;
-   
-   // pending requests 
-   struct vdev_pending_context* pending;
-   
-   // are we taking events from the OS?
-   bool running;
    
    // arguments 
    int argc;
    char** argv;
+   
+   // mountpoint; replicated from fs->mountpoint for the back-end
+   char* mountpoint;
+   
+   // pipe between the front-end and back-end, for sending over the back-end's copy of the mountpoint
+   int pipe_front;
+   int pipe_back;
+   
+   // fskit state (front-end)
+   struct fskit_fuse_state* fs;
+   
+   // acls (front-end)
+   struct vdev_acl* acls;
+   size_t num_acls;
+   
+   // FUSE arguments (front-end)
+   int fuse_argc;
+   char** fuse_argv;
+   
+   // OS context (back-end)
+   struct vdev_os_context* os;
+   
+   // actions (back-end)
+   struct vdev_action* acts;
+   size_t num_acts;
+   
+   // pending requests (back-end)
+   struct vdev_pending_context* pending;
+   
+   // device processing workqueue (back-end)
+   struct fskit_wq device_wq;
+   
+   // are we taking events from the OS? (back-end)
+   bool running;
 };
 
 
 extern "C" {
 
-int vdev_init( struct vdev_state* vdev, struct fskit_fuse_state* fs, int argc, char** argv );
-int vdev_start( struct vdev_state* state );
-int vdev_stop( struct vdev_state* state );
+int vdev_init( struct vdev_state* vdev, int argc, char** argv );
+int vdev_backend_init( struct vdev_state* vdev );
+int vdev_frontend_init( struct vdev_state* vdev );
+
+int vdev_frontend_send_mount_info( struct vdev_state* state );
+
+int vdev_frontend_main( struct vdev_state* state );
+int vdev_backend_main( struct vdev_state* state );
+
+int vdev_frontend_stop( struct vdev_state* state );
+int vdev_backend_stop( struct vdev_state* state );
+
 int vdev_free( struct vdev_state* state );
 
 int vdev_stat( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct stat* sb );
