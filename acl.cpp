@@ -41,114 +41,6 @@ static uint64_t vdev_parse_uint64( char const* uint64_str, bool* success ) {
    return uid;
 }
 
-// get a passwd struct for a user.
-// on success, fill in pwd and *pwd_buf (the caller must free *pwd_buf, but not pwd).
-// return 0 on success
-static int vdev_get_passwd( char const* username, struct passwd* pwd, char** pwd_buf ) {
-   
-   struct passwd* result = NULL;
-   char* buf = NULL;
-   int buf_len = 0;
-   int rc = 0;
-   
-   memset( pwd, 0, sizeof(struct passwd) );
-   
-   buf_len = sysconf( _SC_GETPW_R_SIZE_MAX );
-   if( buf_len <= 0 ) {
-      buf_len = 65536;
-   }
-   
-   buf = VDEV_CALLOC( char, buf_len );
-   if( buf == NULL ) {
-      return -ENOMEM;
-   }
-   
-   rc = getpwnam_r( username, pwd, buf, buf_len, &result );
-   
-   if( result == NULL ) {
-      
-      if( rc == 0 ) {
-         free( buf );
-         return -ENOENT;
-      }
-      else {
-         rc = -errno;
-         free( buf );
-         
-         vdev_error("getpwnam_r(%s) errno = %d\n", username, rc);
-         return rc;
-      }
-   }
-   
-   // success!
-   return rc;
-}
-
-
-// free up memory returned by vdev_get_passwd
-static int vdev_free_passwd( struct passwd* pwd, char* pwd_buf ) {
-   if( pwd_buf != NULL ) {
-      free( pwd_buf );
-   }
-   
-   memset( pwd, 0, sizeof(struct passwd) );
-   return 0;
-}
-
-
-// get a group struct for a group.
-// on success, fill in grp and *grp_buf (the caller must free *grp_buf, but not grp).
-// return 0 on success
-static int vdev_get_group( char const* groupname, struct group* grp, char** grp_buf ) {
-   
-   struct group* result = NULL;
-   char* buf = NULL;
-   int buf_len = 0;
-   int rc = 0;
-   
-   memset( grp, 0, sizeof(struct group) );
-   
-   buf_len = sysconf( _SC_GETGR_R_SIZE_MAX );
-   if( buf_len <= 0 ) {
-      buf_len = 65536;
-   }
-   
-   buf = VDEV_CALLOC( char, buf_len );
-   if( buf == NULL ) {
-      return -ENOMEM;
-   }
-   
-   rc = getgrnam_r( groupname, grp, buf, buf_len, &result );
-   
-   if( result == NULL ) {
-      
-      if( rc == 0 ) {
-         free( buf );
-         return -ENOENT;
-      }
-      else {
-         rc = -errno;
-         free( buf );
-         
-         vdev_error("getgrnam_r(%s) errno = %d\n", groupname, rc);
-         return rc;
-      }
-   }
-   
-   // success!
-   return rc;
-}
-
-
-// free up memory returned by vdev_get_group
-static int vdev_free_group( struct group* grp, char* grp_buf ) {
-   if( grp_buf != NULL ) {
-      free( grp_buf );
-   }
-   
-   memset( grp, 0, sizeof(struct passwd) );
-   return 0;
-}
 
 // parse a "uid" field.
 // translate a username into a uid, if needed
@@ -178,7 +70,7 @@ static int vdev_acl_parse_uid( char const* uid_str, uid_t* uid ) {
       
       *uid = pwd.pw_uid;
       
-      vdev_free_passwd( &pwd, pwd_buf );
+      free( pwd_buf );
    }
    
    return 0;
@@ -213,7 +105,7 @@ static int vdev_acl_parse_gid( char const* gid_str, gid_t* gid ) {
       
       *gid = grp.gr_gid;
       
-      vdev_free_group( &grp, grp_buf );
+      free( grp_buf );
    }
    
    return 0;
@@ -262,7 +154,7 @@ static int vdev_acl_validate_uid( uid_t uid ) {
       rc = -EINVAL;
    }
    
-   vdev_free_passwd( &pwd, buf );
+   free( buf );
    
    return rc;
 }
@@ -309,7 +201,7 @@ static int vdev_acl_validate_gid( gid_t gid ) {
       rc = -EINVAL;
    }
    
-   vdev_free_group( &grp, buf );
+   free( buf );
    
    return rc;
 }
@@ -483,7 +375,7 @@ static int vdev_acl_ini_parser( void* userdata, char const* section, char const*
    if( strcmp(name, VDEV_ACL_DEVICE_REGEX ) == 0 ) {
       
       // parse and preserve this value 
-      int rc = vdev_match_regex_append( &acl->paths, &acl->regexes, acl->num_paths, value );
+      int rc = vdev_match_regex_append( &acl->paths, &acl->regexes, &acl->num_paths, value );
       
       if( rc != 0 ) {
          vdev_error("vdev_match_regex_append(%s) rc = %d\n", value, rc );
@@ -492,7 +384,6 @@ static int vdev_acl_ini_parser( void* userdata, char const* section, char const*
          return 0;
       }
       
-      acl->num_paths++;
       return 1;
    }
    
@@ -578,6 +469,7 @@ int vdev_acl_sanity_check( struct vdev_acl* acl ) {
       rc = vdev_acl_validate_gid( acl->gid );
       if( rc != 0 ) {
          
+         fprintf(stderr, "Invalid GID %d\n", acl->gid );
          return rc;
       }
    }
@@ -587,6 +479,7 @@ int vdev_acl_sanity_check( struct vdev_acl* acl ) {
       rc = vdev_acl_validate_gid( acl->gid );
       if( rc != 0 ) {
          
+         fprintf(stderr, "Invalid set-GID %d\n", acl->setgid );
          return rc;
       }
    }
@@ -596,6 +489,7 @@ int vdev_acl_sanity_check( struct vdev_acl* acl ) {
       rc = vdev_acl_validate_uid( acl->uid );
       if( rc != 0 ) {
          
+         fprintf(stderr, "Invalid UID %d\n", acl->uid );
          return rc;
       }
    }
@@ -605,8 +499,15 @@ int vdev_acl_sanity_check( struct vdev_acl* acl ) {
       rc = vdev_acl_validate_uid( acl->uid );
       if( rc != 0 ) {
          
+         fprintf(stderr, "Invalid set-UID %d\n", acl->setuid );
          return rc;
       }
+   }
+   
+   if( acl->paths == NULL || acl->regexes == NULL || acl->num_paths == 0 ) {
+      
+      fprintf(stderr, "No paths given.  Please set the 'paths=' option.\n");
+      return -EINVAL;
    }
    
    return rc;
@@ -648,6 +549,18 @@ int vdev_acl_load_file( FILE* file, struct vdev_acl* acl ) {
    rc = ini_parse_file( file, vdev_acl_ini_parser, acl );
    if( rc != 0 ) {
       vdev_error("ini_parse_file(ACL) rc = %d\n", rc );
+      return rc;
+   }
+   
+   // sanity check 
+   rc = vdev_acl_sanity_check( acl );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_acl_sanity_check rc = %d\n", rc );
+      
+      vdev_acl_free( acl );
+      memset( acl, 0, sizeof(struct vdev_acl) );
+      return rc;
    }
    
    return rc;
@@ -716,6 +629,23 @@ int vdev_acl_loader( char const* fp, void* cls ) {
    
    struct vdev_acl acl;
    int rc = 0;
+   struct stat sb;
+   
+   // skip if not a regular file 
+   rc = stat( fp, &sb );
+   if( rc != 0 ) {
+      
+      rc = -errno;
+      vdev_error("stat(%s) rc = %d\n", fp, rc );
+      return rc;
+   }
+   
+   if( !S_ISREG( sb.st_mode ) ) {
+      
+      return 0;
+   }
+   
+   vdev_debug("Load ACL %s\n", fp );
    
    vector<struct vdev_acl>* acls = (vector<struct vdev_acl>*)cls;
 
@@ -725,14 +655,6 @@ int vdev_acl_loader( char const* fp, void* cls ) {
    if( rc != 0 ) {
       
       vdev_error("vdev_acl_load(%s) rc = %d\n", fp, rc );
-      return rc;
-   }
-   
-   // sanity check 
-   rc = vdev_acl_sanity_check( &acl );
-   if( rc != 0 ) {
-      
-      vdev_error("vdev_acl_sanity_check(%s) rc = %d\n", fp, rc );
       return rc;
    }
    

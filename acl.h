@@ -21,14 +21,11 @@
 
 #include "util.h"
 
-#include <pwd.h>
-#include <sys/types.h>
-#include <grp.h>
 #include <regex.h>
 #include <dirent.h>
 
 // acl fields
-#define VDEV_ACL_NAME                   "acl"
+#define VDEV_ACL_NAME                   "vdev-acl"
 
 #define VDEV_ACL_NAME_UID               "uid"
 #define VDEV_ACL_NAME_GID               "gid"
@@ -37,7 +34,7 @@
 #define VDEV_ACL_NAME_PROC_SHA256       "sha256"
 #define VDEV_ACL_NAME_PROC_INODE        "inode"
 
-#define VDEV_ACL_DEVICE_REGEX           "devices"
+#define VDEV_ACL_DEVICE_REGEX           "paths"
 
 #define VDEV_ACL_NAME_SETUID            "setuid"
 #define VDEV_ACL_NAME_SETGID            "setgid"
