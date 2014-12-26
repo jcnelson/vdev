@@ -38,33 +38,37 @@ int vdev_match_regex_init( regex_t* regex, char const* str ) {
 // return 0 on success
 // return -EINVAL if the regex is invalid
 // return -ENOMEM if we're out of memory
-int vdev_match_regex_append( char*** strings, regex_t** regexes, size_t len, char const* next ) {
+int vdev_match_regex_append( char*** strings, regex_t** regexes, size_t* len, char const* next ) {
    
    // verify that this is a valid regex 
    regex_t reg;
    int rc = 0;
    
-   rc = regcomp( &reg, next, REG_EXTENDED | REG_NEWLINE );
+   memset( &reg, 0, sizeof(regex_t) );
+   
+   rc = regcomp( &reg, next, REG_EXTENDED | REG_NEWLINE | REG_NOSUB );
    if( rc != 0 ) {
       
       vdev_error("regcomp(%s) rc = %d\n", next, rc );
       return -EINVAL;
    }
    
-   char** new_strings = (char**)realloc( *strings, sizeof(char**) * (len + 2) );
-   regex_t* new_regexes = (regex_t*)realloc( *regexes, sizeof(regex_t) * (len + 1) );
+   char** new_strings = (char**)realloc( *strings, sizeof(char**) * (*len + 2) );
+   regex_t* new_regexes = (regex_t*)realloc( *regexes, sizeof(regex_t) * (*len + 1) );
    
    if( new_strings == NULL || new_regexes == NULL ) {
       return -ENOMEM;
    }
    
-   new_strings[len] = vdev_strdup_or_null( next );
-   new_strings[len + 1] = NULL;
+   new_strings[*len] = vdev_strdup_or_null( next );
+   new_strings[*len + 1] = NULL;
    
-   new_regexes[len] = reg;
+   new_regexes[*len] = reg;
    
    *strings = new_strings;
    *regexes = new_regexes;
+   
+   *len = *len + 1;
    
    return 0;
 }
@@ -106,10 +110,9 @@ int vdev_match_regexes_free( char** regex_strs, regex_t* regexes, size_t len ) {
 // return 1 if so, 0 if not, negative on error 
 int vdev_match_regex( char const* path, regex_t* regex ) {
    
-   regmatch_t matches[1];
    int rc = 0;
    
-   rc = regexec( regex, path, 1, matches, REG_EXTENDED | REG_NEWLINE );
+   rc = regexec( regex, path, 0, NULL, 0 );
    
    if( rc != 0 ) {
       if( rc == REG_NOMATCH ) {
