@@ -44,11 +44,15 @@ struct vdev_device_request {
    // type of request (always initialized)
    vdev_device_request_t type;
    
-   // path to the device node 
+   // path to the device node to create (if we're making one at all)
+   // If we're creating an interface, this is the interface name.
    char* path;
    
-   // device information, for mknod (can't be 0)
+   // device numbers, for mknod
    dev_t dev;
+   
+   // device mode: character or block device
+   mode_t mode;
    
    // OS-specific driver parameters 
    vdev_device_params_t* params;
@@ -67,11 +71,15 @@ int vdev_device_request_free( struct vdev_device_request* req );
 // setters for device requests (so the OS can build one up)
 int vdev_device_request_set_type( struct vdev_device_request* req, vdev_device_request_t req_type );
 int vdev_device_request_set_dev( struct vdev_device_request* req, dev_t dev );
+int vdev_device_request_set_mode( struct vdev_device_request* req, mode_t mode );
 int vdev_device_request_set_path( struct vdev_device_request* req, char const* path );
 int vdev_device_request_add_param( struct vdev_device_request* req, char const* key, char const* value );
 
-// add a device request
-int vdev_device_request_add( struct fskit_wq* wq, struct vdev_device_request* req );
+// add a device request to the work queue
+int vdev_device_request_enqueue( struct fskit_wq* wq, struct vdev_device_request* req );
+
+// sanity check structure 
+int vdev_device_request_sanity_check( struct vdev_device_request* req );
 
 }
 

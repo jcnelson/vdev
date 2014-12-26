@@ -62,6 +62,12 @@ int vdev_device_request_free( struct vdev_device_request* req ) {
       req->params = NULL;
    }
    
+   if( req->path != NULL ) {
+      
+      free( req->path );
+      req->path = NULL;
+   }
+   
    memset( req, 0, sizeof(struct vdev_device_request) );
    
    return 0;
@@ -119,18 +125,20 @@ int vdev_device_request_set_dev( struct vdev_device_request* req, dev_t dev ) {
 int vdev_device_request_sanity_check( struct vdev_device_request* req ) {
    
    if( req->path == NULL ) {
+      
+      vdev_error("request %p missing path\n", req );
       return -EINVAL;
    }
    
    if( req->type == VDEV_DEVICE_INVALID ) {
+      
+      vdev_error("request %p has no request type\n", req );
       return -EINVAL;
    }
    
    if( req->params == NULL ) {
-      return -EINVAL;
-   }
-   
-   if( req->dev == 0 ) {
+      
+      vdev_error("request %p has no params\n", req );
       return -EINVAL;
    }
    
@@ -146,18 +154,28 @@ int vdev_device_request_set_type( struct vdev_device_request* req, vdev_device_r
 }
 
 
+// set the request device mode 
+int vdev_device_request_set_mode( struct vdev_device_request* req, mode_t mode ) {
+   
+   req->mode = mode;
+   return 0;
+}
+
 // handler to add a device (mknod)
+// need to fork to do this
 static int vdev_device_add( struct fskit_wreq* wreq, void* cls ) {
    
    int rc = 0;
    struct vdev_device_request* req = (struct vdev_device_request*)cls;
    
-   if( req->path != NULL && req->dev != 0 ) {
+   if( req->path != NULL && req->dev != 0 && req->mode != 0 ) {
       
-      char* fp = fskit_fullpath( req->state->fs->mountpoint, req->path, NULL );
+      vdev_debug("ADD device %p type %s at %s (%d:%d)\n", req, (S_ISBLK(req->mode) ? "'block'" : S_ISCHR(req->mode) ? "'char'" : "'unknown'"), req->path, major(req->dev), minor(req->dev) );
+      
+      char* fp = fskit_fullpath( req->state->mountpoint, req->path, NULL );
       
       // call into our mknod() via FUSE (waking up inotify/kqueue listeners)
-      rc = mknod( fp, 0, req->dev );
+      rc = mknod( fp, req->mode | 0777, req->dev );
       if( rc != 0 ) {
          
          vdev_error("mknod(%s, dev=(%u, %u)) rc = %d\n", fp, major(req->dev), minor(req->dev), rc );
@@ -175,11 +193,17 @@ static int vdev_device_add( struct fskit_wreq* wreq, void* cls ) {
       
       free( fp );
    }
+   
+   // done with this request
+   vdev_device_request_free( req );
+   free( req );
+   
    return rc;
 }
 
 
 // handler to remove a device (unlink)
+// need to fork to do this
 static int vdev_device_remove( struct fskit_wreq* wreq, void* cls ) {
    
    int rc = 0;
@@ -187,10 +211,13 @@ static int vdev_device_remove( struct fskit_wreq* wreq, void* cls ) {
    
    if( req->path != NULL ) {
       
-      char* fp = fskit_fullpath( req->state->fs->mountpoint, req->path, NULL );
+      vdev_debug("REMOVE device %p type %s at %s (%d:%d)\n", req, (S_ISBLK(req->mode) ? "'block'" : S_ISCHR(req->mode) ? "'char'" : "'unknown'"), req->path, major(req->dev), minor(req->dev) );
+      
+      // child
+      char* fp = fskit_fullpath( req->state->mountpoint, req->path, NULL );
    
       // call into our unlink() via FUSE (waking up inotify/kqueue listeners)
-      rc = unlink( fp );
+      rc = 0; unlink( fp );
       if( rc != 0 ) {
          
          vdev_error("unlink(%s) rc = %d\n", fp, rc );
@@ -209,13 +236,55 @@ static int vdev_device_remove( struct fskit_wreq* wreq, void* cls ) {
       free( fp );
    }
    
+   // done with this request 
+   vdev_device_request_free( req );
+   free( req );
+   
    return rc;
 }
 
 
 // enqueue a device request
-int vdev_device_request_add( struct fskit_wq* wq, struct vdev_device_request* req ) {
+int vdev_device_request_enqueue( struct fskit_wq* wq, struct vdev_device_request* req ) {
    
-   // TODO
-   return 0;
+   int rc = 0;
+   struct fskit_wreq wreq;
+   
+   // sanity check 
+   rc = vdev_device_request_sanity_check( req );
+   if( rc != 0 ) {
+      
+      vdev_error("Invalid device request (type %d)\n", req->type );
+      return -EINVAL;
+   }
+   
+   // which handler?
+   switch( req->type ) {
+      
+      case VDEV_DEVICE_ADD: {
+         
+         fskit_wreq_init( &wreq, vdev_device_add, req, 0 );
+         break;
+      }
+      
+      case VDEV_DEVICE_REMOVE: {
+         
+         fskit_wreq_init( &wreq, vdev_device_remove, req, 0 );
+         break;
+      }
+      
+      default: {
+         
+         vdev_error("Invalid device request type %d\n", req->type );
+         return -EINVAL;
+      }  
+   }
+   
+   rc = fskit_wq_add( wq, &wreq );
+   if( rc != 0 ) {
+      
+      vdev_error("fskit_wq_add('%s') rc = %d\n", req->path, rc );
+   }
+   
+   return rc;
 }
