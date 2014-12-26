@@ -20,7 +20,7 @@
 
 #include "fskit/fskit.h"
 
-int _DEBUG = 1;
+int _DEBUG = 0;
 
 int _DEBUG_MESSAGES = 0;
 int _ERROR_MESSAGES = 1;
@@ -179,6 +179,32 @@ ssize_t vdev_write_uninterrupted( int fd, char const* buf, size_t len ) {
 }
 
 
+// read, but mask EINTR
+ssize_t vdev_read_uninterrupted( int fd, char* buf, size_t len ) {
+   
+   ssize_t num_read = 0;
+   while( (unsigned)num_read < len ) {
+      ssize_t nr = read( fd, buf + num_read, len - num_read );
+      if( nr < 0 ) {
+         
+         int errsv = -errno;
+         if( errsv == -EINTR ) {
+            continue;
+         }
+         
+         return errsv;
+      }
+      if( nr == 0 ) {
+         break;
+      }
+      
+      num_read += nr;
+   }
+   
+   return num_read;
+}
+
+
 // free a list of dirents 
 static void vdev_dirents_free( struct dirent** dirents, int num_entries ) {
    
@@ -195,7 +221,8 @@ static void vdev_dirents_free( struct dirent** dirents, int num_entries ) {
    free( dirents );
 }
 
-// process everything in a directory
+
+// process all files in a directory
 // return 0 on success, negative on error
 int vdev_load_all( char const* dir_path, vdev_dirent_loader_t loader, void* cls ) {
    
@@ -238,3 +265,93 @@ int vdev_load_all( char const* dir_path, vdev_dirent_loader_t loader, void* cls 
    
    return 0;
 }
+
+
+// get a passwd struct for a user.
+// on success, fill in pwd and *pwd_buf (the caller must free *pwd_buf, but not pwd).
+// return 0 on success
+int vdev_get_passwd( char const* username, struct passwd* pwd, char** pwd_buf ) {
+   
+   struct passwd* result = NULL;
+   char* buf = NULL;
+   int buf_len = 0;
+   int rc = 0;
+   
+   memset( pwd, 0, sizeof(struct passwd) );
+   
+   buf_len = sysconf( _SC_GETPW_R_SIZE_MAX );
+   if( buf_len <= 0 ) {
+      buf_len = 65536;
+   }
+   
+   buf = VDEV_CALLOC( char, buf_len );
+   if( buf == NULL ) {
+      return -ENOMEM;
+   }
+   
+   rc = getpwnam_r( username, pwd, buf, buf_len, &result );
+   
+   if( result == NULL ) {
+      
+      if( rc == 0 ) {
+         free( buf );
+         return -ENOENT;
+      }
+      else {
+         rc = -errno;
+         free( buf );
+         
+         vdev_error("getpwnam_r(%s) errno = %d\n", username, rc);
+         return rc;
+      }
+   }
+   
+   // success!
+   return rc;
+}
+
+
+// get a group struct for a group.
+// on success, fill in grp and *grp_buf (the caller must free *grp_buf, but not grp).
+// return 0 on success
+int vdev_get_group( char const* groupname, struct group* grp, char** grp_buf ) {
+   
+   struct group* result = NULL;
+   char* buf = NULL;
+   int buf_len = 0;
+   int rc = 0;
+   
+   memset( grp, 0, sizeof(struct group) );
+   
+   buf_len = sysconf( _SC_GETGR_R_SIZE_MAX );
+   if( buf_len <= 0 ) {
+      buf_len = 65536;
+   }
+   
+   buf = VDEV_CALLOC( char, buf_len );
+   if( buf == NULL ) {
+      return -ENOMEM;
+   }
+   
+   rc = getgrnam_r( groupname, grp, buf, buf_len, &result );
+   
+   if( result == NULL ) {
+      
+      if( rc == 0 ) {
+         free( buf );
+         return -ENOENT;
+      }
+      else {
+         rc = -errno;
+         free( buf );
+         
+         vdev_error("getgrnam_r(%s) errno = %d\n", groupname, rc);
+         return rc;
+      }
+   }
+   
+   // success!
+   return rc;
+}
+
+
