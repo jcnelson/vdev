@@ -1,0 +1,4 @@
+[vdev-acl]
+uid=0
+paths=.*random
+setmode=000

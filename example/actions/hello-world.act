@@ -1,0 +1,4 @@
+[vdev-action]
+event=add
+path=.*random
+command="echo hello >> /tmp/vdev-out.txt"
