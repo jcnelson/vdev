@@ -21,9 +21,8 @@
 #include "methods.h"
 
 // yield new devices 
-void* vdev_os_yield_devices( void* cls ) {
+int vdev_os_main( struct vdev_os_context* vos ) {
    
-   struct vdev_os_context* vos = (struct vdev_os_context*)cls;
    int rc = 0;
    
    while( vos->running ) {
@@ -57,8 +56,10 @@ void* vdev_os_yield_devices( void* cls ) {
          continue;
       }
       
+      vdev_debug("Next device: type=%d path=%s dev=%u mode=%o\n", vreq->type, vreq->path, vreq->dev, vreq->mode );
+      
       // post the event to the device work queue
-      rc = vdev_device_request_add( &vos->state->device_wq, vreq );
+      rc = vdev_device_request_enqueue( &vos->state->device_wq, vreq );
       
       if( rc != 0 ) {
          
@@ -71,7 +72,7 @@ void* vdev_os_yield_devices( void* cls ) {
       }
    }
    
-   return NULL;
+   return 0;
 }
 
 // set up a vdev os context
@@ -91,79 +92,20 @@ int vdev_os_context_init( struct vdev_os_context* vos, struct vdev_state* state 
       return rc;
    }
    
-   return 0;
-}
-
-
-// initialize OS-specific state, and start the listening thread 
-int vdev_os_context_start( struct vdev_os_context* vos ) {
-   
-   int rc = 0;
-   pthread_attr_t attrs;
-   
-   // sanity check 
-   if( vos->running ) {
-      return -EINVAL;
-   }
-   
-   // start processing requests
-   memset( &attrs, 0, sizeof(pthread_attr_t) );
-   
    vos->running = true;
-   rc = pthread_create( &vos->thread, &attrs, vdev_os_yield_devices, vos );
-   
-   if( rc != 0 ) {
-      
-      rc = -errno;
-      vdev_error("pthread_create rc = %d\n", rc );
-      
-      return rc;
-   }
-   else {
-      
-      // start up OS-specific event feeding 
-      rc = vdev_os_start( vos->os_cls );
-      if( rc != 0 ) {
-         
-         vdev_error("vdev_os_start rc = %d\n", rc );
-         return rc;
-      }
-      
-      return 0;
-   }
-}
-
-// stop the listening thread 
-int vdev_os_context_stop( struct vdev_os_context* vos ) {
-   
-   int rc = 0;
-   
-   if( !vos->running ) {
-      return -EINVAL;
-   }
-   
-   // stop getting work requests 
-   rc = vdev_os_stop( vos->os_cls );
-   if( rc != 0 ) {
-      
-      vdev_error("vdev_os_stop rc = %d\n", rc );
-      return rc;
-   }
-   
-   // cancel and join with the listener
-   vos->running = false;
-   pthread_cancel( vos->thread );
-   pthread_join( vos->thread, NULL );
    
    return 0;
 }
+
 
 // free memory 
-int vdev_os_context_free( struct vdev_os_context* vos, void** cls ) {
-   
-   // nothing to do yet 
-   if( cls != NULL ) {
-      *cls = vos->os_cls;
+int vdev_os_context_free( struct vdev_os_context* vos ) {
+
+   if( vos != NULL ) {
+      vdev_os_shutdown( vos->os_cls );
+      vos->os_cls = NULL;
+      
+      memset( vos, 0, sizeof(struct vdev_os_context) );
    }
    
    return 0;

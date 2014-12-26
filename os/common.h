@@ -26,9 +26,7 @@ struct vdev_os_context {
    
    void* os_cls;        // OS-specific data
    
-   // thread listening to events 
    bool running;
-   pthread_t thread;
    
    // reference to global state 
    struct vdev_state* state;
@@ -38,9 +36,9 @@ extern "C" {
 
 // context management
 int vdev_os_context_init( struct vdev_os_context* vos, struct vdev_state* state );
-int vdev_os_context_start( struct vdev_os_context* vos );
-int vdev_os_context_stop( struct vdev_os_context* vos );
-int vdev_os_context_free( struct vdev_os_context* vos, void** cls );
+int vdev_os_context_free( struct vdev_os_context* vos );
+
+int vdev_os_main( struct vdev_os_context* vos );
 
 }
 
