@@ -46,6 +46,8 @@ int vdev_action_init( struct vdev_action* act, vdev_device_request_t trigger, ch
       rc = vdev_match_regex_init( &act->path_regex, path );
       
       if( rc != 0 ) {
+         
+         vdev_error("vdev_match_regex_init('%s') rc = %d\n", path );
          vdev_action_free( act );
          return rc;
       }
@@ -128,6 +130,20 @@ static int vdev_action_ini_parser( void* userdata, char const* section, char con
          }
          
          act->path = vdev_strdup_or_null( value );
+         
+         if( act->path == NULL ) {
+            // EOM
+            return 0;
+         } 
+         else {
+            rc = vdev_match_regex_init( &act->path_regex, act->path );
+            
+            if( rc != 0 ) {
+               
+               vdev_error("vdev_match_regex_init('%s') rc = %d\n", act->path );
+               return 0;
+            }
+         }
          return 1;
       }
       
@@ -304,6 +320,24 @@ int vdev_action_loader( char const* path, void* cls ) {
    
    int rc = 0;
    struct vdev_action act;
+   struct stat sb;
+   
+   // skip if not a regular file 
+   rc = stat( path, &sb );
+   if( rc != 0 ) {
+      
+      rc = -errno;
+      vdev_error("stat(%s) rc = %d\n", path, rc );
+      return rc;
+   }
+   
+   if( !S_ISREG( sb.st_mode ) ) {
+      
+      return 0;
+   }
+   
+   vdev_debug("Load Action %s\n", path );
+   
    vector<struct vdev_action>* acts = (vector<struct vdev_action>*)cls;
 
    memset( &act, 0, sizeof(struct vdev_action) );
@@ -411,6 +445,12 @@ int vdev_action_run_async( struct vdev_action* act ) {
       for( int i = 0; i < max_fd; i++ ) {
          close( i );
       }
+      
+      // preserve only the path environment variable
+      char* path = vdev_strdup_or_null( getenv("PATH") );
+      
+      clearenv();
+      setenv("PATH", path, 1 );
       
       // run the command 
       execl( "/bin/sh", "sh", "-c", act->command, (char*)0 );

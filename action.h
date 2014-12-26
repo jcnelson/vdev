@@ -23,12 +23,12 @@
 #include "workqueue.h"
 
 // action fields
-#define VDEV_ACTION_NAME                "action"
-#define VDEV_OS_ACTION_NAME             "OS"
+#define VDEV_ACTION_NAME                "vdev-action"
+#define VDEV_OS_ACTION_NAME             "vdev-OS"
 
 #define VDEV_ACTION_NAME_EVENT          "event"
 #define VDEV_ACTION_NAME_PATH           "path"
-#define VDEV_ACTION_NAME_SHELL          "cmd"
+#define VDEV_ACTION_NAME_SHELL          "command"
 #define VDEV_ACTION_NAME_ASYNC          "async"
 
 #define VDEV_ACTION_EVENT_ADD           "add"
