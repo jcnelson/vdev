@@ -27,6 +27,10 @@
 #include "linux.h"
 #endif
 
+#ifdef _VDEV_OS_TEST
+#include "test.h"
+#endif
+
 extern "C" {
 
 int vdev_os_init( struct vdev_os_context* ctx, void** cls );
