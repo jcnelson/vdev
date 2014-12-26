@@ -18,86 +18,79 @@
 
 #include "main.h"
 
-// post-mount callback: start processing device requests *after* FUSE is ready
-static int vdev_postmount_setup( struct fskit_fuse_state* state, void* cls ) {
-   
-   struct vdev_state* vdev = (struct vdev_state*)cls;
-   
-   // start vdev 
-   int rc = vdev_start( vdev );
-   if( rc != 0 ) {
-      
-      fprintf(stderr, "vdev_start rc = %d\n", rc );
-      return rc;
-   }
-   
-   return 0;
-}
-
-
 // run! 
 int main( int argc, char** argv ) {
    
    int rc = 0;
-   int rh = 0;
-   struct fskit_fuse_state state;
-   struct fskit_core* core = NULL;
+   pid_t pid = 0;
    struct vdev_state vdev;
    
    memset( &vdev, 0, sizeof(struct vdev_state) );
    
-   // set up fskit
-   rc = fskit_fuse_init( &state, &vdev );
+   // set up global vdev state
+   rc = vdev_init( &vdev, argc, argv );
    if( rc != 0 ) {
       
-      fprintf(stderr, "fskit_fuse_init rc = %d\n", rc );
-      exit(1);
-   }
-   
-   // set up vdev 
-   rc = vdev_init( &vdev, &state, argc, argv );
-   if( rc != 0 ) {
-      
-      fprintf(stderr, "vdev_init rc = %d\n", rc );
+      vdev_error("vdev_init rc = %d\n", rc );
       
       exit(1);
    }
    
-   // make sure the fs can access its methods through the VFS
-   fskit_fuse_setting_enable( &state, FSKIT_FUSE_SET_FS_ACCESS );
-   
-   core = fskit_fuse_get_core( &state );
-   
-   // add handlers.  reads and writes must happen sequentially, since we seek and then perform I/O
-   // NOTE: FSKIT_ROUTE_ANY matches any path, and is a macro for the regex "/([^/]+[/]*)+"
-   rh = fskit_route_readdir( core, FSKIT_ROUTE_ANY, vdev_readdir, FSKIT_CONCURRENT );
-   if( rh < 0 ) {
+   pid = fork();
+   if( pid == 0 ) {
       
-      fprintf(stderr, "fskit_route_readdir(%s) rc = %d\n", FSKIT_ROUTE_ANY, rh );
-      exit(1);
+      // child: filesystem front-end
+      rc = vdev_frontend_init( &vdev );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_frontend_init rc = %d\n", rc );
+         
+         vdev_free( &vdev );
+         exit(1);
+      }
+      
+      // run 
+      rc = vdev_frontend_main( &vdev );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_frontend_main rc = %d\n", rc );
+         
+         vdev_free( &vdev );
+         exit(1);
+      }
+      
+      // clean up
+      vdev_frontend_stop( &vdev );
    }
    
-   rh = fskit_route_stat( core, FSKIT_ROUTE_ANY, vdev_stat, FSKIT_CONCURRENT );
-   if( rh < 0 ) {
+   else if( pid > 0 ) {
       
-      fprintf(stderr, "fskit_route_stat(%s) rc = %d\n", FSKIT_ROUTE_ANY, rh );
-      exit(1);
+      // parent: OS event back-end
+      rc = vdev_backend_init( &vdev );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_backend_init rc = %d\n", rc );
+         
+         vdev_free( &vdev );
+         exit(1);
+      }
+      
+      // run 
+      rc = vdev_backend_main( &vdev );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_backend_main rc = %d\n", rc );
+         
+         vdev_free( &vdev );
+         exit(1);
+      }
+      
+      // clean up 
+      vdev_backend_stop( &vdev );
    }
    
-   // set the root to be owned by the effective UID and GID of user
-   fskit_chown( core, "/", 0, 0, geteuid(), getegid() );
-   
-   // call our post-mount callback to finish initializing vdev 
-   fskit_fuse_postmount_callback( &state, vdev_postmount_setup, &vdev );
-   
-   // run 
-   rc = fskit_fuse_main( &state, argc, argv );
-   
-   // shutdown
-   vdev_stop( &vdev );
    vdev_free( &vdev );
-   fskit_fuse_shutdown( &state, NULL );
    
-   return rc;
+   return 0;
 }
 
