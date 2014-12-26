@@ -53,13 +53,14 @@ struct vdev_linux_context {
    
    // ref to OS context 
    struct vdev_os_context* os_ctx;
+   
+   // initial device requests 
+   vector<struct vdev_device_request*>* initial_requests;
 };
 
 extern "C" {
 
 int vdev_os_init( struct vdev_os_context* ctx, void** cls );
-int vdev_os_start( void* cls );
-int vdev_os_stop( void* cls );
 int vdev_os_shutdown( void* cls );
 
 int vdev_os_next_device( struct vdev_device_request* request, void* cls );
