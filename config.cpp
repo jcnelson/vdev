@@ -162,6 +162,18 @@ int vdev_config_free( struct vdev_config* conf ) {
       conf->firmware_dir = NULL;
    }
    
+   if( conf->acls_dir != NULL ) {
+      
+      free( conf->acls_dir );
+      conf->acls_dir = NULL;
+   }
+   
+   if( conf->acts_dir != NULL ) {
+      
+      free( conf->acts_dir );
+      conf->acts_dir = NULL;
+   }
+   
    if( conf->os_config != NULL ) {
       
       delete conf->os_config;

@@ -22,8 +22,8 @@
 #include "fskit/fskit.h"
 #include "util.h"
 
-#define VDEV_CONFIG_NAME        "config"
-#define VDEV_OS_CONFIG_NAME     "OS"
+#define VDEV_CONFIG_NAME        "vdev-config"
+#define VDEV_OS_CONFIG_NAME     "vdev-OS"
 
 #define VDEV_CONFIG_FIRMWARE_DIR  "firmware"
 #define VDEV_CONFIG_PSTAT         "proc_check"
