@@ -35,6 +35,16 @@ int main( int argc, char** argv ) {
       
       exit(1);
    }
+
+   // load back-end info so we can fail fast before mounting
+   rc = vdev_backend_init( &vdev );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_backend_init rc = %d\n", rc );
+      
+      vdev_free( &vdev );
+      exit(1);
+   }
    
    pid = fork();
    if( pid == 0 ) {
@@ -65,12 +75,13 @@ int main( int argc, char** argv ) {
    
    else if( pid > 0 ) {
       
-      // parent: OS event back-end
-      rc = vdev_backend_init( &vdev );
+      // start 
+      rc = vdev_backend_start( &vdev );
       if( rc != 0 ) {
          
          vdev_error("vdev_backend_init rc = %d\n", rc );
          
+         vdev_backend_stop( &vdev );
          vdev_free( &vdev );
          exit(1);
       }
@@ -81,6 +92,7 @@ int main( int argc, char** argv ) {
          
          vdev_error("vdev_backend_main rc = %d\n", rc );
          
+         vdev_backend_stop( &vdev );
          vdev_free( &vdev );
          exit(1);
       }
