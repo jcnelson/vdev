@@ -861,12 +861,81 @@ int vdev_parse_pids( char const* pid_list_str, size_t pid_list_len, pid_t** pids
    return 0;
 }
 
+
+// run a 'pidlist' command, with the appropriate environment variables set.
+// populate *pids with the list of PIDs returned, on success
+// return 0 on success
+// return negative on error 
+int vdev_acl_do_pidlist( struct vdev_acl* acl, struct pstat* ps, uid_t caller_uid, gid_t caller_gid, pid_t** ret_pids, int* ret_num_pids ) {
+
+   // get the list of PIDs from the shell command 
+   char* pid_list_str = NULL;
+   size_t pid_list_maxlen = VDEV_ACL_PROC_BUFLEN;
+   pid_t* pids = NULL;
+   int num_pids = 0;
+   int exit_status = 0;
+   char* cmd_buf = NULL;
+   char env_buf[3][100];
+   char* pidlist_env[4];
+   int rc = 0;
+   
+   // build the command with the apporpriate environment variables:
+   // * VDEV_GID: the gid of the calling process
+   // * VDEV_UID: the uid of the calling process
+   // * VDEV_PID: the pid of the calling process
+   
+   sprintf(env_buf[0], "VDEV_UID=%u", caller_uid );
+   sprintf(env_buf[1], "VDEV_GID=%u", caller_gid );
+   sprintf(env_buf[2], "VDEV_PID=%u", ps->pid );
+   
+   pidlist_env[0] = env_buf[0];
+   pidlist_env[1] = env_buf[1];
+   pidlist_env[2] = env_buf[2];
+   pidlist_env[3] = NULL;
+   
+   rc = vdev_subprocess( cmd_buf, pidlist_env, &pid_list_str, pid_list_maxlen, &exit_status );
+   
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_subprocess('%s') rc = %d\n", cmd_buf, rc );
+      
+      free( cmd_buf );
+      return rc;
+   }
+   
+   if( exit_status != 0 ) {
+      
+      vdev_error("vdev_subprocess('%s') exit status %d\n", cmd_buf, exit_status );
+      free( cmd_buf );
+      return -EPERM;
+   }
+   
+   free( cmd_buf );
+   
+   // lex the pids
+   rc = vdev_parse_pids( pid_list_str, pid_list_maxlen, &pids, &num_pids );
+   
+   free( pid_list_str );
+   
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_parse_pids rc = %d\n", rc );
+      return rc;
+   }
+   
+   *ret_pids = pids;
+   *ret_num_pids = num_pids;
+   
+   return 0;
+}
+      
+
 // check that the caller PID is matched by the given ACL.
 // every process match criterion must be satisfied.
 // return 1 if all ACL criteria match
 // return 0 if at least one ACL criterion does not match 
 // return negative on error
-int vdev_acl_match_process( struct vdev_acl* acl, struct pstat* ps ) {
+int vdev_acl_match_process( struct vdev_acl* acl, struct pstat* ps, uid_t caller_uid, gid_t caller_gid ) {
    
    int rc = 0;
    
@@ -922,35 +991,14 @@ int vdev_acl_match_process( struct vdev_acl* acl, struct pstat* ps ) {
    if( acl->proc_pidlist_cmd != NULL ) {
       
       // get the list of PIDs from the shell command 
-      char* pid_list_str = NULL;
-      size_t pid_list_maxlen = VDEV_ACL_PROC_BUFLEN;
       pid_t* pids = NULL;
       int num_pids = 0;
-      int exit_status = 0;
       bool found = false;
       
-      rc = vdev_subprocess( acl->proc_pidlist_cmd, &pid_list_str, pid_list_maxlen, &exit_status );
-      
+      rc = vdev_acl_do_pidlist( acl, ps, caller_uid, caller_gid, &pids, &num_pids );
       if( rc != 0 ) {
          
-         vdev_error("vdev_subprocess(%s) rc = %d\n", acl->proc_pidlist_cmd, rc );
-         return rc;
-      }
-      
-      if( exit_status != 0 ) {
-         
-         vdev_error("vdev_subprocess(%s) exit status %d\n", acl->proc_pidlist_cmd, exit_status );
-         return -EPERM;
-      }
-      
-      // lex the pids
-      rc = vdev_parse_pids( pid_list_str, pid_list_maxlen, &pids, &num_pids );
-      
-      free( pid_list_str );
-      
-      if( rc != 0 ) {
-         
-         vdev_error("vdev_parse_pids rc = %d\n", rc );
+         vdev_error("vdev_acl_do_pidlist('%s') rc = %d\n", acl->proc_pidlist_cmd, rc );
          return rc;
       }
       
@@ -982,7 +1030,7 @@ int vdev_acl_apply( struct vdev_acl* acl, struct pstat* caller_proc, uid_t calle
    int rc = 0;
    
    // does this apply to our process?
-   rc = vdev_acl_match_process( acl, caller_proc );
+   rc = vdev_acl_match_process( acl, caller_proc, caller_uid, caller_gid );
    if( rc < 0 ) {
       
       vdev_error("vdev_acl_match_process(%d) rc = %d\n", caller_proc->pid );
