@@ -42,113 +42,167 @@ int vdev_get_error_level() {
    return _ERROR_MESSAGES;
 }
 
-// run a subprocess in the system shell.
+// run a subprocess in the system shell (/bin/sh)
 // gather the output into the output buffer (allocating it if needed).
-// do not allow the output buffer to exceed max_output bytes.
 // return 0 on success
-// return 1 on truncate 
+// return 1 on output truncate 
 // return negative on error
 // set the subprocess exit status in *exit_status
-int vdev_subprocess( char const* cmd, char** output, size_t max_output, int* exit_status ) {
+int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t max_output, int* exit_status ) {
    
-   FILE* pipe = NULL;
+   int p[2];
    int rc = 0;
-   
-   // read up to max_output
-   if( output != NULL ) {
-      if( *output == NULL && max_output > 0 ) {
-         
-         *output = VDEV_CALLOC( char, max_output );
-         if( *output == NULL ) {
-            return -ENOMEM;
-         }
-      }
-   }
-   
-   pipe = popen( cmd, "r" );
-   if( pipe == NULL ) {
-      
-      rc = -errno;
-      vdev_error("popen(%s) rc = %d\n", cmd, rc );
-      
-      if( output != NULL && *output != NULL ) {
-         free( *output );
-         *output = NULL;
-      }
-      
-      return rc;
-   }
-   
-   // read up to max_output 
+   pid_t pid = 0;
+   int max_fd = 0;
+   ssize_t nr = 0;
    size_t num_read = 0;
-   bool truncate = false;
-   bool eof = false;
+   int status = 0;
+   bool alloced = false;
    
-   while( num_read < max_output ) {
-      
-      size_t nr = 0;
-      size_t len = 4096;
-      char static_buf[4096];
-      char* buf = NULL;
-      
-      if( output != NULL && *output != NULL ) {
-         buf = *output;
-      }
-      else {
-         // dummy output 
-         buf = static_buf;
-      }
-      
-      if( num_read + len >= max_output ) {
-         // truncate
-         len = max_output - num_read;
-      }
-      
-      nr = fread( buf, 1, len, pipe );
-      
-      num_read += nr;
-      
-      if( nr != len ) {
-         
-         // error or EOF?
-         if( feof(pipe) ) {
-            eof = true;
-            break;
-         }
-         
-         else if( ferror(pipe) ) {
-            
-            rc = -errno;
-            vdev_error("fread(pipe) rc = %d, ferror = %d\n", rc, ferror(pipe) );
-            
-            break;
-         }
-      }
-   }
-   
-   if( !eof && num_read >= max_output ) {
-      truncate = true;
-   }
-   
-   *exit_status = pclose( pipe );
-   
+   // open the pipe 
+   rc = pipe( p );
    if( rc != 0 ) {
       
-      // clean up 
-      if( output != NULL && *output != NULL ) {
-         free( *output );
-         *output = NULL;
-      }
-      
+      rc = -errno;
+      vdev_error("pipe() rc = %d\n", rc );
       return rc;
    }
-   else {
-      if( truncate ) {
-         return 1;
+   
+   // fork the child 
+   pid = fork();
+   
+   if( pid == 0 ) {
+      
+      // send stdout to p[1]
+      close( p[0] );
+      rc = dup2( p[1], STDOUT_FILENO );
+      
+      if( rc < 0 ) {
+         
+         rc = -errno;
+         vdev_error("dup2(%d, %d) rc = %d\n", p[1], STDOUT_FILENO, rc );
+         
+         close( p[1] );
+         exit(1);
+      }
+      
+      // close everything else but stdout
+      max_fd = sysconf(_SC_OPEN_MAX);
+      
+      for( int i = 0; i < max_fd; i++ ) {
+         
+         if( i != STDOUT_FILENO ) {
+            close( i );
+         }
+      }
+      
+      // run the command 
+      if( env != NULL ) {
+         rc = execle( "/bin/sh", "sh", "-c", cmd, (char*)0, env );
       }
       else {
-         return 0;
+         rc = execl( "/bin/sh", "sh", "-c", cmd, (char*)0 );
       }
+      
+      if( rc != 0 ) {
+         
+         rc = -errno;
+         vdev_error("execl[e]() rc = %d\n", rc );
+         exit(1);
+      }
+      else {
+         // make gcc happy 
+         exit(0);
+      }
+   }
+   else if( pid > 0 ) {
+      
+      // parent 
+      close(p[1]);
+      
+      // allocate output 
+      if( output != NULL ) {
+         if( *output == NULL && max_output > 0 ) {
+            
+            *output = VDEV_CALLOC( char, max_output );
+            if( *output == NULL ) {
+               
+               // out of memory 
+               return -ENOMEM;
+            }
+            
+            alloced = true;
+         }
+      }
+      
+      // get output 
+      if( output != NULL && *output != NULL && max_output > 0 ) {
+         
+         while( (unsigned)num_read < max_output ) {
+            
+            nr = vdev_read_uninterrupted( p[0], (*output) + num_read, max_output - num_read );
+            if( nr < 0 ) {
+               
+               vdev_error("vdev_read_uninterrupted rc = %d\n", rc );
+               close( p[0] );
+               
+               if( alloced ) {
+                  
+                  free( *output );
+                  *output = NULL;
+               }
+               return rc;
+            }
+            
+            if( nr == 0 ) {
+               break;
+            }
+            
+            num_read += nr;
+         }
+      }
+      
+      // wait for child
+      rc = waitpid( pid, &status, 0 );
+      if( rc < 0 ) {
+         
+         rc = -errno;
+         vdev_error("waitpid(%d) rc = %d\n", pid );
+         
+         close( p[0] );
+         
+         if( alloced ) {
+            
+            free( *output );
+            *output = NULL;
+         }
+         
+         return rc;
+      }
+      
+      if( WIFEXITED( status ) ) {
+         
+         *exit_status = WEXITSTATUS( *exit_status );
+      }
+      else if( WIFSIGNALED( status ) ) {
+         
+         vdev_error("WARN: command '%s' failed with signal %d\n", cmd, WTERMSIG( status ) );
+         *exit_status = status;
+      }
+      else {
+         
+         // don't care about start/stop
+         *exit_status = 0;
+      }
+      
+      close( p[0] );
+      return 0;
+   }
+   else {
+      
+      rc = -errno;
+      vdev_error("fork() rc = %d\n", rc );
+      return rc;
    }
 }
 
@@ -354,4 +408,54 @@ int vdev_get_group( char const* groupname, struct group* grp, char** grp_buf ) {
    return rc;
 }
 
+
+// make a string of directories, given the path dirp
+// return 0 if the directory exists at the end of the call.
+// return negative if the directory could not be created.
+int vdev_mkdirs( char const* dirp, int start, mode_t mode ) {
+   
+   unsigned int i = start;
+   char* currdir = NULL;
+   struct stat statbuf;
+   int rc = 0;
+   
+   currdir = VDEV_CALLOC( char, strlen(dirp) + 1 );
+   if( currdir == NULL ) {
+      return -ENOMEM;
+   }
+   
+   while( i <= strlen(dirp) ) {
+      
+      // next '/'
+      if( dirp[i] == '/' || i == strlen(dirp) ) {
+         
+         strncpy( currdir, dirp, i == 0 ? 1 : i );
+         
+         rc = stat( currdir, &statbuf );
+         if( rc == 0 && !S_ISDIR( statbuf.st_mode ) ) {
+            
+            // something else exists here
+            free( currdir );
+            return -ENOTDIR;
+         }
+         
+         if( rc != 0 ) {
+            
+            // try to make this directory
+            rc = mkdir( currdir, mode );
+            if( rc != 0 ) {
+               
+               rc = -errno;
+               free(currdir);
+               return rc;
+            }
+         }
+      }
+      
+      i++;
+   }
+   
+   free(currdir);
+   return 0;
+}
 

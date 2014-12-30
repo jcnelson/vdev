@@ -60,6 +60,7 @@
 
 #include <pwd.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <grp.h>
 
 #include "fskit/fskit.h"
@@ -96,7 +97,7 @@ int vdev_get_debug_level();
 int vdev_get_error_level();
 
 // shell functions 
-int vdev_subprocess( char const* cmd, char** output, size_t max_output, int* exit_status );
+int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t max_output, int* exit_status );
 
 // I/O functions 
 ssize_t vdev_read_uninterrupted( int fd, char* buf, size_t len );
@@ -104,6 +105,7 @@ ssize_t vdev_write_uninterrupted( int fd, char const* buf, size_t len );
 
 // directory I/O
 int vdev_load_all( char const* dir_path, vdev_dirent_loader_t loader, void* cls );
+int vdev_mkdirs( char const* dirp, int start, mode_t mode );
 
 // passwd/group query
 int vdev_get_passwd( char const* username, struct passwd* pwd, char** pwd_buf );
