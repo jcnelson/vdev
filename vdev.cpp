@@ -44,8 +44,6 @@ static int vdev_postmount_setup( struct fskit_fuse_state* state, void* cls ) {
 int vdev_backend_init( struct vdev_state* vdev ) {
    
    int rc = 0;
-   size_t mountpoint_len = 0;
-   char* mountpoint = NULL;
    
    // load actions 
    rc = vdev_action_load_all( vdev->config->acts_dir, &vdev->acts, &vdev->num_acts );
@@ -64,6 +62,17 @@ int vdev_backend_init( struct vdev_state* vdev ) {
       
       return rc;
    }
+   
+   return 0;
+}
+
+
+// start up the back-end: ask the front-end for the mountpoint and start taking requests
+int vdev_backend_start( struct vdev_state* vdev ) {
+   
+   int rc = 0;
+   char* mountpoint = NULL;
+   size_t mountpoint_len = 0;
    
    // get mountpoint len 
    rc = read( vdev->pipe_back, &mountpoint_len, sizeof(size_t) );
@@ -120,6 +129,7 @@ int vdev_backend_init( struct vdev_state* vdev ) {
    }
    
    // drop privileges
+   clearenv();
    if( getuid() == 0 ) {
       // TODO
    }
@@ -377,22 +387,25 @@ int vdev_backend_stop( struct vdev_state* state ) {
       return rc;
    }
    
-   // unmount the child 
-   sprintf( umount_cmd, "/sbin/fusermount -u %s", state->mountpoint );
-   
-   vdev_debug("Unmount %s\n", state->mountpoint );
-   
-   rc = vdev_subprocess( umount_cmd, 0, 0, &umount_rc );
-   
-   if( rc != 0 ) {
+   if( state->mountpoint != NULL ) {
+         
+      // unmount the front-end 
+      sprintf( umount_cmd, "/sbin/fusermount -u %s", state->mountpoint );
       
-      vdev_error("vdev_subprocess('%s') rc = %d\n", umount_cmd, rc );
-   }
-   if( umount_rc != 0 ) {
+      vdev_debug("Unmount %s\n", state->mountpoint );
       
-      vdev_error("umount('%s') rc = %d\n", state->mountpoint, umount_rc );
-      if( rc == 0 ) {
-         rc = -abs(umount_rc);
+      rc = vdev_subprocess( umount_cmd, NULL, NULL, 0, &umount_rc );
+      
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_subprocess('%s') rc = %d\n", umount_cmd, rc );
+      }
+      if( umount_rc != 0 ) {
+         
+         vdev_error("umount('%s') rc = %d\n", state->mountpoint, umount_rc );
+         if( rc == 0 ) {
+            rc = -abs(umount_rc);
+         }
       }
    }
    
@@ -505,7 +518,6 @@ int vdev_stat( struct fskit_core* core, struct fskit_match_group* grp, struct fs
       return 0;
    }
 }
-
 
 // readdir: equivocate about which devices exist, depending on who's asking
 int vdev_readdir( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct fskit_dir_entry** dirents, size_t num_dirents ) {

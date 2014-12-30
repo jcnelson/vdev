@@ -90,6 +90,7 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv );
 int vdev_backend_init( struct vdev_state* vdev );
 int vdev_frontend_init( struct vdev_state* vdev );
 
+int vdev_backend_start( struct vdev_state* vdev );
 int vdev_frontend_send_mount_info( struct vdev_state* state );
 
 int vdev_frontend_main( struct vdev_state* state );
