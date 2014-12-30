@@ -75,6 +75,9 @@ int vdev_device_request_set_mode( struct vdev_device_request* req, mode_t mode )
 int vdev_device_request_set_path( struct vdev_device_request* req, char const* path );
 int vdev_device_request_add_param( struct vdev_device_request* req, char const* key, char const* value );
 
+// environment variables 
+int vdev_device_request_to_env( struct vdev_device_request* req, char*** env, size_t* num_env );
+
 // add a device request to the work queue
 int vdev_device_request_enqueue( struct fskit_wq* wq, struct vdev_device_request* req );
 
