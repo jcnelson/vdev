@@ -77,6 +77,12 @@ int vdev_action_free( struct vdev_action* act ) {
       act->command = NULL;
    }
    
+   if( act->rename_command != NULL ) {
+      
+      free( act->rename_command );
+      act->rename_command = NULL;
+   }
+   
    if( act->dev_params != NULL ) {
       
       delete act->dev_params;
@@ -147,6 +153,18 @@ static int vdev_action_ini_parser( void* userdata, char const* section, char con
          return 1;
       }
       
+      if( strcmp(name, VDEV_ACTION_NAME_RENAME) == 0 ) {
+         
+         // rename command 
+         if( act->rename_command != NULL ) {
+            
+            free( act->rename_command );
+         }
+         
+         act->rename_command = vdev_strdup_or_null( value );
+         return 1;
+      }
+      
       if( strcmp(name, VDEV_ACTION_NAME_EVENT) == 0 ) {
          
          // event?
@@ -167,7 +185,7 @@ static int vdev_action_ini_parser( void* userdata, char const* section, char con
          // shell command 
          if( act->command != NULL ) {
             
-            free( act->path );
+            free( act->command );
          }
          
          act->command = vdev_strdup_or_null( value );
@@ -194,21 +212,23 @@ static int vdev_action_ini_parser( void* userdata, char const* section, char con
          }
       }
       
+      
+      if( strncmp(name, "OS_", 3) == 0 ) {
+         
+         // OS-specific param 
+         rc = vdev_action_add_param( act, name + 3, value );
+         
+         if( rc == 0 ) {
+            return 1;
+         }
+         else {
+            vdev_error("vdev_action_add_param( '%s', '%s' ) rc = %d\n", name, value, rc );
+            return 0;
+         }
+      }
+      
       fprintf(stderr, "Unknown field '%s' in section '%s'\n", name, section );
       return 0;
-   }
-   
-   if( strcmp(section, VDEV_OS_ACTION_NAME) == 0 ) {
-      
-      rc = vdev_action_add_param( act, name, value );
-      
-      if( rc == 0 ) {
-         return 1;
-      }
-      else {
-         vdev_error("vdev_action_add_param( '%s', '%s' ) rc = %d\n", name, value, rc );
-         return 0;
-      }
    }
    
    fprintf(stderr, "Unknown section '%s'\n", section);
@@ -222,15 +242,9 @@ int vdev_action_sanity_check( struct vdev_action* act ) {
    
    int rc = 0;
    
-   if( act->path == NULL ) {
+   if( act->command == NULL && act->rename_command == NULL ) {
       
-      fprintf(stderr, "Action is missing 'path='\n");
-      rc = -EINVAL;
-   }
-   
-   if( act->command == NULL ) {
-      
-      fprintf(stderr, "Action is missing 'command='\n");
+      fprintf(stderr, "Action is missing 'command=' or 'rename_command='\n");
       rc = -EINVAL;
    }
    
@@ -249,10 +263,19 @@ int vdev_action_load( char const* path, struct vdev_action* act ) {
    int rc = 0;
    FILE* f = NULL;
    
+   rc = vdev_action_init( act, VDEV_DEVICE_INVALID, NULL, NULL, false );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_action_init('%s') rc = %d\n", path );
+      return rc;
+   }
+   
    f = fopen( path, "r" );
    if( f == NULL ) {
       
+      vdev_action_free( act );
       rc = -errno;
+      
       return rc;
    }
    
@@ -262,7 +285,8 @@ int vdev_action_load( char const* path, struct vdev_action* act ) {
    
    if( rc == -EINVAL ) {
       
-      vdev_error("Invalid action %s\n", path );
+      vdev_action_free( act );
+      vdev_error("Invalid action '%s'\n", path );
    }
    
    return rc;
@@ -361,6 +385,7 @@ int vdev_action_loader( char const* path, void* cls ) {
    return 0;
 }
 
+
 // load all actions in a directory
 // return 0 on success
 // return negative on error
@@ -406,29 +431,54 @@ int vdev_action_load_all( char const* dir_path, struct vdev_action** ret_acts, s
 }
 
 
-// carry out an action, synchronously.
+// carry out a command, synchronously, using an environment given by vreq.
 // return the exit status on success (non-negative)
 // return negative on error
-int vdev_action_run_sync( struct vdev_action* act ) {
+int vdev_action_run_sync( struct vdev_device_request* vreq, char const* command, char** output, size_t max_output ) {
    
    int rc = 0;
    int exit_status = 0;
+   char** req_env = NULL;
+   size_t num_env = 0;
    
-   rc = vdev_subprocess( act->command, NULL, 0, &exit_status );
+   // convert to environment variables
+   rc = vdev_device_request_to_env( vreq, &req_env, &num_env );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_device_request_to_env(%s) rc = %d\n", vreq->path, rc );
+      return rc;
+   }
+   
+   vdev_debug("run command: '%s'\n", command );
+   
+   rc = vdev_subprocess( command, req_env, output, max_output, &exit_status );
+   
+   if( output != NULL && *output != NULL ) {
+      
+      vdev_debug("command output: '%s'\n", *output );
+   }
+   
+   VDEV_FREE_LIST( req_env );
    
    if( rc != 0 ) {
       
-      vdev_error("vdev_subprocess(%s) rc = %d\n", act->command, rc );
+      vdev_error("vdev_subprocess('%s') rc = %d\n", command, rc );
+      
       return rc;
+   }
+   
+   if( exit_status != 0 ) {
+      
+      vdev_error("vdev_subprocess('%s') exit status = %d\n", command, exit_status );
    }
    
    return exit_status;
 }
 
 
-// carry out an action, asynchronously
+// carry out an action, asynchronously.
 // return 0 if we were able to fork 
-int vdev_action_run_async( struct vdev_action* act ) {
+int vdev_action_run_async( struct vdev_device_request* req, char const* command ) {
    
    int rc = 0;
    pid_t pid = 0;
@@ -446,14 +496,21 @@ int vdev_action_run_async( struct vdev_action* act ) {
          close( i );
       }
       
-      // preserve only the path environment variable
-      char* path = vdev_strdup_or_null( getenv("PATH") );
-      
       clearenv();
-      setenv("PATH", path, 1 );
+      
+      // generate the environment 
+      char** env = NULL;
+      size_t num_env = 0;
+      
+      rc = vdev_device_request_to_env( req, &env, &num_env );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_device_request_to_env('%s') rc = %d\n", req->path, rc );
+         exit(1);
+      }
       
       // run the command 
-      execl( "/bin/sh", "sh", "-c", act->command, (char*)0 );
+      execle( "/bin/sh", "sh", "-c", command, (char*)0, env );
       
       // keep gcc happy 
       return 0;
@@ -474,18 +531,63 @@ int vdev_action_run_async( struct vdev_action* act ) {
 }
 
 
+// match device request against action
+// return 1 if match
+// return 0 if not match 
+int vdev_action_match( struct vdev_device_request* vreq, struct vdev_action* act ) {
+   
+   int rc = 0;
+   
+   // path match?
+   if( act->path != NULL ) {
+      
+      rc = vdev_match_regex( vreq->path, &act->path_regex );
+      if( rc == 0 ) {
+         
+         // no match 
+         return 0;
+      }
+      if( rc < 0 ) {
+         
+         // some error
+         return rc;
+      }
+   }
+   
+   // OS parameter match?
+   if( act->dev_params != NULL ) {
+      
+      for( vdev_device_params_t::iterator itr = act->dev_params->begin(); itr != act->dev_params->end(); itr++ ) {
+         
+         vdev_device_params_t::iterator vreq_itr = vreq->params->find( itr->first );
+         
+         if( vreq_itr != vreq->params->end() ) {
+            
+            if( strcmp( vreq_itr->second.c_str(), itr->second.c_str() ) != 0 ) {
+               
+               // values don't match 
+               return 0;
+            }
+         }
+      }
+   }
+   
+   // match!
+   return 1;
+}
+
 // find the next action in a list of actions to run, given the path 
 // return the index into acts of the next match, if found 
 // return num_acts if not found 
 // return negative on error
-int vdev_action_find_next( char const* path, struct vdev_action* acts, size_t num_acts ) {
+int vdev_action_find_next( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts ) {
    
    int rc = 0;
    int i = 0;
    
    for( i = 0; (unsigned)i < num_acts; i++ ) {
       
-      rc = vdev_match_regex( path, &acts[i].path_regex );
+      rc = vdev_action_match( vreq, &acts[i] );
       
       if( rc > 0 ) {
          return i;
@@ -499,10 +601,83 @@ int vdev_action_find_next( char const* path, struct vdev_action* acts, size_t nu
 }
 
 
+// find the path to create for the given device request.
+// *path will be filled in with path to the device node, relative to the mountpoint.  *path must be NULL on call.
+// return 0 on success
+// return negative on failure 
+int vdev_action_create_path( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts, char** path ) {
+   
+   int rc = 0;
+   int act_offset = 0;
+   int i = 0;
+   char* new_path = NULL;
+   
+   if( *path != NULL ) {
+      return -EINVAL;
+   }
+   
+   while( act_offset < (signed)num_acts ) {
+      
+      // skip this action if there is no rename command 
+      if( acts[act_offset].rename_command == NULL ) {
+         act_offset++;
+         continue;
+      }
+      
+      // find the next action that matches this path
+      rc = vdev_action_find_next( vreq, acts + act_offset, num_acts - act_offset );
+      
+      if( rc == (signed)(num_acts - act_offset) ) {
+         
+         // not found 
+         rc = 0;
+         break;
+      }
+      else if( rc < 0 ) {
+         
+         // error
+         vdev_error("vdev_action_find_next(%s, offset = %d) rc = %d\n", vreq->path, act_offset, rc );
+         break;
+      }
+      else {
+         
+         // matched! advance offset to next action
+         i = act_offset + rc;
+         act_offset += rc + 1;
+         
+         if( acts[i].rename_command == NULL ) {
+            continue;
+         }
+         
+         // generate the new name
+         rc = vdev_action_run_sync( vreq, acts[i].rename_command, &new_path, PATH_MAX + 1 );
+         if( rc < 0 ) {
+            
+            vdev_error("vdev_action_run_sync('%s') rc = %d\n", acts[i].rename_command, rc );
+            break;
+         }
+         else {
+            
+            if( *path != NULL ) {
+               free( *path );
+            }
+            
+            *path = new_path;
+            new_path = NULL;
+         }
+      }
+      
+      rc = 0;
+   }
+   
+   return rc;
+}
+
+
 // run all actions for a device, sequentially, in lexographic order
 // return 0 on success
 // return negative on failure
-int vdev_action_run_all( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts ) {
+int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts ) {
    
    int rc = 0;
    int act_offset = 0;
@@ -511,12 +686,19 @@ int vdev_action_run_all( struct vdev_device_request* vreq, struct vdev_action* a
    
    while( act_offset < (signed)num_acts ) {
       
-      // find the next action
-      rc = vdev_action_find_next( vreq->path, acts + act_offset, num_acts - act_offset );
+      // skip this action if there is no command 
+      if( acts[act_offset].command == NULL ) {
+         act_offset++;
+         continue;
+      }
+      
+      // find the next action that matches this path 
+      rc = vdev_action_find_next( vreq, acts + act_offset, num_acts - act_offset );
       
       if( rc == (signed)(num_acts - act_offset) ) {
          
          // not found 
+         rc = 0;
          break;
       }
       else if( rc < 0 ) {
@@ -526,20 +708,24 @@ int vdev_action_run_all( struct vdev_device_request* vreq, struct vdev_action* a
       }
       else {
          
-         // matched! advance offset to next acl
+         // matched! advance offset to next action
          i = act_offset + rc;
          act_offset += rc + 1;
+         
+         if( acts[i].command == NULL ) {
+            continue;
+         }
          
          // what kind of action?
          if( acts[i].async ) {
             
             method = "vdev_action_run_async";
-            rc = vdev_action_run_async( &acts[i] );
+            rc = vdev_action_run_async( vreq, acts[i].command );
          }
          else {
             
             method = "vdev_action_run_sync";
-            rc = vdev_action_run_sync( &acts[i] );
+            rc = vdev_action_run_sync( vreq, acts[i].command, NULL, 0 );
          }
          
          if( rc != 0 ) {
@@ -548,9 +734,11 @@ int vdev_action_run_all( struct vdev_device_request* vreq, struct vdev_action* a
             return rc;
          }
       }
+      
+      rc = 0;
    }
    
-   return 0;
+   return rc;
 }
 
 

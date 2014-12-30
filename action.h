@@ -24,10 +24,10 @@
 
 // action fields
 #define VDEV_ACTION_NAME                "vdev-action"
-#define VDEV_OS_ACTION_NAME             "vdev-OS"
 
 #define VDEV_ACTION_NAME_EVENT          "event"
 #define VDEV_ACTION_NAME_PATH           "path"
+#define VDEV_ACTION_NAME_RENAME         "rename_command"
 #define VDEV_ACTION_NAME_SHELL          "command"
 #define VDEV_ACTION_NAME_ASYNC          "async"
 
@@ -45,7 +45,10 @@ struct vdev_action {
    char* path;
    regex_t path_regex;
    
-   // command to run 
+   // command to run to rename the matched path, if needed
+   char* rename_command;
+   
+   // command to run once the device state change is processed
    char* command;
    
    // OS-specific fields to match on
@@ -67,7 +70,8 @@ int vdev_action_load_file( FILE* f, struct vdev_action* act );
 
 int vdev_action_load_all( char const* dir, struct vdev_action** acts, size_t* num_acts );
 
-int vdev_action_run_all( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts );
+int vdev_action_create_path( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts, char** path );
+int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts );
 
 };
 
