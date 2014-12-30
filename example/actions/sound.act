@@ -1,0 +1,5 @@
+[vdev-action]
+event=any
+OS_SUBSYSTEM=sound
+rename_command=/bin/echo -n "snd/$VDEV_PATH"
+command=[ $VDEV_PATH = audio ] && /bin/mknod $VDEV_MOUNTPOINT/audio c $VDEV_MAJOR $VDEV_MINOR

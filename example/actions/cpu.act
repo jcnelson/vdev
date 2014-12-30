@@ -1,0 +1,4 @@
+[vdev-action]
+event=any
+path=microcode
+rename_command=/bin/echo -n cpu/$VDEV_PATH
