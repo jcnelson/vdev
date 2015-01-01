@@ -215,10 +215,10 @@ static int vdev_action_ini_parser( void* userdata, char const* section, char con
       }
       
       
-      if( strncmp(name, "OS_", 3) == 0 ) {
+      if( strncmp(name, VDEV_ACTION_NAME_OS_PREFIX, strlen(VDEV_ACTION_NAME_OS_PREFIX)) == 0 ) {
          
          // OS-specific param 
-         rc = vdev_action_add_param( act, name + 3, value );
+         rc = vdev_action_add_param( act, name + strlen(VDEV_ACTION_NAME_OS_PREFIX), value );
          
          if( rc == 0 ) {
             return 1;
@@ -453,6 +453,10 @@ int vdev_action_run_sync( struct vdev_device_request* vreq, char const* command,
    
    vdev_debug("run command: '%s'\n", command );
    
+   for( unsigned int i = 0; i < num_env; i++ ) {
+      vdev_debug("command env: '%s'\n", req_env[i] );
+   }
+   
    rc = vdev_subprocess( command, req_env, output, max_output, &exit_status );
    
    if( output != NULL && *output != NULL ) {
@@ -540,6 +544,11 @@ int vdev_action_match( struct vdev_device_request* vreq, struct vdev_action* act
    
    int rc = 0;
    
+   // action match?
+   if( act->trigger != vreq->type && act->trigger != VDEV_DEVICE_ANY ) {
+      return 0;
+   }
+   
    // path match?
    if( act->path != NULL ) {
       
@@ -561,15 +570,32 @@ int vdev_action_match( struct vdev_device_request* vreq, struct vdev_action* act
       
       for( vdev_device_params_t::iterator itr = act->dev_params->begin(); itr != act->dev_params->end(); itr++ ) {
          
-         vdev_device_params_t::iterator vreq_itr = vreq->params->find( itr->first );
+         const string& act_param_name = itr->first;
+         
+         vdev_device_params_t::iterator vreq_itr = vreq->params->find( act_param_name );
          
          if( vreq_itr != vreq->params->end() ) {
             
-            if( strcmp( vreq_itr->second.c_str(), itr->second.c_str() ) != 0 ) {
+            // vreq has this parameter
+            char const* vreq_param_value = vreq_itr->second.c_str();
+            char const* act_param_value = itr->second.c_str();
+            
+            // if the action has no value (value of length 0), then it matches any vreq value 
+            if( strlen( vreq_param_value ) == 0 ) {
+               continue;
+            }
+            
+            // otherwise, compare the values
+            if( strcmp( vreq_param_value, act_param_value ) != 0 ) {
                
                // values don't match 
                return 0;
             }
+         }
+         else {
+            
+            // vreq does not have this parameter, so no match 
+            return 0;
          }
       }
    }
@@ -714,6 +740,8 @@ int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_acti
          i = act_offset + rc;
          act_offset += rc + 1;
          
+         rc = 0;
+         
          if( acts[i].command == NULL ) {
             continue;
          }
@@ -736,8 +764,6 @@ int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_acti
             return rc;
          }
       }
-      
-      rc = 0;
    }
    
    return rc;

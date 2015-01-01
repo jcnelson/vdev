@@ -33,6 +33,7 @@
 #define VDEV_ACTION_NAME_RENAME         "rename_command"
 #define VDEV_ACTION_NAME_SHELL          "command"
 #define VDEV_ACTION_NAME_ASYNC          "async"
+#define VDEV_ACTION_NAME_OS_PREFIX      "OS_"
 
 #define VDEV_ACTION_EVENT_ADD           "add"
 #define VDEV_ACTION_EVENT_REMOVE        "remove"
