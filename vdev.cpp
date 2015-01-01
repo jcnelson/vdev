@@ -24,6 +24,7 @@
 #include "opts.h"
 
 static char const* vdev_fuse_odev = "-odev";
+static char const* vdev_fuse_allow_other = "-oallow_other";
 
 // post-mount callback: tell the back-end to start processing
 static int vdev_postmount_setup( struct fskit_fuse_state* state, void* cls ) {
@@ -222,7 +223,7 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
    struct vdev_opts opts;
    int fuse_argc = 0;
    int vdev_pipe[2];
-   char** fuse_argv = VDEV_CALLOC( char*, argc + 3 );
+   char** fuse_argv = VDEV_CALLOC( char*, argc + 4 );
    
    if( fuse_argv == NULL ) {
       return -ENOMEM;
@@ -295,6 +296,10 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
    
    // force -odev, since we'll create device nodes 
    fuse_argv[fuse_argc] = (char*)vdev_fuse_odev;
+   fuse_argc++;
+   
+   // force -oallow_other, since we'll want to expose this to everyone 
+   fuse_argv[fuse_argc] = (char*)vdev_fuse_allow_other;
    fuse_argc++;
    
    vdev_opts_free( &opts );
