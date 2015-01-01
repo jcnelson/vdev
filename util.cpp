@@ -262,6 +262,35 @@ ssize_t vdev_read_uninterrupted( int fd, char* buf, size_t len ) {
 }
 
 
+// read a whole file, masking EINTR 
+int vdev_read_file( char const* path, char* buf, size_t len ) {
+   
+   int fd = 0;
+   int rc = 0;
+   
+   fd = open( path, O_RDONLY );
+   if( fd < 0 ) {
+      
+      rc = -errno;
+      vdev_error("open('%s') rc = %d\n", path, rc );
+      return rc;
+   }
+   
+   rc = vdev_read_uninterrupted( fd, buf, len );
+   if( rc < 0 ) {
+      
+      rc = -errno;
+      vdev_error("vdev_read_uninterrupted('%s') rc = %d\n", path, rc );
+      
+      close( fd );
+      return rc;
+   }
+   
+   close( fd );
+   return 0;
+}
+
+
 // free a list of dirents 
 static void vdev_dirents_free( struct dirent** dirents, int num_entries ) {
    
@@ -462,3 +491,34 @@ int vdev_mkdirs( char const* dirp, int start, mode_t mode ) {
    return 0;
 }
 
+
+// given a key=value string, chomp it into a null-terminated key and value.
+// remove the newline at the end of value, if present, null-terminating it
+// return the total number of bytes consumed, including the = and \n, on success.
+// return negative on error
+int vdev_keyvalue_next( char* keyvalue, char** key, char** value ) {
+   
+   char* tmp = NULL;
+   int len_add = 0;
+   
+   // find the '='
+   tmp = strchr(keyvalue, '=');
+   if( tmp == NULL ) {
+      
+      return -EINVAL;
+   }
+   
+   *key = keyvalue;
+   *tmp = '\0';
+   tmp++;
+   
+   *value = tmp;
+   
+   tmp = strchr(*value, '\n');
+   if( tmp != NULL ) {
+      *tmp = '\0';
+      len_add = 1;
+   }
+   
+   return strlen(*key) + strlen(*value) + len_add;
+}

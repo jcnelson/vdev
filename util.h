@@ -102,9 +102,13 @@ int vdev_get_error_level();
 // shell functions 
 int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t max_output, int* exit_status );
 
+// parser functions 
+int vdev_keyvalue_next( char* keyvalue, char** key, char** value );
+
 // I/O functions 
 ssize_t vdev_read_uninterrupted( int fd, char* buf, size_t len );
 ssize_t vdev_write_uninterrupted( int fd, char const* buf, size_t len );
+int vdev_read_file( char const* path, char* buf, size_t len );
 
 // directory I/O
 int vdev_load_all( char const* dir_path, vdev_dirent_loader_t loader, void* cls );
