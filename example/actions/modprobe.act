@@ -1,0 +1,4 @@
+[vdev-action]
+event=add
+OS_MODALIAS=
+command=/sbin/modprobe $VDEV_OS_MODALIAS

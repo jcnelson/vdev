@@ -3,4 +3,3 @@ event=any
 OS_SUBSYSTEM=misc
 path=tun
 rename_command=/bin/echo -n "net/$VDEV_PATH"
-command=echo net >> /tmp/vdev-out.txt; env >> /tmp/vdev-out.txt; echo "" >> /tmp/vdev-out.txt

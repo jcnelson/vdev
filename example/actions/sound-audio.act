@@ -1,0 +1,5 @@
+[vdev-action]
+event=any
+path=audio
+OS_SUBSYSTEM=sound
+command=/bin/mknod $VDEV_MOUNTPOINT/audio c $VDEV_MAJOR $VDEV_MINOR

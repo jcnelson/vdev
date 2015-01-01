@@ -2,4 +2,3 @@
 event=any
 OS_SUBSYSTEM=drm
 rename_command=/bin/echo -n "dri/$VDEV_PATH"
-command=echo dri >> /tmp/vdev-out.txt; env >> /tmp/vdev-out.txt; echo "" >> /tmp/vdev-out.txt

@@ -1,0 +1,5 @@
+[vdev-action]
+event=add
+OS_SUBSYSTEM=block
+OS_DEVTYPE=partition
+command=DISK_ID=$(/lib/udev/ata_id $VDEV_MOUNTPOINT/$VDEV_PATH); test 0 -ne $? && exit 0; test -z "$DISK_ID" && return 0; PART=$(cat /sys/dev/block/$VDEV_MAJOR\:$VDEV_MINOR/partition); test -z $PART && return 0; DISK_NAME="ata-$DISK_ID-part${PART}"; /bin/mkdir -p $VDEV_MOUNTPOINT/disk/by-id && /bin/ln -s ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$DISK_NAME
