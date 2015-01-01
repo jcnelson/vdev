@@ -335,39 +335,37 @@ int vdev_device_request_set_mode( struct vdev_device_request* req, mode_t mode )
    return 0;
 }
 
-// handler to add a device (mknod)
-// need to fork to do this
+// handler to add a device
 static int vdev_device_add( struct fskit_wreq* wreq, void* cls ) {
    
    int rc = 0;
    struct vdev_device_request* req = (struct vdev_device_request*)cls;
    char* renamed_path = NULL;
+      
+   // do the rename, possibly generating it
+   rc = vdev_action_create_path( req, req->state->acts, req->state->num_acts, &renamed_path );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_action_create_path('%s') rc = %d\n", req->path, rc);
+      
+      // done with this request
+      vdev_device_request_free( req );
+      free( req );
    
-   if( req->path != NULL && req->dev != 0 && req->mode != 0 ) {
+      return rc;
+   }
+   
+   if( renamed_path == NULL ) {
+      renamed_path = vdev_strdup_or_null( req->path );
+   }
+   
+   vdev_debug("ADD device %p type '%s' at '%s' (%d:%d, original path='%s')\n", req, (S_ISBLK(req->mode) ? "block" : S_ISCHR(req->mode) ? "char" : "unknown"), renamed_path, major(req->dev), minor(req->dev), req->path );
+   
+   if( renamed_path != NULL && req->dev != 0 && req->mode != 0 ) {
       
-      // do the rename 
-      rc = vdev_action_create_path( req, req->state->acts, req->state->num_acts, &renamed_path );
-      if( rc != 0 ) {
-         
-         vdev_error("vdev_action_create_path('%s') rc = %d\n", req->path, rc);
-         
-         // done with this request
-         vdev_device_request_free( req );
-         free( req );
-      
-         return rc;
-      }
-      
-      if( renamed_path == NULL ) {
-         renamed_path = vdev_strdup_or_null( req->path );
-      }
-      
-      vdev_debug("ADD device %p type %s at '%s' (%d:%d, original path='%s')\n", req, (S_ISBLK(req->mode) ? "'block'" : S_ISCHR(req->mode) ? "'char'" : "'unknown'"), renamed_path, major(req->dev), minor(req->dev), req->path );
-      
+      // make the device file
       char* fp = fskit_fullpath( req->state->mountpoint, renamed_path, NULL );
       char* fp_dir = fskit_dirname( fp, NULL );
-      
-      free( renamed_path );
       
       if( strcmp(fp_dir, "/") != 0 ) {
       
@@ -389,19 +387,23 @@ static int vdev_device_add( struct fskit_wreq* wreq, void* cls ) {
             
             vdev_error("mknod(%s, dev=(%u, %u)) rc = %d\n", fp, major(req->dev), minor(req->dev), rc );
          }
-         
-         else {
-            
-            // call all ADD actions
-            rc = vdev_action_run_commands( req, req->state->acts, req->state->num_acts );
-            if( rc != 0 ) {
-               
-               vdev_error("vdev_action_run_commands(ADD %s, dev=(%u, %u)) rc = %d\n", fp, major(req->dev), minor(req->dev), rc );
-            }
-         }
       }
       
       free( fp );
+   }
+   
+   if( rc == 0 ) {
+
+      // success!  call all ADD actions
+      rc = vdev_action_run_commands( req, req->state->acts, req->state->num_acts );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_action_run_commands(ADD %p, dev=(%u, %u)) rc = %d\n", req, major(req->dev), minor(req->dev), rc );
+      }
+   }
+   
+   if( renamed_path != NULL ) {
+      free( renamed_path );
    }
    
    // done with this request
@@ -419,31 +421,62 @@ static int vdev_device_remove( struct fskit_wreq* wreq, void* cls ) {
    int rc = 0;
    struct vdev_device_request* req = (struct vdev_device_request*)cls;
    
-   if( req->path != NULL ) {
+   char* renamed_path = NULL;
       
-      vdev_debug("REMOVE device %p type %s at %s (%d:%d)\n", req, (S_ISBLK(req->mode) ? "'block'" : S_ISCHR(req->mode) ? "'char'" : "'unknown'"), req->path, major(req->dev), minor(req->dev) );
+   // do the rename, possibly generating it
+   rc = vdev_action_create_path( req, req->state->acts, req->state->num_acts, &renamed_path );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_action_create_path('%s') rc = %d\n", req->path, rc);
+      
+      // done with this request
+      vdev_device_request_free( req );
+      free( req );
+   
+      return rc;
+   }
+   
+   if( renamed_path == NULL ) {
+      renamed_path = vdev_strdup_or_null( req->path );
+   }
+   
+   vdev_debug("REMOVE device %p type '%s' at '%s' (%d:%d) (original path='%s')\n", req, (S_ISBLK(req->mode) ? "block" : S_ISCHR(req->mode) ? "char" : "unknown"), renamed_path, major(req->dev), minor(req->dev), req->path );
+      
+   if( renamed_path != NULL ) {
       
       // child
       char* fp = fskit_fullpath( req->state->mountpoint, req->path, NULL );
    
       // call into our unlink() via FUSE (waking up inotify/kqueue listeners)
-      rc = 0; unlink( fp );
+      rc = unlink( fp );
       if( rc != 0 ) {
          
-         vdev_error("unlink(%s) rc = %d\n", fp, rc );
-      }
-      
-      else {
-         
-         // call all REMOVE actions
-         rc = vdev_action_run_commands( req, req->state->acts, req->state->num_acts );
-         if( rc != 0 ) {
+         rc = -errno;
+         if( rc != -ENOENT ) {
+            vdev_error("unlink(%s) rc = %d\n", fp, rc );
+         }
+         else {
             
-            vdev_error("vdev_action_run_all(REMOVE %s) rc = %d\n", fp, rc );
+            // not an error--someone else beat us to it
+            rc = 0;
          }
       }
       
       free( fp );
+   }
+      
+   if( rc == 0 ) {
+      
+      // call all REMOVE actions
+      rc = vdev_action_run_commands( req, req->state->acts, req->state->num_acts );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_action_run_all(REMOVE %p) rc = %d\n", req, rc );
+      }
+   }
+   
+   if( renamed_path != NULL ) {
+      free( renamed_path );
    }
    
    // done with this request 

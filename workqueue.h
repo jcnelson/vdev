@@ -48,7 +48,7 @@ struct vdev_device_request {
    vdev_device_request_t type;
    
    // path to the device node to create (if we're making one at all)
-   // If we're creating an interface, this is the interface name.
+   // If we're creating a network interface, this is the interface name.
    char* path;
    
    // device numbers, for mknod
