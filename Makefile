@@ -8,16 +8,20 @@ DEFS  := -D_REENTRANT -D_THREAD_SAFE -D__STDC_FORMAT_MACROS -D_FILE_OFFSET_BITS=
 
 VDEV := vdev
 
-DESTDIR := /
-BIN_DIR := /usr/local/bin
+PREFIX ?= /usr
+BINDIR ?= $(PREFIX)/bin
 
 # change/override this for your OS
 OS := LINUX
 
-all: vdev
+all: $(VDEV)
 
-vdev: $(OBJ)
+$(VDEV): $(OBJ)
 	$(CPP) -o $(VDEV) $(OBJ) $(LIBINC) $(LIB) -D_VDEV_OS_$(OS)
+
+install: $(VDEV)
+	mkdir -p $(BINDIR)
+	cp -a $(VDEV) $(BINDIR)
 
 %.o : %.c
 	$(CPP) -o $@ $(INC) -c $< $(DEFS) -D_VDEV_OS_$(OS)
