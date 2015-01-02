@@ -367,7 +367,7 @@ static int vdev_device_add( struct fskit_wreq* wreq, void* cls ) {
       char* fp = fskit_fullpath( req->state->mountpoint, renamed_path, NULL );
       char* fp_dir = fskit_dirname( fp, NULL );
       
-      if( strcmp(fp_dir, "/") != 0 ) {
+      if( strchr(renamed_path, '/') != NULL ) {
       
          // make sure the directories leading to this path exist 
          rc = vdev_mkdirs( fp_dir, strlen(req->state->mountpoint), 0777 );
