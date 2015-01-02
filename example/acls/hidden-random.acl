@@ -1,4 +1,4 @@
 [vdev-acl]
-uid=0
+uid=jude
 paths=.*random
 setmode=000
