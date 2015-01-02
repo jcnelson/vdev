@@ -286,26 +286,6 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
       
       offset += rc + 1;         // count the \0 at the end
       
-      /*
-      // sanity check: must have '='
-      key = buf + offset;
-      value = strchr(key, '=');
-      
-      if( value == NULL ) {
-         // invalid line 
-         vdev_error("Invalid line '%s'\n", key);
-         
-         return -EINVAL;
-      }
-      
-      // next line
-      offset += strlen(key) + 1;
-      
-      // separate key and value 
-      *value = '\0';
-      value++;
-      */
-      
       rc = vdev_device_request_add_param( vreq, key, value );
       if( rc != 0 ) {
          
@@ -802,12 +782,18 @@ static int vdev_linux_sysfs_register_device( struct vdev_linux_context* ctx, cha
       // parse uevent, if we have it 
       if( uevent_buf != NULL ) {
          
-         while( uevent_off < (signed)uevent_buf_len ) {
+         while( uevent_off <= (signed)uevent_buf_len ) {
+            
+            if( strlen( uevent_buf + uevent_off ) == 0 ) {
+               // end of buffer
+               rc = 0;
+               break;
+            }
             
             rc = vdev_keyvalue_next( uevent_buf + uevent_off, &uevent_key, &uevent_value );
             if( rc < 0 ) {
                
-               vdev_error("Invalid uevent line '%s'\n", uevent_buf + uevent_off );
+               vdev_error("Invalid uevent line '%s' at %d bytes\n", uevent_buf + uevent_off, uevent_off );
                rc = 0;
                break;
             }
