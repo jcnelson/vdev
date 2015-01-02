@@ -27,186 +27,6 @@
 #include "vdev.h"
 #include "match.h"
 
-// parse an unsigned 64-bit number 
-static uint64_t vdev_parse_uint64( char const* uint64_str, bool* success ) {
-   
-   char* tmp = NULL;
-   uint64_t uid = (uint64_t)strtoll( uint64_str, &tmp, 10 );
-   
-   if( tmp == NULL ) {
-      *success = false;
-   }
-   else {
-      *success = true;
-   }
-   
-   return uid;
-}
-
-
-// parse a "uid" field.
-// translate a username into a uid, if needed
-// return 0 and set uid on success 
-// return negative on error 
-static int vdev_acl_parse_uid( char const* uid_str, uid_t* uid ) {
-   
-   bool parsed = false;
-   int rc = 0;
-   
-   *uid = (uid_t)vdev_parse_uint64( uid_str, &parsed );
-   
-   // not a number?
-   if( !parsed ) {
-      
-      // probably a username 
-      char* pwd_buf = NULL;
-      struct passwd pwd;
-      
-      // look up the uid...
-      rc = vdev_get_passwd( uid_str, &pwd, &pwd_buf );
-      if( rc != 0 ) {
-         
-         vdev_error("vdev_get_passwd(%s) rc = %d\n", uid_str, rc );
-         return rc;
-      }
-      
-      *uid = pwd.pw_uid;
-      
-      free( pwd_buf );
-   }
-   
-   return 0;
-}
-
-
-// parse a GID 
-// translate a group name into a gid, if needed
-// return 0 and set gid on success 
-// return negative on error
-static int vdev_acl_parse_gid( char const* gid_str, gid_t* gid ) {
-   
-   bool parsed = false;
-   int rc = 0;
-   
-   *gid = (gid_t)vdev_parse_uint64( gid_str, &parsed );
-   
-   // not a number?
-   if( !parsed ) {
-      
-      // probably a username 
-      char* grp_buf = NULL;
-      struct group grp;
-      
-      // look up the gid...
-      rc = vdev_get_group( gid_str, &grp, &grp_buf );
-      if( rc != 0 ) {
-         
-         vdev_error("vdev_get_passwd(%s) rc = %d\n", gid_str, rc );
-         return rc;
-      }
-      
-      *gid = grp.gr_gid;
-      
-      free( grp_buf );
-   }
-   
-   return 0;
-}
-
-
-// verify that a UID is valid 
-static int vdev_acl_validate_uid( uid_t uid ) {
-   
-   struct passwd* result = NULL;
-   char* buf = NULL;
-   int buf_len = 0;
-   int rc = 0;
-   struct passwd pwd;
-   
-   memset( &pwd, 0, sizeof(struct passwd) );
-   
-   buf_len = sysconf( _SC_GETPW_R_SIZE_MAX );
-   if( buf_len <= 0 ) {
-      buf_len = 65536;
-   }
-   
-   buf = VDEV_CALLOC( char, buf_len );
-   if( buf == NULL ) {
-      return -ENOMEM;
-   }
-   
-   rc = getpwuid_r( uid, &pwd, buf, buf_len, &result );
-   
-   if( result == NULL ) {
-      
-      if( rc == 0 ) {
-         free( buf );
-         return -ENOENT;
-      }
-      else {
-         rc = -errno;
-         free( buf );
-         
-         vdev_error("getpwuid_r(%" PRIu64 ") errno = %d\n", uid, rc);
-         return rc;
-      }
-   }
-   
-   if( uid != pwd.pw_uid ) {
-      rc = -EINVAL;
-   }
-   
-   free( buf );
-   
-   return rc;
-}
-
-// verify that a GID is valid 
-static int vdev_acl_validate_gid( gid_t gid ) {
-   
-   struct group* result = NULL;
-   struct group grp;
-   char* buf = NULL;
-   int buf_len = 0;
-   int rc = 0;
-   
-   memset( &grp, 0, sizeof(struct group) );
-   
-   buf_len = sysconf( _SC_GETGR_R_SIZE_MAX );
-   if( buf_len <= 0 ) {
-      buf_len = 65536;
-   }
-   
-   buf = VDEV_CALLOC( char, buf_len );
-   if( buf == NULL ) {
-      return -ENOMEM;
-   }
-   
-   rc = getgrgid_r( gid, &grp, buf, buf_len, &result );
-   
-   if( result == NULL ) {
-      
-      if( rc == 0 ) {
-         free( buf );
-         return -ENOENT;
-      }
-      else {
-         rc = -errno;
-         free( buf );
-         
-         vdev_error("getgrgid_r(%" PRIu64 ") errno = %d\n", gid, rc);
-         return rc;
-      }
-   }
-   
-   if( gid != grp.gr_gid ) {
-      rc = -EINVAL;
-   }
-   
-   free( buf );
-   
-   return rc;
-}
 
 // parse the ACL mode 
 static int vdev_acl_parse_mode( mode_t* mode, char const* mode_str ) {
@@ -215,7 +35,7 @@ static int vdev_acl_parse_mode( mode_t* mode, char const* mode_str ) {
    
    *mode = ((mode_t)strtol( mode_str, &tmp, 8 )) & 0777;
    
-   if( tmp == NULL ) {
+   if( *tmp != '\0' ) {
       return -EINVAL;
    }
    else {
@@ -288,10 +108,10 @@ static int vdev_acl_ini_parser( void* userdata, char const* section, char const*
       
       // parse user or UID 
       uid_t uid = 0;
-      int rc = vdev_acl_parse_uid( value, &uid );
+      int rc = vdev_parse_uid( value, &uid );
       
       if( rc != 0 ) {
-         vdev_error("vdev_acl_parse_uid(%s) rc = %d\n", value, rc );
+         vdev_error("vdev_parse_uid(%s) rc = %d\n", value, rc );
          
          fprintf(stderr, "Invalid user/UID '%s'\n", value );
          return 0;
@@ -306,10 +126,10 @@ static int vdev_acl_ini_parser( void* userdata, char const* section, char const*
       
       // parse user or UID 
       uid_t uid = 0;
-      int rc = vdev_acl_parse_uid( value, &uid );
+      int rc = vdev_parse_uid( value, &uid );
       
       if( rc != 0 ) {
-         vdev_error("vdev_acl_parse_uid(%s) rc = %d\n", value, rc );
+         vdev_error("vdev_parse_uid(%s) rc = %d\n", value, rc );
          
          fprintf(stderr, "Invalid user/UID '%s'\n", value );
          return 0;
@@ -324,10 +144,10 @@ static int vdev_acl_ini_parser( void* userdata, char const* section, char const*
       
       // parse group or GID 
       gid_t gid = 0;
-      int rc = vdev_acl_parse_gid( value, &gid );
+      int rc = vdev_parse_gid( value, &gid );
       
       if( rc != 0 ) {
-         vdev_error("vdev_acl_parse_gid(%s) rc = %d\n", value, rc );
+         vdev_error("vdev_parse_gid(%s) rc = %d\n", value, rc );
          
          fprintf(stderr, "Invalid group/GID '%s'\n", value );
          return 0;
@@ -342,10 +162,10 @@ static int vdev_acl_ini_parser( void* userdata, char const* section, char const*
       
       // parse group or GID 
       gid_t gid = 0;
-      int rc = vdev_acl_parse_gid( value, &gid );
+      int rc = vdev_parse_gid( value, &gid );
       
       if( rc != 0 ) {
-         vdev_error("vdev_acl_parse_gid(%s) rc = %d\n", value, rc );
+         vdev_error("vdev_parse_gid(%s) rc = %d\n", value, rc );
          
          fprintf(stderr, "Invalid group/GID '%s'\n", value );
          return 0;
@@ -468,7 +288,7 @@ int vdev_acl_sanity_check( struct vdev_acl* acl ) {
    
    if( acl->has_gid ) {
       
-      rc = vdev_acl_validate_gid( acl->gid );
+      rc = vdev_validate_gid( acl->gid );
       if( rc != 0 ) {
          
          fprintf(stderr, "Invalid GID %d\n", acl->gid );
@@ -478,7 +298,7 @@ int vdev_acl_sanity_check( struct vdev_acl* acl ) {
    
    if( acl->has_setgid ) {
       
-      rc = vdev_acl_validate_gid( acl->gid );
+      rc = vdev_validate_gid( acl->gid );
       if( rc != 0 ) {
          
          fprintf(stderr, "Invalid set-GID %d\n", acl->setgid );
@@ -488,7 +308,7 @@ int vdev_acl_sanity_check( struct vdev_acl* acl ) {
    
    if( acl->has_uid ) {
       
-      rc = vdev_acl_validate_uid( acl->uid );
+      rc = vdev_validate_uid( acl->uid );
       if( rc != 0 ) {
          
          fprintf(stderr, "Invalid UID %d\n", acl->uid );
@@ -498,18 +318,12 @@ int vdev_acl_sanity_check( struct vdev_acl* acl ) {
    
    if( acl->has_setuid ) {
       
-      rc = vdev_acl_validate_uid( acl->uid );
+      rc = vdev_validate_uid( acl->uid );
       if( rc != 0 ) {
          
          fprintf(stderr, "Invalid set-UID %d\n", acl->setuid );
          return rc;
       }
-   }
-   
-   if( acl->paths == NULL || acl->regexes == NULL || acl->num_paths == 0 ) {
-      
-      fprintf(stderr, "No paths given.  Please set the 'paths=' option.\n");
-      return -EINVAL;
    }
    
    return rc;
@@ -525,7 +339,10 @@ int vdev_acl_init( struct vdev_acl* acl ) {
 // free an acl 
 int vdev_acl_free( struct vdev_acl* acl ) {
    
-   vdev_match_regexes_free( acl->paths, acl->regexes, acl->num_paths );
+   if( acl->num_paths > 0 ) {
+      
+      vdev_match_regexes_free( acl->paths, acl->regexes, acl->num_paths );
+   }
    
    if( acl->proc_path != NULL ) {
       free( acl->proc_path );
@@ -715,49 +532,6 @@ int vdev_acl_load_all( char const* dir_path, struct vdev_acl** ret_acls, size_t*
    return 0;
 }
 
-
-// given a list of access control lists, find the index of the first one that applies to the given path 
-// return >= 0 with the index
-// return num_acls if not found
-// return negative on error
-int vdev_acl_find_next( char const* path, struct vdev_acl* acls, size_t num_acls ) {
-   
-   int matched = 0;
-   bool found = false;
-   int idx = 0;
-   
-   for( unsigned int i = 0; i < num_acls; i++ ) {
-      
-      matched = vdev_match_first_regex( path, acls[i].regexes, acls[i].num_paths );
-      
-      if( matched >= (signed)acls[i].num_paths ) {
-         // no match
-         continue;
-      }
-      
-      if( matched < 0 ) {
-         vdev_error("vdev_match_first_regex(%s) rc = %d\n", path );
-         return matched;
-      }
-      
-      found = true;
-      idx = i;
-      break;
-   }
-   
-   if( found ) {
-      return idx;
-   }
-   else {
-      if( matched >= 0 ) {
-         return num_acls;
-      }
-      else {
-         return matched;
-      }
-   }
-}
-
 // modify a stat buffer to apply a user access control list, if the acl says so
 int vdev_acl_do_set_user( struct vdev_acl* acl, uid_t caller_uid, struct stat* sb ) {
    
@@ -836,7 +610,7 @@ int vdev_parse_pids( char const* pid_list_str, size_t pid_list_len, pid_t** pids
       
       // is this a pid?
       pid_t next_pid = (pid_t)strtoll( tok, &strtoll_tmp, 10 );
-      if( strtoll_tmp == NULL ) {
+      if( *strtoll_tmp != '\0' ) {
          
          // not valid 
          vdev_error("Invalid PID '%s'\n", tok );
@@ -1026,34 +800,97 @@ int vdev_acl_match_process( struct vdev_acl* acl, struct pstat* ps, uid_t caller
 }
 
 
-// apply the acl to the stat buf, filtering on caller uid, gid, and process information
-int vdev_acl_apply( struct vdev_acl* acl, struct pstat* caller_proc, uid_t caller_uid, gid_t caller_gid, struct stat* sb ) {
+// given a list of access control lists, find the index of the first one that applies to the given caller and path. 
+// return >= 0 with the index
+// return num_acls if not found
+// return negative on error
+int vdev_acl_find_next( char const* path, struct pstat* caller_proc, uid_t caller_uid, gid_t caller_gid, struct vdev_acl* acls, size_t num_acls ) {
    
    int rc = 0;
+   bool found = false;
+   int idx = 0;
    
-   // does this apply to our process?
-   rc = vdev_acl_match_process( acl, caller_proc, caller_uid, caller_gid );
-   if( rc < 0 ) {
+   for( unsigned int i = 0; i < num_acls; i++ ) {
       
-      vdev_error("vdev_acl_match_process(%d) rc = %d\n", caller_proc->pid );
-      return rc;
+      rc = 0;
+      
+      // match UID?
+      if( acls[i].has_uid && acls[i].uid != caller_uid ) {
+         // nope 
+         continue;
+      }
+      
+      // match GID?
+      if( acls[i].has_gid && acls[i].gid != caller_gid ) {
+         // nope 
+         continue;
+      }
+      
+      // match path?
+      if( acls[i].num_paths > 0 ) {
+         
+         rc = vdev_match_first_regex( path, acls[i].regexes, acls[i].num_paths );
+         
+         if( rc >= (signed)acls[i].num_paths ) {
+            // no match
+            continue;
+         }
+      }
+      
+      if( rc < 0 ) {
+         
+         vdev_error("vdev_match_first_regex(%s) rc = %d\n", path, rc );
+         break;
+      }
+      
+      // match process?  Do this last, since it can be expensive 
+      rc = vdev_acl_match_process( &acls[i], caller_proc, caller_uid, caller_gid );
+      if( rc == 0 ) {
+         // no match 
+         continue;
+      }
+      
+      if( rc < 0 ) {
+         
+         // error...
+         vdev_error("vdev_acl_match_process(%d) rc = %d\n", caller_proc->pid, rc );
+         break;
+      }
+      
+      // success!
+      found = true;
+      idx = i;
+      rc = 0;
+      break;
    }
    
-   if( rc > 0 ) {
-      
-      // apply!
-      // set user, group, mode (if given)
-      vdev_acl_do_set_user( acl, caller_uid, sb );
-      vdev_acl_do_set_group( acl, caller_gid, sb );
-      vdev_acl_do_set_mode( acl, sb );
+   if( found ) {
+      return idx;
    }
+   else {
+      if( rc >= 0 ) {
+         return num_acls;
+      }
+      else {
+         return rc;
+      }
+   }
+}
+
+// apply the acl to the stat buf, filtering on caller uid, gid, and process information
+int vdev_acl_apply( struct vdev_acl* acl, uid_t caller_uid, gid_t caller_gid, struct stat* sb ) {
+   
+   // set user, group, mode (if given)
+   vdev_acl_do_set_user( acl, caller_uid, sb );
+   vdev_acl_do_set_group( acl, caller_gid, sb );
+   vdev_acl_do_set_mode( acl, sb );
    
    return 0;
 }
 
 
 // go through the list of acls and apply any modifications to the given stat buffer
-// return 1 on success
+// return 1 if at least one ACL matches
 // return 0 if there are no matches (i.e. this device node should be hidden)
 // return negative on error 
 int vdev_acl_apply_all( struct vdev_acl* acls, size_t num_acls, char const* path, struct pstat* caller_proc, uid_t caller_uid, gid_t caller_gid, struct stat* sb ) {
@@ -1066,11 +903,12 @@ int vdev_acl_apply_all( struct vdev_acl* acls, size_t num_acls, char const* path
    while( acl_offset < (signed)num_acls ) {
       
       // find the next acl 
-      rc = vdev_acl_find_next( path, acls + acl_offset, num_acls - acl_offset );
+      rc = vdev_acl_find_next( path, caller_proc, caller_uid, caller_gid, acls + acl_offset, num_acls - acl_offset );
       
       if( rc == (signed)(num_acls - acl_offset) ) {
          
          // not found 
+         rc = 0;
          break;
       }
       else if( rc < 0 ) {
@@ -1086,7 +924,7 @@ int vdev_acl_apply_all( struct vdev_acl* acls, size_t num_acls, char const* path
          found = true;
          
          // apply the ACL 
-         rc = vdev_acl_apply( &acls[i], caller_proc, caller_uid, caller_gid, sb );
+         rc = vdev_acl_apply( &acls[i], caller_uid, caller_gid, sb );
          if( rc != 0 ) {
             
             vdev_error("vdev_acl_apply(%s, offset = %d) rc = %d\n", path, acl_offset, rc );
