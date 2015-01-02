@@ -387,6 +387,38 @@ static int vdev_device_add( struct fskit_wreq* wreq, void* cls ) {
             
             vdev_error("mknod(%s, dev=(%u, %u)) rc = %d\n", fp, major(req->dev), minor(req->dev), rc );
          }
+         else {
+               
+            // save all OS-specific attributes to this, via setxattr 
+            for( vdev_device_params_t::iterator itr = req->params->begin(); itr != req->params->end(); itr++ ) {
+               
+               char const* param_name = itr->first.c_str();
+               char const* param_value = itr->second.c_str();
+               
+               char* vdev_param_name = VDEV_CALLOC( char, strlen(VDEV_OS_XATTR_NAMESPACE) + 1 + strlen(param_name) + 1 );
+               
+               if( vdev_param_name == NULL ) {
+                  
+                  rc = -ENOMEM;
+                  break;
+               }
+               
+               sprintf(vdev_param_name, "%s%s", VDEV_OS_XATTR_NAMESPACE, param_name );
+               
+               rc = setxattr( fp, vdev_param_name, param_value, strlen(param_value) + 1, 0 );
+               
+               if( rc != 0 ) {
+                  
+                  rc = -errno;
+                  vdev_error("WARN: setxattr('%s' = '%s') rc = %d\n", vdev_param_name, param_value, rc );
+                  
+                  // not a fatal error...
+                  rc = 0;
+               }
+               
+               free( vdev_param_name );
+            }
+         }  
       }
       
       free( fp );

@@ -29,6 +29,8 @@ using namespace std;
 
 #define VDEV_NAME_MAX 256
 
+#define VDEV_OS_XATTR_NAMESPACE    "vdev.VDEV_OS_"
+
 // device request type 
 enum vdev_device_request_t {
    VDEV_DEVICE_INVALID = 0,             // invalid request
