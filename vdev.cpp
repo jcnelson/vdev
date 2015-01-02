@@ -39,6 +39,8 @@ static int vdev_postmount_setup( struct fskit_fuse_state* state, void* cls ) {
       return rc;
    }
    
+   clearenv();
+   
    return 0;
 }
 
@@ -130,12 +132,6 @@ int vdev_backend_start( struct vdev_state* vdev ) {
       vdev_error("vdev_os_context_init rc = %d\n", rc );
       
       return rc;
-   }
-   
-   // drop privileges
-   clearenv();
-   if( getuid() == 0 ) {
-      // TODO
    }
    
    return 0;
@@ -484,8 +480,6 @@ int vdev_free( struct vdev_state* state ) {
 // stat: equvocate about which devices exist, depending on who's asking
 int vdev_stat( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct stat* sb ) {
    
-   vdev_debug("vdev_stat(%s)\n", grp->path );
-   
    int rc = 0;
    struct pstat ps;
    pid_t pid = 0;
@@ -498,8 +492,11 @@ int vdev_stat( struct fskit_core* core, struct fskit_match_group* grp, struct fs
    pid = fskit_fuse_get_pid();
    uid = fskit_fuse_get_uid( fs_state );
    gid = fskit_fuse_get_gid( fs_state );
-   rc = pstat( pid, &ps, state->config->pstat_discipline );
    
+   vdev_debug("vdev_stat('%s') from user %d group %d task %d\n", grp->path, uid, gid, pid );
+   
+   // see who's asking 
+   rc = pstat( pid, &ps, state->config->pstat_discipline );
    if( rc != 0 ) {
       
       vdev_error("pstat(%d) rc = %d\n", pid, rc );
@@ -515,9 +512,10 @@ int vdev_stat( struct fskit_core* core, struct fskit_match_group* grp, struct fs
    }
    
    // omit entirely?
-   if( rc == 0 ) {
+   if( rc == 0 || (sb->st_mode & 0777) == 0 ) {
       
       // filter
+      vdev_debug("Filter '%s'\n", grp->path );
       return -ENOENT;
    }
    else {
@@ -529,7 +527,6 @@ int vdev_stat( struct fskit_core* core, struct fskit_match_group* grp, struct fs
 
 // readdir: equivocate about which devices exist, depending on who's asking
 int vdev_readdir( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct fskit_dir_entry** dirents, size_t num_dirents ) {
-   
    
    int rc = 0;
    struct fskit_entry* child = NULL;
@@ -546,12 +543,13 @@ int vdev_readdir( struct fskit_core* core, struct fskit_match_group* grp, struct
    
    struct stat sb;
    struct pstat ps;
+   char* child_path = NULL;
    
    pid = fskit_fuse_get_pid();
    uid = fskit_fuse_get_uid( fs_state );
    gid = fskit_fuse_get_gid( fs_state );
    
-   vdev_debug("vdev_readdir(%s, %zu) from task %d\n", grp->path, num_dirents, pid );
+   vdev_debug("vdev_readdir(%s, %zu) from user %d group %d task %d\n", grp->path, num_dirents, uid, gid, pid );
    
    // see who's asking
    rc = pstat( pid, &ps, state->config->pstat_discipline );
@@ -578,23 +576,46 @@ int vdev_readdir( struct fskit_core* core, struct fskit_match_group* grp, struct
       
       fskit_entry_rlock( child );
       
-      rc = vdev_acl_apply_all( state->acls, state->num_acls, grp->path, &ps, uid, gid, &sb );
+      // construct a stat buffer from what we actually need 
+      memset( &sb, 0, sizeof(struct stat) );
+      
+      sb.st_uid = child->owner;
+      sb.st_gid = child->group;
+      sb.st_mode = fskit_fullmode( child->type, child->mode );
+      
+      child_path = fskit_fullpath( grp->path, child->name, NULL );
+      if( child_path == NULL ) {
+         
+         // can't continue; OOM
+         fskit_entry_unlock( child );
+         rc = -ENOMEM;
+         break;
+      }
+      
+      // filter it 
+      rc = vdev_acl_apply_all( state->acls, state->num_acls, child_path, &ps, uid, gid, &sb );
       if( rc < 0 ) {
          
-         vdev_error("vdev_acl_apply_all(%s, uid=%d, gid=%d, pid=%d) rc = %d\n", grp->path, uid, gid, pid, rc );
+         vdev_error("vdev_acl_apply_all('%s', uid=%d, gid=%d, pid=%d) rc = %d\n", child_path, uid, gid, pid, rc );
          rc = -EIO;
       }
-      else if( rc == 0 ) {
+      else if( rc == 0 || (sb.st_mode & 0777) == 0 ) {
          
          // omit this one 
+         vdev_debug("Filter '%s'\n", child->name );
          omitted_idx.push_back( i );
+         
+         rc = 0;
       }
       else {
          
+         // success; matched
          rc = 0;
       }
       
       fskit_entry_unlock( child );
+      
+      free( child_path );
       
       // error?
       if( rc != 0 ) {
