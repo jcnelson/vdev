@@ -356,6 +356,7 @@ int vdev_load_all( char const* dir_path, vdev_dirent_loader_t loader, void* cls 
 // get a passwd struct for a user.
 // on success, fill in pwd and *pwd_buf (the caller must free *pwd_buf, but not pwd).
 // return 0 on success
+// return negative on error
 int vdev_get_passwd( char const* username, struct passwd* pwd, char** pwd_buf ) {
    
    struct passwd* result = NULL;
@@ -391,6 +392,8 @@ int vdev_get_passwd( char const* username, struct passwd* pwd, char** pwd_buf ) 
          return rc;
       }
    }
+   
+   *pwd_buf = buf;
    
    // success!
    return rc;
@@ -492,6 +495,24 @@ int vdev_mkdirs( char const* dirp, int start, mode_t mode ) {
 }
 
 
+// parse an unsigned 64-bit number 
+// set *success to true if we succeeded
+uint64_t vdev_parse_uint64( char const* uint64_str, bool* success ) {
+   
+   char* tmp = NULL;
+   uint64_t uid = (uint64_t)strtoll( uint64_str, &tmp, 10 );
+   
+   if( *tmp != '\0' ) {
+      *success = false;
+   }
+   else {
+      *success = true;
+   }
+   
+   return uid;
+}
+
+
 // given a key=value string, chomp it into a null-terminated key and value.
 // remove the newline at the end of value, if present, null-terminating it
 // return the total number of bytes consumed, including the = and \n, on success.
@@ -521,4 +542,178 @@ int vdev_keyvalue_next( char* keyvalue, char** key, char** value ) {
    }
    
    return strlen(*key) + strlen(*value) + len_add;
+}
+
+
+
+// parse a username or uid from a string.
+// translate a username into a uid, if needed
+// return 0 and set *uid on success 
+// return negative on error 
+int vdev_parse_uid( char const* uid_str, uid_t* uid ) {
+   
+   bool parsed = false;
+   int rc = 0;
+   
+   *uid = (uid_t)vdev_parse_uint64( uid_str, &parsed );
+   
+   // not a number?
+   if( !parsed ) {
+      
+      // probably a username 
+      char* pwd_buf = NULL;
+      struct passwd pwd;
+      
+      // look up the uid...
+      rc = vdev_get_passwd( uid_str, &pwd, &pwd_buf );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_get_passwd(%s) rc = %d\n", uid_str, rc );
+         return rc;
+      }
+      
+      *uid = pwd.pw_uid;
+      
+      vdev_debug("UID of '%s' is %d\n", uid_str, *uid );
+      
+      free( pwd_buf );
+   }
+   
+   return 0;
+}
+
+
+// parse a group name or GID from a string
+// translate a group name into a gid, if needed
+// return 0 and set gid on success 
+// return negative on error
+int vdev_parse_gid( char const* gid_str, gid_t* gid ) {
+   
+   bool parsed = false;
+   int rc = 0;
+   
+   *gid = (gid_t)vdev_parse_uint64( gid_str, &parsed );
+   
+   // not a number?
+   if( !parsed ) {
+      
+      // probably a username 
+      char* grp_buf = NULL;
+      struct group grp;
+      
+      // look up the gid...
+      rc = vdev_get_group( gid_str, &grp, &grp_buf );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_get_passwd(%s) rc = %d\n", gid_str, rc );
+         return rc;
+      }
+      
+      *gid = grp.gr_gid;
+      
+      vdev_debug("GID of '%s' is %d\n", gid_str, *gid );
+      
+      free( grp_buf );
+   }
+   
+   return 0;
+}
+
+
+// verify that a UID is valid
+// return 0 on success
+// return negative on error
+int vdev_validate_uid( uid_t uid ) {
+   
+   struct passwd* result = NULL;
+   char* buf = NULL;
+   int buf_len = 0;
+   int rc = 0;
+   struct passwd pwd;
+   
+   memset( &pwd, 0, sizeof(struct passwd) );
+   
+   buf_len = sysconf( _SC_GETPW_R_SIZE_MAX );
+   if( buf_len <= 0 ) {
+      buf_len = 65536;
+   }
+   
+   buf = VDEV_CALLOC( char, buf_len );
+   if( buf == NULL ) {
+      return -ENOMEM;
+   }
+   
+   rc = getpwuid_r( uid, &pwd, buf, buf_len, &result );
+   
+   if( result == NULL ) {
+      
+      if( rc == 0 ) {
+         free( buf );
+         return -ENOENT;
+      }
+      else {
+         rc = -errno;
+         free( buf );
+         
+         vdev_error("getpwuid_r(%" PRIu64 ") errno = %d\n", uid, rc);
+         return rc;
+      }
+   }
+   
+   if( uid != pwd.pw_uid ) {
+      rc = -EINVAL;
+   }
+   
+   free( buf );
+   
+   return rc;
+}
+
+// verify that a GID is valid 
+// return 0 on success
+// return negative on error
+int vdev_validate_gid( gid_t gid ) {
+   
+   struct group* result = NULL;
+   struct group grp;
+   char* buf = NULL;
+   int buf_len = 0;
+   int rc = 0;
+   
+   memset( &grp, 0, sizeof(struct group) );
+   
+   buf_len = sysconf( _SC_GETGR_R_SIZE_MAX );
+   if( buf_len <= 0 ) {
+      buf_len = 65536;
+   }
+   
+   buf = VDEV_CALLOC( char, buf_len );
+   if( buf == NULL ) {
+      return -ENOMEM;
+   }
+   
+   rc = getgrgid_r( gid, &grp, buf, buf_len, &result );
+   
+   if( result == NULL ) {
+      
+      if( rc == 0 ) {
+         free( buf );
+         return -ENOENT;
+      }
+      else {
+         rc = -errno;
+         free( buf );
+         
+         vdev_error("getgrgid_r(%" PRIu64 ") errno = %d\n", gid, rc);
+         return rc;
+      }
+   }
+   
+   if( gid != grp.gr_gid ) {
+      rc = -EINVAL;
+   }
+   
+   free( buf );
+   
+   return rc;
 }

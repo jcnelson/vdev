@@ -104,6 +104,7 @@ int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t m
 
 // parser functions 
 int vdev_keyvalue_next( char* keyvalue, char** key, char** value );
+uint64_t vdev_parse_uint64( char const* uint64_str, bool* success );
 
 // I/O functions 
 ssize_t vdev_read_uninterrupted( int fd, char* buf, size_t len );
@@ -117,6 +118,10 @@ int vdev_mkdirs( char const* dirp, int start, mode_t mode );
 // passwd/group query
 int vdev_get_passwd( char const* username, struct passwd* pwd, char** pwd_buf );
 int vdev_get_group( char const* groupname, struct group* grp, char** grp_buf );
+int vdev_parse_uid( char const* uid_str, uid_t* uid );
+int vdev_parse_gid( char const* gid_str, gid_t* gid );
+int vdev_validate_uid( uid_t uid );
+int vdev_validate_gid( gid_t gid );
 
 }
 
