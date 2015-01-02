@@ -121,7 +121,7 @@ int vdev_opts_parse( struct vdev_opts* opts, int argc, char** argv, int* fuse_ar
             
             debug_level = strtol( optarg, &tmp, 10 );
             
-            if( tmp == NULL ) {
+            if( *tmp != '\0' ) {
                fprintf(stderr, "Invalid argument for -d\n");
                rc = -1;
             }
