@@ -1,4 +1,0 @@
-[vdev-action]
-event=add
-path=sr0
-command=/bin/ln -s $VDEV_PATH $VDEV_MOUNTPOINT/cdrom
