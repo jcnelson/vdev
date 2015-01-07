@@ -44,7 +44,6 @@ static int vdev_postmount_setup( struct fskit_fuse_state* state, void* cls ) {
    return 0;
 }
 
-
 // initialize the back-end link to the OS.
 // call after vdev_init
 int vdev_backend_init( struct vdev_state* vdev ) {
@@ -176,8 +175,7 @@ int vdev_frontend_init( struct vdev_state* vdev ) {
    
    core = fskit_fuse_get_core( fs );
    
-   // add handlers.  reads and writes must happen sequentially, since we seek and then perform I/O
-   // NOTE: FSKIT_ROUTE_ANY matches any path, and is a macro for the regex "/([^/]+[/]*)+"
+   // add handlers.
    rh = fskit_route_readdir( core, FSKIT_ROUTE_ANY, vdev_readdir, FSKIT_CONCURRENT );
    if( rh < 0 ) {
       
@@ -289,6 +287,7 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
    vdev_debug("vdev ACLs dir:    %s\n", vdev->config->acls_dir );
    vdev_debug("vdev actions dir: %s\n", vdev->config->acts_dir );
    vdev_debug("firmware dir:     %s\n", vdev->config->firmware_dir );
+   vdev_debug("helpers dir:      %s\n", vdev->config->helpers_dir );
    
    // force -odev, since we'll create device nodes 
    fuse_argv[fuse_argc] = (char*)vdev_fuse_odev;
@@ -406,11 +405,13 @@ int vdev_backend_stop( struct vdev_state* state ) {
       }
       if( umount_rc != 0 ) {
          
-         vdev_error("umount('%s') rc = %d\n", state->mountpoint, umount_rc );
+         vdev_error("fusermount -u '%s' rc = %d\n", state->mountpoint, umount_rc );
          if( rc == 0 ) {
             rc = -abs(umount_rc);
          }
       }
+      
+      vdev_debug("Unmounted %s\n", state->mountpoint );
    }
    
    return rc;
@@ -475,7 +476,6 @@ int vdev_free( struct vdev_state* state ) {
    
    return 0;
 }
-
 
 // stat: equvocate about which devices exist, depending on who's asking
 int vdev_stat( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct stat* sb ) {
