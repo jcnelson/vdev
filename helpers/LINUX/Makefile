@@ -1,0 +1,32 @@
+CPP    := g++ -Wall -g
+LIB   := -lpthread -lrt 
+INC   := -I/usr/include -I/usr/local/include -I. 
+C_SRCS:= $(wildcard *.c) $(wildcard os/*.c)
+CXSRCS:= $(wildcard *.cpp) $(wildcard os/*.cpp)
+OBJ   := $(patsubst %.c,%.o,$(C_SRCS)) $(patsubst %.cpp,%.o,$(CXSRCS))
+DEFS  := -D_REENTRANT -D_THREAD_SAFE -D__STDC_FORMAT_MACROS 
+
+HELPERS := stat_optical stat_ata
+HELPER_SCRIPTS := $(wildcard *.sh)
+
+PREFIX ?= /usr
+BINDIR ?= $(PREFIX)/lib/vdev/
+
+all: $(HELPERS)
+
+stat_%: stat_%.o
+	$(CPP) -o $@ $(INC) $(LIBINC) $(LIB) $<
+
+install: $(HELPERS)
+	mkdir -p $(BINDIR)
+	cp -a $(HELPERS) $(HELPER_SCRIPTS) $(BINDIR)
+
+%.o : %.c
+	$(CPP) -o $@ $(INC) -c $< $(DEFS)
+
+%.o : %.cpp
+	$(CPP) -o $@ $(INC) -c $< $(DEFS)
+
+.PHONY: clean
+clean:
+	/bin/rm -f $(OBJ) $(HELPERS)
