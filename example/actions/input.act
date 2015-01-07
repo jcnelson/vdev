@@ -1,4 +1,4 @@
 [vdev-action]
 event=any
 path=event[0-9]+|js[0-9]+|mouse[0-9]+|mice
-rename_command=/bin/echo -n "input/$VDEV_PATH"
+rename_command=echo -n "input/$VDEV_PATH"
