@@ -30,6 +30,7 @@
 
 #define VDEV_ACTION_NAME_EVENT          "event"
 #define VDEV_ACTION_NAME_PATH           "path"
+#define VDEV_ACTION_NAME_TYPE           "type"
 #define VDEV_ACTION_NAME_RENAME         "rename_command"
 #define VDEV_ACTION_NAME_SHELL          "command"
 #define VDEV_ACTION_NAME_ASYNC          "async"
@@ -48,6 +49,10 @@ struct vdev_action {
    // device path to match on 
    char* path;
    regex_t path_regex;
+   
+   // device type to match on (block, char)
+   bool has_type;
+   char* type;
    
    // command to run to rename the matched path, if needed
    char* rename_command;

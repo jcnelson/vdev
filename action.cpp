@@ -100,6 +100,12 @@ int vdev_action_free( struct vdev_action* act ) {
       regfree( &act->path_regex );
    }
    
+   if( act->type != NULL ) {
+      
+      free( act->type );
+      act->type = NULL;
+   }
+   
    return 0;
 }
 
@@ -214,7 +220,14 @@ static int vdev_action_ini_parser( void* userdata, char const* section, char con
          }
       }
       
-      
+      if( strcmp(name, VDEV_ACTION_NAME_TYPE) == 0 ) {
+         
+         // remember this
+         act->has_type = true;
+         act->type = vdev_strdup_or_null( value );
+         return 1;
+      }
+         
       if( strncmp(name, VDEV_ACTION_NAME_OS_PREFIX, strlen(VDEV_ACTION_NAME_OS_PREFIX)) == 0 ) {
          
          // OS-specific param 
@@ -565,6 +578,21 @@ int vdev_action_match( struct vdev_device_request* vreq, struct vdev_action* act
       }
    }
    
+   // type match?
+   if( act->has_type ) {
+      
+      if( S_ISBLK( vreq->mode ) && strcasecmp( act->type, "block" ) != 0 ) {
+         
+         // not a block device
+         return 0;
+      }
+      if( S_ISCHR( vreq->mode ) && strcasecmp( act->type, "char" ) != 0 ) {
+         
+         // not a char device
+         return 0;
+      }
+   }
+   
    // OS parameter match?
    if( act->dev_params != NULL ) {
       
@@ -696,6 +724,16 @@ int vdev_action_create_path( struct vdev_device_request* vreq, struct vdev_actio
       }
       
       rc = 0;
+   }
+   
+   if( *path != NULL && strlen(*path) == 0 ) {
+      
+      vdev_error("Zero-length path generated for '%s'\n", vreq->path );
+      
+      free( *path );
+      *path = NULL;
+      
+      rc = -ENODATA;
    }
    
    return rc;
