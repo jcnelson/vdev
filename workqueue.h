@@ -53,6 +53,9 @@ struct vdev_device_request {
    // If we're creating a network interface, this is the interface name.
    char* path;
    
+   // renamed path (used internally)
+   char* renamed_path;
+   
    // device numbers, for mknod
    dev_t dev;
    
