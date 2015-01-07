@@ -18,6 +18,7 @@
    For the terms of this license, see LICENSE.ISC or 
    <http://www.isc.org/downloads/software-support-policy/isc-license/>.
 */
+
 #ifndef _VDEV_OS_LINUX_H_
 #define _VDEV_OS_LINUX_H_
 
@@ -40,6 +41,8 @@
 
 #define VDEV_LINUX_NETLINK_UDEV_HEADER "libudev"
 #define VDEV_LINUX_NETLINK_UDEV_HEADER_LEN 8
+
+#define VDEV_OS_SYSFS_PREFIX    "SYSFS_"
 
 // connection to the linux kernel for hotplug
 struct vdev_linux_context {
