@@ -1,4 +1,4 @@
 [vdev-action]
 event=add
-OS_SUBSYSTEM=block
-command=/bin/mkdir -p $VDEV_MOUNTPOINT/block; /bin/ln -s ../$VDEV_PATH $VDEV_MOUNTPOINT/block/$VDEV_MAJOR:$VDEV_MINOR
+type=block
+command=exec $VDEV_HELPERS/block.sh
