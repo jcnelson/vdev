@@ -1,0 +1,5 @@
+[vdev-action]
+event=any
+OS_SUBSYSTEM=misc
+path=^tun$
+rename_command=echo -n "net/$VDEV_PATH"
