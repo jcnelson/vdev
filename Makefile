@@ -1,5 +1,5 @@
 CPP    := g++ -Wall -g
-LIB   := -lpthread -lrt -lfskit -lfskit_fuse -lpstat
+LIB   := -lpthread -lrt -lfskit -lfskit_fuse -lpstat -lfuse
 INC   := -I/usr/include -I/usr/local/include -I. 
 C_SRCS:= $(wildcard *.c) $(wildcard os/*.c)
 CXSRCS:= $(wildcard *.cpp) $(wildcard os/*.cpp)
@@ -14,14 +14,21 @@ BINDIR ?= $(PREFIX)/bin
 # change/override this for your OS
 OS := LINUX
 
-all: $(VDEV)
+HELPERS_DIR := ./helpers/$(OS)
 
-$(VDEV): $(OBJ)
+all: $(VDEV) helpers
+
+$(VDEV): $(OBJ) helpers
 	$(CPP) -o $(VDEV) $(OBJ) $(LIBINC) $(LIB) -D_VDEV_OS_$(OS)
+
+.PHONY: helpers
+helpers:
+	$(MAKE) -C $(HELPERS_DIR)
 
 install: $(VDEV)
 	mkdir -p $(BINDIR)
 	cp -a $(VDEV) $(BINDIR)
+	$(MAKE) -C $(HELPERS_DIR) install
 
 %.o : %.c
 	$(CPP) -o $@ $(INC) -c $< $(DEFS) -D_VDEV_OS_$(OS)
@@ -32,3 +39,4 @@ install: $(VDEV)
 .PHONY: clean
 clean:
 	/bin/rm -f $(OBJ) $(VDEV)
+	$(MAKE) -C $(HELPERS_DIR) clean
