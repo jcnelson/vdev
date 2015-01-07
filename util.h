@@ -44,7 +44,6 @@
 #include <sys/un.h>
 #include <semaphore.h>
 #include <signal.h>
-#include <openssl/sha.h>
 #include <regex.h>
 #include <iostream>
 #include <list>
@@ -56,8 +55,6 @@
 #include <stdint.h>
 #include <pthread.h>
 #include <signal.h>
-#include <openssl/bio.h>
-#include <openssl/evp.h>
 #include <math.h>
 #include <sys/mman.h>
 
@@ -114,6 +111,9 @@ int vdev_read_file( char const* path, char* buf, size_t len );
 // directory I/O
 int vdev_load_all( char const* dir_path, vdev_dirent_loader_t loader, void* cls );
 int vdev_mkdirs( char const* dirp, int start, mode_t mode );
+int vdev_mkdirsat( int dir_fd, char const* dirp, int start, mode_t mode );
+int vdev_rmdirs( char const* dirp );
+int vdev_rmdirsat( int dirfd, char const* dirp );
 
 // passwd/group query
 int vdev_get_passwd( char const* username, struct passwd* pwd, char** pwd_buf );

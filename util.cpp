@@ -194,8 +194,8 @@ int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t m
       }
       else {
          
-         // don't care about start/stop
-         *exit_status = 0;
+         // indicate start/stop
+         *exit_status = -EPERM;
       }
       
       close( p[0] );
@@ -319,7 +319,7 @@ int vdev_load_all( char const* dir_path, vdev_dirent_loader_t loader, void* cls 
    num_entries = scandir( dir_path, &dirents, NULL, alphasort );
    if( num_entries < 0 ) {
       
-      vdev_error("scandir(%s) rc = %d\n", dir_path, num_entries );
+      vdev_error("scandir('%s') rc = %d\n", dir_path, num_entries );
       return num_entries;
    }
    
@@ -337,7 +337,7 @@ int vdev_load_all( char const* dir_path, vdev_dirent_loader_t loader, void* cls 
       rc = (*loader)( fp, cls );
       if( rc != 0 ) {
          
-         vdev_error("loader(%s) rc = %d\n", fp, rc );
+         vdev_error("loader('%s') rc = %d\n", fp, rc );
          
          free( fp );
          vdev_dirents_free( dirents, num_entries );
@@ -495,6 +495,124 @@ int vdev_mkdirs( char const* dirp, int start, mode_t mode ) {
 }
 
 
+// make a string of directories at a given directory, given the path dirp
+// return 0 if the directory exists at the end of the call.
+// return negative if the directory could not be created.
+int vdev_mkdirsat( int dir_fd, char const* dirp, int start, mode_t mode ) {
+   
+   unsigned int i = start;
+   char* currdir = NULL;
+   struct stat statbuf;
+   int rc = 0;
+   
+   currdir = VDEV_CALLOC( char, strlen(dirp) + 1 );
+   if( currdir == NULL ) {
+      return -ENOMEM;
+   }
+   
+   while( i <= strlen(dirp) ) {
+      
+      // next '/'
+      if( dirp[i] == '/' || i == strlen(dirp) ) {
+         
+         strncpy( currdir, dirp, i == 0 ? 1 : i );
+         
+         rc = fstatat( dir_fd, currdir, &statbuf, 0 );
+         
+         if( rc == 0 && !S_ISDIR( statbuf.st_mode ) ) {
+            
+            // something else exists here
+            free( currdir );
+            return -ENOTDIR;
+         }
+         
+         if( rc != 0 ) {
+            
+            // try to make this directory
+            rc = mkdirat( dir_fd, currdir, mode );
+            if( rc != 0 ) {
+               
+               rc = -errno;
+               free(currdir);
+               return rc;
+            }
+         }
+      }
+      
+      i++;
+   }
+   
+   free(currdir);
+   return 0;
+}
+
+
+// try to remove a path of directories
+// the must all be emtpy
+// return 0 on success
+// return negative on error
+int vdev_rmdirs( char const* dirp ) {
+   
+   char* dirname = strdup( dirp );
+   int rc = 0;
+   
+   while( strlen(dirname) > 0 ) {
+      
+      rc = rmdir( dirname );
+      
+      if( rc != 0 ) {
+         
+         rc = -errno;
+         break;
+      }
+      else {
+         
+         char* tmp = fskit_dirname( dirname, NULL );
+         
+         free( dirname );
+         
+         dirname = tmp;
+      }
+   }
+   
+   free( dirname );
+   return rc;
+}
+
+
+// try to remove a relative path of directories from a specific directory
+// the must all be emtpy
+// return 0 on success
+// return negative on error
+int vdev_rmdirsat( int dirfd, char const* dirp ) {
+   
+   char* dirname = strdup( dirp );
+   int rc = 0;
+   
+   while( strlen(dirname) > 0 ) {
+      
+      rc = unlinkat( dirfd, dirname, AT_REMOVEDIR );
+      
+      if( rc != 0 ) {
+         
+         rc = -errno;
+         break;
+      }
+      else {
+         
+         char* tmp = fskit_dirname( dirname, NULL );
+         
+         free( dirname );
+         
+         dirname = tmp;
+      }
+   }
+   
+   free( dirname );
+   return rc;
+}
+
+
 // parse an unsigned 64-bit number 
 // set *success to true if we succeeded
 uint64_t vdev_parse_uint64( char const* uint64_str, bool* success ) {
@@ -513,14 +631,13 @@ uint64_t vdev_parse_uint64( char const* uint64_str, bool* success ) {
 }
 
 
-// given a key=value string, chomp it into a null-terminated key and value.
-// remove the newline at the end of value, if present, null-terminating it
-// return the total number of bytes consumed, including the = and \n, on success.
+// given a null-terminated key=value string, chomp it into a null-terminated key and value.
+// return the original length of the string.
 // return negative on error
 int vdev_keyvalue_next( char* keyvalue, char** key, char** value ) {
    
+   int ret = strlen(keyvalue);
    char* tmp = NULL;
-   int len_add = 0;
    
    // find the '='
    tmp = strchr(keyvalue, '=');
@@ -535,13 +652,7 @@ int vdev_keyvalue_next( char* keyvalue, char** key, char** value ) {
    
    *value = tmp;
    
-   tmp = strchr(*value, '\n');
-   if( tmp != NULL ) {
-      *tmp = '\0';
-      len_add = 1;
-   }
-   
-   return strlen(*key) + strlen(*value) + len_add;
+   return ret;
 }
 
 
