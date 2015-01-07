@@ -35,6 +35,9 @@ struct vdev_opts {
    
    // logfile 
    char* logfile_path;
+   
+   // mountpoint
+   char* mountpoint;
 };
 
 

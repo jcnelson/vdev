@@ -22,6 +22,10 @@
 #include "opts.h"
 #include "vdev.h"
 
+// for options parsing
+#define _FILE_OFFSET_BITS 64
+#include <fuse.h>
+
 static const char* FUSE_OPT_O = "-o";
 static const char* FUSE_OPT_D = "-d";
 static const char* FUSE_OPT_F = "-f";
@@ -61,6 +65,46 @@ static int vdev_opts_default( struct vdev_opts* opts ) {
    
    return 0;
 }
+
+
+// get the mountpoint option, by parsing the FUSE command line 
+static int vdev_opts_get_mountpoint( int fuse_argc, char** fuse_argv, char** ret_mountpoint ) {
+   
+   struct fuse_args fargs = FUSE_ARGS_INIT(fuse_argc, fuse_argv);
+   char* mountpoint = NULL;
+   int unused_1;
+   int unused_2;
+   int rc = 0;
+   
+   // parse command-line...
+   rc = fuse_parse_cmdline( &fargs, &mountpoint, &unused_1, &unused_2 );
+   if( rc < 0 ) {
+
+      fskit_error("fuse_parse_cmdline rc = %d\n", rc );
+      fuse_opt_free_args(&fargs);
+
+      return rc;
+   }
+   
+   else {
+      
+      if( mountpoint != NULL ) {
+         
+         *ret_mountpoint = strdup( mountpoint );
+         free( mountpoint );
+         
+         rc = 0;
+      }
+      else {
+         rc = -ENOMEM;
+      }
+      
+      fuse_opt_free_args(&fargs);
+   }
+   
+   return 0;
+}     
+   
 
 // parse command-line options.
 // fill in fuse_argv with fuse-specific options.
@@ -173,6 +217,9 @@ int vdev_opts_parse( struct vdev_opts* opts, int argc, char** argv, int* fuse_ar
    
    *fuse_argc = fuse_optind;
    
+   // parse FUSE args to get the mountpoint 
+   rc = vdev_opts_get_mountpoint( *fuse_argc, fuse_argv, &opts->mountpoint );
+   
    return rc;
 }
 
@@ -184,6 +231,12 @@ int vdev_opts_free( struct vdev_opts* opts ) {
       
       free( opts->config_file_path );
       opts->config_file_path = NULL;
+   }
+   
+   if( opts->mountpoint != NULL ) {
+      
+      free( opts->mountpoint );
+      opts->mountpoint = NULL;
    }
    
    return 0;
