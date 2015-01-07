@@ -30,6 +30,7 @@
 static int vdev_config_ini_parser( void* userdata, char const* section, char const* name, char const* value ) {
    
    struct vdev_config* conf = (struct vdev_config*)userdata;
+   bool success = false;
    
    if( strcmp(section, VDEV_CONFIG_NAME) == 0 ) {
       
@@ -63,9 +64,32 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
             conf->pstat_discipline |= PSTAT_HASH;
             return 1;
          }
+         else {
+            
+            fprintf(stderr, "Invalid value '%s' for '%s'\n", value, name );
+            return 0;
+         }
+      }
+      
+      if( strcmp(name, VDEV_CONFIG_HELPERS) == 0 ) {
          
-         fprintf(stderr, "Invalid value '%s' for '%s'\n", value, name );
-         return 0;
+         // save this 
+         conf->helpers_dir = vdev_strdup_or_null( value );
+         return 1;
+      }
+      
+      if( strcmp(name, VDEV_CONFIG_DEFAULT_MODE) == 0 ) {
+         
+         conf->default_mode = (mode_t)vdev_parse_uint64( value, &success );
+         if( !success ) {
+            
+            fprintf(stderr, "Invalid value '%s' for '%s'\n", value, name );
+            return 0;
+         }
+         else {
+            
+            return 1;
+         }
       }
       
       fprintf(stderr, "Unrecognized '%s' field '%s'\n", section, name);
@@ -181,6 +205,12 @@ int vdev_config_free( struct vdev_config* conf ) {
       
       delete conf->os_config;
       conf->os_config = NULL;
+   }
+   
+   if( conf->helpers_dir != NULL ) {
+      
+      free( conf->helpers_dir );
+      conf->helpers_dir = NULL;
    }
    
    return 0;

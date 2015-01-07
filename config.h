@@ -32,6 +32,8 @@
 #define VDEV_CONFIG_PSTAT         "proc_check"
 #define VDEV_CONFIG_ACLS          "acls"
 #define VDEV_CONFIG_ACTIONS       "actions"
+#define VDEV_CONFIG_HELPERS       "helpers"
+#define VDEV_CONFIG_DEFAULT_MODE  "default_mode"
 
 #define VDEV_CONFIG_NAME_PSTAT_HASH "hash"
 
@@ -48,11 +50,17 @@ struct vdev_config {
    // actions directory 
    char* acts_dir;
    
+   // helpers directory 
+   char* helpers_dir;
+   
    // process stat discipline 
    int pstat_discipline;
    
    // OS-specific configuration (for keys under "OS")
    vdev_config_map_t* os_config;
+   
+   // default permission bits for mknod 
+   mode_t default_mode;
 };
 
 extern "C" {
