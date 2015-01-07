@@ -42,6 +42,10 @@ int vdev_os_main( struct vdev_os_context* vos ) {
       rc = vdev_device_request_init( vreq, vos->state, VDEV_DEVICE_INVALID, NULL );
       if( rc != 0 ) {
          
+         if( rc == -EAGAIN ) {
+            continue;
+         }
+         
          free( vreq );
          
          vdev_error("vdev_device_request_init rc = %d\n", rc );
@@ -59,7 +63,7 @@ int vdev_os_main( struct vdev_os_context* vos ) {
          continue;
       }
       
-      vdev_debug("Next device: type=%d path=%s dev=%u mode=%o\n", vreq->type, vreq->path, vreq->dev, vreq->mode );
+      vdev_debug("Next device: type=%d path=%s major=%u minor=%u mode=%o\n", vreq->type, vreq->path, major(vreq->dev), minor(vreq->dev), vreq->mode );
       
       // post the event to the device work queue
       rc = vdev_device_request_enqueue( &vos->state->device_wq, vreq );
