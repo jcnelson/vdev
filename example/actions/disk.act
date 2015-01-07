@@ -1,0 +1,5 @@
+[vdev-action]
+event=add
+OS_DEVTYPE=disk
+OS_SUBSYSTEM=block
+command=exec $VDEV_HELPERS/disk.sh
