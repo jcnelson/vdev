@@ -5,6 +5,8 @@ vdev: a virtual device filesystem
 
 vdev is a userspace virtual filesystem that exposes attached devices as device nodes for UNIX-like operating systems.  It differs from FreeBSD's devfs or Linux's udev, eudev, and mdev in that it offers *per-process access control* in a portable manner, providing the necessary functionality for the host administrator to control device node access based on arbitrary process groupings (e.g. per-user, per-session, per-seat, etc.).
 
+More information is available in the [design document](http://judecnelson.blogspot.com/2015/01/introducing-vdev.html).
+
 Project Goals
 -------------
 * **Portable Architecture**.  Unlike devfs or udev, vdev is designed to be portable across (modern) *nix.  As such, all OS-specific functionality is abstracted out of the core logic, and the core logic makes minimal assumptions about the underlying OS's device API.  In addition, the architecture supports multiple hardware event sources, including non-OS sources (such as another vdev instance, or modifications to an existing /dev tree).
