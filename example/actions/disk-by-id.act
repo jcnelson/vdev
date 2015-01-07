@@ -1,5 +1,0 @@
-[vdev-action]
-event=add
-OS_DEVTYPE=disk
-OS_SUBSYSTEM=block
-command=DISK_ID=$(/lib/udev/ata_id $VDEV_MOUNTPOINT/$VDEV_PATH); test 0 -ne $? && exit 0; test -z "$DISK_ID" && return 0; DISK_NAME="ata-$DISK_ID"; /bin/mkdir -p $VDEV_MOUNTPOINT/disk/by-id && /bin/ln -s ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$DISK_NAME
