@@ -67,6 +67,8 @@ static int vdev_opts_default( struct vdev_opts* opts ) {
 }
 
 
+#ifdef _USE_FS
+
 // get the mountpoint option, by parsing the FUSE command line 
 static int vdev_opts_get_mountpoint( int fuse_argc, char** fuse_argv, char** ret_mountpoint ) {
    
@@ -104,7 +106,23 @@ static int vdev_opts_get_mountpoint( int fuse_argc, char** fuse_argv, char** ret
    
    return 0;
 }     
+
+#else 
+
+// get the mountpoint option, by taking the last argument that wasn't an optarg
+static int vdev_opts_get_mountpoint( int fuse_argc, char** fuse_argv, char** ret_mountpoint ) {
    
+   *ret_mountpoint = realpath( fuse_argv[ fuse_argc - 1 ], NULL );
+   
+   if( *ret_mountpoint == NULL ) {
+      return -EINVAL;
+   }
+   
+   return 0;
+}
+
+#endif // _USE_FS
+
 
 // parse command-line options.
 // fill in fuse_argv with fuse-specific options.
