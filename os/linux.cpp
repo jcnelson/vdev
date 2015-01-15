@@ -56,13 +56,13 @@ static int vdev_linux_sysfs_read_device_mode( struct vdev_linux_context* ctx, un
    sprintf( char_dev_buf, "/dev/char/%u:%u", major, minor );
    sprintf( block_dev_buf, "/dev/block/%u:%u", major, minor );
    
-   sysfs_char_path = fskit_fullpath( ctx->sysfs_mountpoint, char_dev_buf, NULL );
+   sysfs_char_path = vdev_fullpath( ctx->sysfs_mountpoint, char_dev_buf, NULL );
    if( sysfs_char_path == NULL ) {
       
       return -ENOMEM;
    }
    
-   sysfs_block_path = fskit_fullpath( ctx->sysfs_mountpoint, block_dev_buf, NULL );
+   sysfs_block_path = vdev_fullpath( ctx->sysfs_mountpoint, block_dev_buf, NULL );
    if( sysfs_block_path == NULL ) {
       
       free( sysfs_char_path );
@@ -123,12 +123,12 @@ static char* vdev_linux_sysfs_fullpath( char const* sysfs_mountpoint, char const
    char* tmp = NULL;
    char* ret = NULL;
    
-   tmp = fskit_fullpath( sysfs_mountpoint, devpath, NULL );
+   tmp = vdev_fullpath( sysfs_mountpoint, devpath, NULL );
    if( tmp == NULL ) {
       return NULL;
    }
    
-   ret = fskit_fullpath( tmp, attr_path, NULL );
+   ret = vdev_fullpath( tmp, attr_path, NULL );
    free( tmp );
    
    return ret;
@@ -232,7 +232,7 @@ static int vdev_linux_sysfs_read_subsystem( struct vdev_linux_context* ctx, char
    
    free( subsystem_path );
    
-   *subsystem = fskit_basename( linkpath, NULL );
+   *subsystem = vdev_basename( linkpath, NULL );
    return 0;
 }
 
@@ -278,7 +278,7 @@ static int vdev_linux_sysfs_read_dev_attrs( char const* fp, void* cls ) {
    }
    
    // make the full name as VDEV_OS_SYSFS_$name
-   name = fskit_basename( fp, NULL );
+   name = vdev_basename( fp, NULL );
    if( name == NULL ) {
       
       return -ENOMEM;
@@ -916,7 +916,7 @@ static int vdev_linux_sysfs_read_device_path( struct vdev_linux_context* ctx, ch
    
    memset( devpath, 0, PATH_MAX+1 );
    
-   device_fp = fskit_fullpath( device_dir, "device", NULL );
+   device_fp = vdev_fullpath( device_dir, "device", NULL );
    if( device_fp == NULL ) {
       
       return -ENOMEM;
@@ -940,7 +940,7 @@ static int vdev_linux_sysfs_read_device_path( struct vdev_linux_context* ctx, ch
    }
    
    // canonicalize...
-   tmp = fskit_fullpath( device_dir, devpath, NULL );
+   tmp = vdev_fullpath( device_dir, devpath, NULL );
    if( tmp == NULL ) {
       
       free( device_fp );
@@ -994,13 +994,13 @@ static int vdev_linux_sysfs_register_device( struct vdev_linux_context* ctx, cha
    }
    
    // get parent path 
-   fp_parent = fskit_dirname( fp, NULL );
+   fp_parent = vdev_dirname( fp, NULL );
    if( fp_parent == NULL ) {
       return -ENOMEM;
    }
    
    // get uevent path 
-   fp_uevent = fskit_fullpath( fp_parent, "uevent", NULL );
+   fp_uevent = vdev_fullpath( fp_parent, "uevent", NULL );
    if( fp_uevent == NULL ) {
       free( fp_parent );
       return -ENOMEM;
@@ -1079,7 +1079,7 @@ static int vdev_linux_sysfs_register_device( struct vdev_linux_context* ctx, cha
    }
    
    // get the name--it's the basename of the dev parent 
-   name = fskit_basename( fp_parent, NULL );
+   name = vdev_basename( fp_parent, NULL );
    if( name == NULL ) {
       
       free( fp_parent );
@@ -1190,7 +1190,7 @@ static int vdev_linux_sysfs_build_char_glob( char const* fp, void* cls ) {
    char name[NAME_MAX+1];
    int rc = 0;
    
-   fskit_basename( fp, name );
+   vdev_basename( fp, name );
    
    // skip . and ..
    if( strcmp(name, ".") == 0 || strcmp(name, "..") == 0 ) {
@@ -1513,15 +1513,15 @@ static int vdev_linux_load_firmware( struct vdev_linux_context* ctx, char const*
    ssize_t nr = 0;
    
    // build firmware path
-   fskit_fullpath( ctx->os_ctx->state->config->firmware_dir, firmware_name, fw_path );
+   vdev_fullpath( ctx->os_ctx->state->config->firmware_dir, firmware_name, fw_path );
    
    // build sysfs firmware output path
-   fskit_fullpath( ctx->sysfs_mountpoint, devpath, sysfs_fw_path );
-   fskit_fullpath( sysfs_fw_path, "data", sysfs_fw_path );
+   vdev_fullpath( ctx->sysfs_mountpoint, devpath, sysfs_fw_path );
+   vdev_fullpath( sysfs_fw_path, "data", sysfs_fw_path );
    
    // build sysfs firmware loading control path 
-   fskit_fullpath( ctx->sysfs_mountpoint, devpath, sysfs_ctl_path );
-   fskit_fullpath( sysfs_ctl_path, "loading", sysfs_ctl_path );
+   vdev_fullpath( ctx->sysfs_mountpoint, devpath, sysfs_ctl_path );
+   vdev_fullpath( sysfs_ctl_path, "loading", sysfs_ctl_path );
    
    // get the firmware 
    fw_fd = open( fw_path, O_RDONLY );
