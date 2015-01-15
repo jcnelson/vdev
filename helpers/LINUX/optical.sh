@@ -11,7 +11,7 @@ set_device_symlink() {
    
    TARGET=$1
 
-   /bin/ln -s $VDEV_MOUNTPOINT/$VDEV_PATH $VDEV_MOUNTPOINT/$TARGET 2>/dev/null
+   /bin/ln -s $VDEV_PATH $VDEV_MOUNTPOINT/$TARGET 2>/dev/null
    return $?
 }
 
