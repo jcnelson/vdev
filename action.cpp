@@ -49,7 +49,7 @@ int vdev_action_init( struct vdev_action* act, vdev_device_request_t trigger, ch
       
       if( rc != 0 ) {
          
-         vdev_error("vdev_match_regex_init('%s') rc = %d\n", path );
+         vdev_error("vdev_match_regex_init('%s') rc = %d\n", path, rc );
          vdev_action_free( act );
          return rc;
       }
@@ -154,7 +154,7 @@ static int vdev_action_ini_parser( void* userdata, char const* section, char con
             
             if( rc != 0 ) {
                
-               vdev_error("vdev_match_regex_init('%s') rc = %d\n", act->path );
+               vdev_error("vdev_match_regex_init('%s') rc = %d\n", act->path, rc );
                return 0;
             }
          }
@@ -281,7 +281,7 @@ int vdev_action_load( char const* path, struct vdev_action* act ) {
    rc = vdev_action_init( act, VDEV_DEVICE_INVALID, NULL, NULL, false );
    if( rc != 0 ) {
       
-      vdev_error("vdev_action_init('%s') rc = %d\n", path );
+      vdev_error("vdev_action_init('%s') rc = %d\n", path, rc );
       return rc;
    }
    

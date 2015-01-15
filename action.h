@@ -23,7 +23,7 @@
 #define _VDEV_ACTION_H_
 
 #include "util.h"
-#include "workqueue.h"
+#include "device.h"
 
 // action fields
 #define VDEV_ACTION_NAME                "vdev-action"
