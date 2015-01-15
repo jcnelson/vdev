@@ -18,6 +18,9 @@
    For the terms of this license, see LICENSE.ISC or 
    <http://www.isc.org/downloads/software-support-policy/isc-license/>.
 */
+
+#ifdef _USE_FS
+
 #include "acl.h"
 
 #define INI_MAX_LINE 4096 
@@ -26,6 +29,7 @@
 #include "ini.h"
 #include "vdev.h"
 #include "match.h"
+#include "config.h"
 
 
 // parse the ACL mode 
@@ -44,59 +48,13 @@ static int vdev_acl_parse_mode( mode_t* mode, char const* mode_str ) {
 }
 
 
-// convert a printable sha256 to a binary sha256 of length SHA256_DIGEST_LENGTH
-// return 0 on success and fill in *sha256_bin to point to an allocated buffer
-// return negative on error
-static int vdev_sha256_to_bin( char const* sha256_printable, unsigned char** sha256_bin ) {
-   
-   unsigned char* ret = NULL;
-   
-   // sanity check 
-   if( strlen(sha256_printable) != 2 * SHA256_DIGEST_LENGTH ) {
-      return -EINVAL;
-   }
-   
-   // sanity check
-   for( int i = 0; i < 2 * SHA256_DIGEST_LENGTH; i++ ) {
-      
-      int c = sha256_printable[i];
-      
-      // must be a hex number 
-      if( ! ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) ) {
-         return -EINVAL;
-      }
-   }
-   
-   ret = VDEV_CALLOC( unsigned char, SHA256_DIGEST_LENGTH );
-   
-   if( ret == NULL ) {
-      return -ENOMEM;
-   }
-   
-   for( int i = 0; i < SHA256_DIGEST_LENGTH; i++ ) {
-      
-      char buf[2];
-      
-      memcpy( buf, sha256_printable + (2 * i), 2 );
-      
-      ret[i] = (unsigned char) strtol( buf, NULL, 16 );
-   }
-   
-   *sha256_bin = ret;
-   
-   return 0;
-}
-
-
-
 // callback from inih to parse an acl 
 // return 1 on success
 // return 0 on failure
 static int vdev_acl_ini_parser( void* userdata, char const* section, char const* name, char const* value ) {
    
    struct vdev_acl* acl = (struct vdev_acl*)userdata;
-   int rc = 0;
-   
+
    // verify this is an acl section 
    if( strcmp(section, VDEV_ACL_NAME) != 0 ) {
       
@@ -223,38 +181,17 @@ static int vdev_acl_ini_parser( void* userdata, char const* section, char const*
       return 1;
    }
    
-   if( strcmp(name, VDEV_ACL_NAME_PROC_SHA256 ) == 0 ) {
+   if( strcmp(name, VDEV_ACL_NAME_PROC_PREDICATE ) == 0 ) {
       
       // preserve this value 
-      if( acl->proc_sha256 != NULL ) {
+      if( acl->proc_predicate_cmd != NULL ) {
          
-         fprintf(stderr, "Duplicate process SHA256 '%s'\n", value );
-         return 0;
-      }
-      
-      rc = vdev_sha256_to_bin( value, &acl->proc_sha256 );
-      
-      if( rc != 0 ) {
-         fprintf(stderr, "Failed to parse '%s' as a SHA256 hash\n", value );
+         fprintf(stderr, "Duplicate predicate '%s'\n", value );
          return 0;
       }
       
       acl->has_proc = true;
-      
-      return 1;
-   }
-   
-   if( strcmp(name, VDEV_ACL_NAME_PROC_PIDLIST ) == 0 ) {
-      
-      // preserve this value 
-      if( acl->proc_pidlist_cmd != NULL ) {
-         
-         fprintf(stderr, "Duplicate process PID list command '%s'\n", value );
-         return 0;
-      }
-      
-      acl->has_proc = true;
-      acl->proc_pidlist_cmd = vdev_strdup_or_null(value);
+      acl->proc_predicate_cmd = vdev_strdup_or_null(value);
       return 1;
    }
    
@@ -349,11 +286,6 @@ int vdev_acl_free( struct vdev_acl* acl ) {
       acl->proc_path = NULL;
    }
    
-   if( acl->proc_sha256 != NULL ) {
-      free( acl->proc_sha256 );
-      acl->proc_sha256 = NULL;
-   }
-   
    return 0;
 }
 
@@ -396,7 +328,7 @@ int vdev_acl_load( char const* path, struct vdev_acl* acl ) {
    if( f == NULL ) {
       
       rc = -errno;
-      vdev_error("fopen(%s) errno = %d\n", rc );
+      vdev_error("fopen(%s) errno = %d\n", path,rc );
       return rc;
    }
    
@@ -576,83 +508,16 @@ int vdev_acl_do_set_mode( struct vdev_acl* acl, struct stat* sb ) {
 }
 
 
-// parse the list of PIDs
-// return 0 on success, and allocate pids and set the number of pids in num_pids
-// return negative on error
-int vdev_parse_pids( char const* pid_list_str, size_t pid_list_len, pid_t** pids, int* num_pids ) {
-   
-   char* tok_tmp = NULL;
-   char* strtoll_tmp = NULL;
-   char* pid_list_str_dup = NULL;
-   char* pid_list_str_in = NULL;
-   char* tok = NULL;
-   vector<pid_t> parsed_pids;
-   int rc = 0;
-   
-   // make a copy of the pid list, so we can destroy it
-   pid_list_str_dup = VDEV_CALLOC( char, pid_list_len );
-   if( pid_list_str_dup == NULL ) {
-      return -ENOMEM;
-   }
-   
-   memcpy( pid_list_str_dup, pid_list_str, pid_list_len );
-   pid_list_str_in = pid_list_str_dup;
-   
-   while( true ) {
-      
-      tok = strtok_r( pid_list_str_in, " \n\r\t", &tok_tmp );
-      pid_list_str_in = NULL;
-      
-      if( tok == NULL ) {
-         // out of tokens
-         break;
-      }
-      
-      // is this a pid?
-      pid_t next_pid = (pid_t)strtoll( tok, &strtoll_tmp, 10 );
-      if( *strtoll_tmp != '\0' ) {
-         
-         // not valid 
-         vdev_error("Invalid PID '%s'\n", tok );
-         rc = -EINVAL;
-         break;
-      }
-      
-      parsed_pids.push_back( next_pid );
-   }
-   
-   free( pid_list_str_dup );
-   
-   if( rc == 0 ) {
-      
-      *pids = VDEV_CALLOC( pid_t, parsed_pids.size() );
-      if( *pids == NULL ) {
-         return -ENOMEM;
-      }
-      
-      // NOTE: vectors are guaranteed to be laid out contiguously in memory...
-      memcpy( *pids, &parsed_pids[0], sizeof(pid_t) * parsed_pids.size() );
-   }
-   
-   return 0;
-}
-
-
-// run a 'pidlist' command, with the appropriate environment variables set.
-// populate *pids with the list of PIDs returned, on success
+// evaluate a predicate command, with the appropriate environment variables set.
+// on success, fill in the exit code.
 // return 0 on success
 // return negative on error 
-int vdev_acl_do_pidlist( struct vdev_acl* acl, struct pstat* ps, uid_t caller_uid, gid_t caller_gid, pid_t** ret_pids, int* ret_num_pids ) {
+int vdev_acl_run_predicate( struct vdev_acl* acl, struct pstat* ps, uid_t caller_uid, gid_t caller_gid, int* exit_code ) {
 
-   // get the list of PIDs from the shell command 
-   char* pid_list_str = NULL;
-   size_t pid_list_maxlen = VDEV_ACL_PROC_BUFLEN;
-   pid_t* pids = NULL;
-   int num_pids = 0;
    int exit_status = 0;
    char* cmd_buf = NULL;
    char env_buf[3][100];
-   char* pidlist_env[4];
+   char* predicate_env[4];
    int rc = 0;
    
    // build the command with the apporpriate environment variables:
@@ -664,12 +529,12 @@ int vdev_acl_do_pidlist( struct vdev_acl* acl, struct pstat* ps, uid_t caller_ui
    sprintf(env_buf[1], "VDEV_GID=%u", caller_gid );
    sprintf(env_buf[2], "VDEV_PID=%u", ps->pid );
    
-   pidlist_env[0] = env_buf[0];
-   pidlist_env[1] = env_buf[1];
-   pidlist_env[2] = env_buf[2];
-   pidlist_env[3] = NULL;
+   predicate_env[0] = env_buf[0];
+   predicate_env[1] = env_buf[1];
+   predicate_env[2] = env_buf[2];
+   predicate_env[3] = NULL;
    
-   rc = vdev_subprocess( cmd_buf, pidlist_env, &pid_list_str, pid_list_maxlen, &exit_status );
+   rc = vdev_subprocess( cmd_buf, predicate_env, NULL, 0, &exit_status );
    
    if( rc != 0 ) {
       
@@ -679,28 +544,9 @@ int vdev_acl_do_pidlist( struct vdev_acl* acl, struct pstat* ps, uid_t caller_ui
       return rc;
    }
    
-   if( exit_status != 0 ) {
-      
-      vdev_error("vdev_subprocess('%s') exit status %d\n", cmd_buf, exit_status );
-      free( cmd_buf );
-      return -EPERM;
-   }
+   *exit_code = exit_status;
    
    free( cmd_buf );
-   
-   // lex the pids
-   rc = vdev_parse_pids( pid_list_str, pid_list_maxlen, &pids, &num_pids );
-   
-   free( pid_list_str );
-   
-   if( rc != 0 ) {
-      
-      vdev_error("vdev_parse_pids rc = %d\n", rc );
-      return rc;
-   }
-   
-   *ret_pids = pids;
-   *ret_num_pids = num_pids;
    
    return 0;
 }
@@ -720,34 +566,10 @@ int vdev_acl_match_process( struct vdev_acl* acl, struct pstat* ps, uid_t caller
       return 1;
    }
    
-   if( acl->proc_path != NULL || acl->proc_sha256 != NULL || acl->has_proc_inode ) {
+   if( acl->proc_path != NULL || acl->has_proc_inode ) {
       
       if( acl->proc_path != NULL ) {
          if( strcmp( acl->proc_path, ps->path ) != 0 ) {
-            
-            // doesn't match 
-            return 0;
-         }
-      }
-      
-      if( acl->proc_sha256 != NULL ) {
-         
-         // do we need to get the SHA256?
-         unsigned char blank_sha256[SHA256_DIGEST_LENGTH];
-         memset( blank_sha256, 0, SHA256_DIGEST_LENGTH );
-         
-         if( memcmp( blank_sha256, ps->sha256, SHA256_DIGEST_LENGTH ) == 0 ) {
-            
-            // we don't have the hash.  Go get it
-            rc = pstat_sha256( ps );
-            if( rc != 0 ) {
-               
-               vdev_error("Failed to SHA256 the process binary for %d, rc = %d\n", ps->pid, rc );
-               return rc;
-            }
-         }
-         
-         if( memcmp( acl->proc_sha256, ps->sha256, SHA256_DIGEST_LENGTH ) != 0 ) {
             
             // doesn't match 
             return 0;
@@ -764,33 +586,27 @@ int vdev_acl_match_process( struct vdev_acl* acl, struct pstat* ps, uid_t caller
    }
    
    // filter on a given PID list generator?
-   if( acl->proc_pidlist_cmd != NULL ) {
+   if( acl->proc_predicate_cmd != NULL ) {
       
-      // get the list of PIDs from the shell command 
-      pid_t* pids = NULL;
-      int num_pids = 0;
-      bool found = false;
+      // run the command and use the exit code to see if 
+      // this ACL applies to the calling process
+      int exit_status = 0;
       
-      rc = vdev_acl_do_pidlist( acl, ps, caller_uid, caller_gid, &pids, &num_pids );
+      rc = vdev_acl_run_predicate( acl, ps, caller_uid, caller_gid, &exit_status );
       if( rc != 0 ) {
          
-         vdev_error("vdev_acl_do_pidlist('%s') rc = %d\n", acl->proc_pidlist_cmd, rc );
+         vdev_error("vdev_acl_run_predicate('%s') rc = %d\n", acl->proc_predicate_cmd, rc );
          return rc;
       }
       
-      // is the caller in the list?
-      for( int i = 0; i < num_pids; i++ ) {
-         
-         if( ps->pid == pids[i] ) {
-            found = true;
-            break;
-         }
+      // exit status follows shell-like semantics:
+      // 0 indicates "yes, this applies."
+      // non-zero indicates "no, this does not apply"
+      
+      if( exit_status == 0 ) {
+         return 1;
       }
-      
-      free( pids );
-      
-      if( !found ) {
-         
+      else {
          return 0;
       }
    }
@@ -893,12 +709,17 @@ int vdev_acl_apply( struct vdev_acl* acl, uid_t caller_uid, gid_t caller_gid, st
 // return 1 if at least one ACL matches
 // return 0 if there are no matches (i.e. this device node should be hidden)
 // return negative on error 
-int vdev_acl_apply_all( struct vdev_acl* acls, size_t num_acls, char const* path, struct pstat* caller_proc, uid_t caller_uid, gid_t caller_gid, struct stat* sb ) {
+int vdev_acl_apply_all( struct vdev_config* config, struct vdev_acl* acls, size_t num_acls, char const* path, struct pstat* caller_proc, uid_t caller_uid, gid_t caller_gid, struct stat* sb ) {
    
    int rc = 0;
    int acl_offset = 0;
    int i = 0;
    bool found = false;
+   
+   // special case: if there are no ACLs, then follow the config default policy
+   if( num_acls == 0 ) {
+      return config->default_policy;
+   }
    
    while( acl_offset < (signed)num_acls ) {
       
@@ -943,3 +764,4 @@ int vdev_acl_apply_all( struct vdev_acl* acls, size_t num_acls, char const* path
    return rc;
 }
 
+#endif // _USE_FS

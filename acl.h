@@ -19,6 +19,8 @@
    <http://www.isc.org/downloads/software-support-policy/isc-license/>.
 */
 
+#ifdef _USE_FS
+
 #ifndef _VDEV_ACL_H_
 #define _VDEV_ACL_H_
 
@@ -33,8 +35,7 @@
 #define VDEV_ACL_NAME_UID               "uid"
 #define VDEV_ACL_NAME_GID               "gid"
 #define VDEV_ACL_NAME_PROC_PATH         "bin"
-#define VDEV_ACL_NAME_PROC_PIDLIST      "pidlist"
-#define VDEV_ACL_NAME_PROC_SHA256       "sha256"
+#define VDEV_ACL_NAME_PROC_PREDICATE    "predicate"
 #define VDEV_ACL_NAME_PROC_INODE        "inode"
 
 #define VDEV_ACL_DEVICE_REGEX           "paths"
@@ -59,8 +60,7 @@ struct vdev_acl {
    // process info to match (set at least one; all must match for the ACL to apply)
    bool has_proc;               // if true, at least one of the following is filled in (and the ACL will only apply if the request is from one of the indicated processes)
    char* proc_path;             // path to the allowed process
-   unsigned char* proc_sha256;  // sha256 of the allowed process binary
-   char* proc_pidlist_cmd;      // command string to run to get the list of PIDs
+   char* proc_predicate_cmd;    // command string to run to see if this ACL applies to the calling process (based on the exit code:  0 indicates 'yes, this applies'; nonzero indicates 'no, does not apply')
    bool has_proc_inode;         // whether or not the ACL has an inode check
    ino_t proc_inode;            // process binary's inode
    
@@ -82,6 +82,9 @@ struct vdev_acl {
    size_t num_paths;
 };
 
+// prototype...
+struct vdev_config;
+
 extern "C" {
 
 int vdev_acl_init( struct vdev_acl* acl );
@@ -89,8 +92,10 @@ int vdev_acl_load_all( char const* dir_path, struct vdev_acl** ret_acls, size_t*
 int vdev_acl_free( struct vdev_acl* acl );
 int vdev_acl_free_all( struct vdev_acl* acl_list, size_t num_acls );
 
-int vdev_acl_apply_all( struct vdev_acl* acls, size_t num_acls, char const* path, struct pstat* caller_proc, uid_t caller_uid, gid_t caller_gid, struct stat* sb );
+int vdev_acl_apply_all( struct vdev_config* conf, struct vdev_acl* acls, size_t num_acls, char const* path, struct pstat* caller_proc, uid_t caller_uid, gid_t caller_gid, struct stat* sb );
 
 }
 
 #endif
+
+#endif  // _USE_FS
