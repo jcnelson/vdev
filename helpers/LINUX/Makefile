@@ -4,7 +4,7 @@ INC   := -I/usr/include -I/usr/local/include -I.
 C_SRCS:= $(wildcard *.c) $(wildcard os/*.c)
 CXSRCS:= $(wildcard *.cpp) $(wildcard os/*.cpp)
 OBJ   := $(patsubst %.c,%.o,$(C_SRCS)) $(patsubst %.cpp,%.o,$(CXSRCS))
-DEFS  := -D_REENTRANT -D_THREAD_SAFE -D__STDC_FORMAT_MACROS 
+DEFS  := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS -fstack-protector -fstack-protector-all
 
 HELPERS := stat_optical stat_ata
 HELPER_SCRIPTS := $(wildcard *.sh)
