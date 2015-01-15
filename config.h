@@ -33,9 +33,8 @@
 #define VDEV_CONFIG_ACLS          "acls"
 #define VDEV_CONFIG_ACTIONS       "actions"
 #define VDEV_CONFIG_HELPERS       "helpers"
-#define VDEV_CONFIG_DEFAULT_MODE  "default_mode"
-
-#define VDEV_CONFIG_NAME_PSTAT_HASH "hash"
+#define VDEV_CONFIG_DEFAULT_MODE  "default_permissions"
+#define VDEV_CONFIG_DEFAULT_POLICY "default_policy"     // allow or deny
 
 typedef map<string, string> vdev_config_map_t;
 
@@ -55,6 +54,9 @@ struct vdev_config {
    
    // process stat discipline 
    int pstat_discipline;
+   
+   // default policy (0 for deny, 1 for allow)
+   int default_policy;
    
    // OS-specific configuration (for keys under "OS")
    vdev_config_map_t* os_config;

@@ -56,21 +56,6 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
          return 1;
       }
       
-      if( strcmp(name, VDEV_CONFIG_PSTAT) == 0 ) {
-         
-         if( strcmp(value, VDEV_CONFIG_NAME_PSTAT_HASH) == 0 ) {
-            
-            // force sha256 check on pstat 
-            conf->pstat_discipline |= PSTAT_HASH;
-            return 1;
-         }
-         else {
-            
-            fprintf(stderr, "Invalid value '%s' for '%s'\n", value, name );
-            return 0;
-         }
-      }
-      
       if( strcmp(name, VDEV_CONFIG_HELPERS) == 0 ) {
          
          // save this 
@@ -90,6 +75,12 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
             
             return 1;
          }
+      }
+      
+      if( strcmp(name, VDEV_CONFIG_DEFAULT_POLICY) == 0 ) {
+         
+         conf->default_policy = strcasecmp( value, "allow" ) ? 1 : 0;
+         return 1;
       }
       
       fprintf(stderr, "Unrecognized '%s' field '%s'\n", section, name);
