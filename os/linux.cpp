@@ -541,20 +541,6 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
          return -ENOMEM;
       }
       
-      /*
-      rc = vdev_load_all( full_devpath, vdev_linux_sysfs_read_dev_attrs, vreq );
-      if( rc != 0 ) {
-         
-         vdev_error("vdev_load_all('%s') rc = %d\n", full_devpath, rc );
-         
-         free( full_devpath );
-         if( subsystem != NULL ) {
-            free( subsystem );
-         }
-         
-         return rc;
-      }
-      */
       free( full_devpath );
    }
    
@@ -580,10 +566,6 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
       }
    }
    
-   if( subsystem != NULL ) {
-      free( subsystem );
-   }
-      
    return 0;
 }
 
