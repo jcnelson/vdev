@@ -25,10 +25,12 @@
 int main( int argc, char** argv ) {
    
    int rc = 0;
-   pid_t pid = 0;
+   pid_t pid = 1;
    struct vdev_state vdev;
+   struct vdev_fs fs_frontend;
    
    memset( &vdev, 0, sizeof(struct vdev_state) );
+   memset( &fs_frontend, 0, sizeof(struct vdev_fs) );
    
    // set up global vdev state
    rc = vdev_init( &vdev, argc, argv );
@@ -38,45 +40,53 @@ int main( int argc, char** argv ) {
       
       exit(1);
    }
-
+   
    // load back-end info so we can fail fast before mounting
    rc = vdev_backend_init( &vdev );
    if( rc != 0 ) {
       
       vdev_error("vdev_backend_init rc = %d\n", rc );
       
-      vdev_free( &vdev );
+      vdev_backend_stop( &vdev );
+      vdev_shutdown( &vdev );
       exit(1);
    }
+   
+#ifdef _USE_FS
+   // load the front-end 
+   rc = vdev_frontend_init( &fs_frontend, &vdev );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_frontend_init rc = %d\n", rc );
+      
+      vdev_backend_stop( &vdev );
+      vdev_shutdown( &vdev );
+      exit(1);
+   }
+   
+   vdev.fs_frontend = &fs_frontend;
    
    pid = fork();
    if( pid == 0 ) {
       
-      // child: filesystem front-end
-      rc = vdev_frontend_init( &vdev );
-      if( rc != 0 ) {
-         
-         vdev_error("vdev_frontend_init rc = %d\n", rc );
-         
-         vdev_free( &vdev );
-         exit(1);
-      }
-      
       // run 
-      rc = vdev_frontend_main( &vdev );
+      rc = vdev_frontend_main( &fs_frontend, vdev.fuse_argc, vdev.fuse_argv );
       if( rc != 0 ) {
          
          vdev_error("vdev_frontend_main rc = %d\n", rc );
          
-         vdev_free( &vdev );
+         vdev_backend_stop( &vdev );
+         vdev_shutdown( &vdev );
          exit(1);
       }
       
       // clean up
-      vdev_frontend_stop( &vdev );
-   }
-   
-   else if( pid > 0 ) {
+      vdev_frontend_stop( &fs_frontend );
+      vdev_frontend_shutdown( &fs_frontend );
+   }   
+#endif
+
+   if( pid > 0 ) {
       
       // start 
       rc = vdev_backend_start( &vdev );
@@ -85,7 +95,7 @@ int main( int argc, char** argv ) {
          vdev_error("vdev_backend_init rc = %d\n", rc );
          
          vdev_backend_stop( &vdev );
-         vdev_free( &vdev );
+         vdev_shutdown( &vdev );
          exit(1);
       }
       
@@ -96,7 +106,7 @@ int main( int argc, char** argv ) {
          vdev_error("vdev_backend_main rc = %d\n", rc );
          
          vdev_backend_stop( &vdev );
-         vdev_free( &vdev );
+         vdev_shutdown( &vdev );
          exit(1);
       }
       
@@ -104,7 +114,7 @@ int main( int argc, char** argv ) {
       vdev_backend_stop( &vdev );
    }
    
-   vdev_free( &vdev );
+   vdev_shutdown( &vdev );
    
    return 0;
 }

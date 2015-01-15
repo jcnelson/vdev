@@ -20,6 +20,7 @@
 */
 
 #include "common.h"
+#include "device.h"
 #include "workqueue.h"
 #include "methods.h"
 

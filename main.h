@@ -24,6 +24,7 @@
 
 #include "vdev.h"
 #include "acl.h"
+#include "fs.h"
 #include "config.h"
 
 #endif
