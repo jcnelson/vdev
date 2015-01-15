@@ -66,15 +66,29 @@
 #include "fskit/fskit.h"
 #include "pstat/libpstat.h"
 
-#define WHERESTR "%05d:%05d: [%16s:%04u] %s: "
-#define WHEREARG (int)getpid(), (int)vdev_os_gettid(), __FILE__, __LINE__, __func__
+#define VDEV_WHERESTR "%05d:%05d: [%16s:%04u] %s: "
+#define VDEV_WHEREARG (int)getpid(), (int)pthread_self(), __FILE__, __LINE__, __func__
 
-extern int _DEBUG_MESSAGES;
-extern int _ERROR_MESSAGES;
+extern int _VDEV_DEBUG_MESSAGES;
+extern int _VDEV_ERROR_MESSAGES;
 
-#define vdev_debug( format, ... ) fskit_debug( format, __VA_ARGS__ )
-#define vdev_error( format, ... ) fskit_error( format, __VA_ARGS__ )
+#define vdev_debug( format, ... ) \
+   do { \
+      if( _VDEV_DEBUG_MESSAGES ) { \
+         printf( VDEV_WHERESTR format, VDEV_WHEREARG, __VA_ARGS__ ); \
+         fflush(stdout); \
+      } \
+   } while(0)
 
+
+#define vdev_error( format, ... ) \
+   do { \
+      if( _VDEV_ERROR_MESSAGES ) { \
+         fprintf(stderr, VDEV_WHERESTR format, VDEV_WHEREARG, __VA_ARGS__); \
+         fflush(stderr); \
+      } \
+   } while(0)
+   
 #define VDEV_CALLOC(type, count) (type*)calloc( sizeof(type) * (count), 1 )
 #define VDEV_FREE_LIST(list) do { if( (list) != NULL ) { for(unsigned int __i = 0; (list)[__i] != NULL; ++ __i) { if( (list)[__i] != NULL ) { free( (list)[__i] ); (list)[__i] = NULL; }} free( (list) ); } } while(0)
 #define VDEV_SIZE_LIST(sz, list) for( *(sz) = 0; (list)[*(sz)] != NULL; ++ *(sz) );
@@ -122,6 +136,12 @@ int vdev_parse_uid( char const* uid_str, uid_t* uid );
 int vdev_parse_gid( char const* gid_str, gid_t* gid );
 int vdev_validate_uid( uid_t uid );
 int vdev_validate_gid( gid_t gid );
+
+// misc 
+char* vdev_fullpath( char const* root, char const* path, char* dest );
+char* vdev_dirname( char const* path, char* dest );
+size_t vdev_basename_len( char const* path );
+char* vdev_basename( char const* path, char* dest );
 
 }
 

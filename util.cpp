@@ -23,26 +23,139 @@
 
 #include "fskit/fskit.h"
 
-int _DEBUG = 0;
-
-int _DEBUG_MESSAGES = 0;
-int _ERROR_MESSAGES = 1;
+int _VDEV_DEBUG_MESSAGES = 0;
+int _VDEV_ERROR_MESSAGES = 1;
 
 
 void vdev_set_debug_level( int d ) {
-   _DEBUG_MESSAGES = d;
+   _VDEV_DEBUG_MESSAGES = d;
 }
 
 void vdev_set_error_level( int e ) {
-   _ERROR_MESSAGES = e;
+   _VDEV_ERROR_MESSAGES = e;
 }
 
 int vdev_get_debug_level() {
-   return _DEBUG_MESSAGES;
+   return _VDEV_DEBUG_MESSAGES;
 }
 
 int vdev_get_error_level() {
-   return _ERROR_MESSAGES;
+   return _VDEV_ERROR_MESSAGES;
+}
+
+// join two paths, writing the result to dest if dest is not NULL.
+// otherwise, allocate and return a buffer containing the joined paths.
+char* vdev_fullpath( char const* root, char const* path, char* dest ) {
+
+   char delim = 0;
+   int path_off = 0;
+
+   int len = strlen(path) + strlen(root) + 2;
+
+   if( strlen(root) > 0 ) {
+      size_t root_delim_off = strlen(root) - 1;
+      if( root[root_delim_off] != '/' && path[0] != '/' ) {
+         len++;
+         delim = '/';
+      }
+      else if( root[root_delim_off] == '/' && path[0] == '/' ) {
+         path_off = 1;
+      }
+   }
+
+   if( dest == NULL ) {
+      dest = VDEV_CALLOC( char, len );
+   }
+
+   memset(dest, 0, len);
+
+   strcpy( dest, root );
+   if( delim != 0 ) {
+      dest[strlen(dest)] = '/';
+   }
+   strcat( dest, path + path_off );
+
+   return dest;
+}
+
+
+// get the directory name of a path.
+// put it into dest if dest is not null.
+// otherwise, allocate a buffer and return it.
+char* vdev_dirname( char const* path, char* dest ) {
+   if( dest == NULL ) {
+      dest = VDEV_CALLOC( char, strlen(path) + 1 );
+   }
+
+   // is this root?
+   if( strlen(path) == 0 || strcmp( path, "/" ) == 0 ) {
+      strcpy( dest, "/" );
+      return dest;
+   }
+
+   int delim_i = strlen(path);
+   if( path[delim_i] == '/' ) {
+      delim_i--;
+   }
+
+   for( ; delim_i >= 0; delim_i-- ) {
+      if( path[delim_i] == '/' ) {
+         break;
+      }
+   }
+
+   if( delim_i < 0 ) {
+      delim_i = 0;
+   }
+
+   if( delim_i == 0 && path[0] == '/' ) {
+      delim_i = 1;
+   }
+
+   strncpy( dest, path, delim_i );
+   dest[delim_i+1] = '\0';
+   return dest;
+}
+
+// determine how long the basename of a path is
+size_t vdev_basename_len( char const* path ) {
+   int delim_i = strlen(path) - 1;
+   if( delim_i <= 0 ) {
+      return 0;
+   }
+   if( path[delim_i] == '/' ) {
+      // this path ends with '/', so skip over it if it isn't /
+      if( delim_i > 0 ) {
+         delim_i--;
+      }
+   }
+   for( ; delim_i >= 0; delim_i-- ) {
+      if( path[delim_i] == '/' ) {
+         break;
+      }
+   }
+   delim_i++;
+
+   return strlen(path) - delim_i;
+}
+
+
+// get the basename of a (non-directory) path.
+// put it into dest, if dest is not null.
+// otherwise, allocate a buffer with it and return the buffer
+char* vdev_basename( char const* path, char* dest ) {
+
+   size_t len = vdev_basename_len( path );
+
+   if( dest == NULL ) {
+      dest = VDEV_CALLOC( char, len + 1 );
+   }
+   else {
+      memset( dest, 0, len + 1 );
+   }
+
+   strncpy( dest, path + strlen(path) - len, len );
+   return dest;
 }
 
 // run a subprocess in the system shell (/bin/sh)
@@ -170,7 +283,7 @@ int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t m
       if( rc < 0 ) {
          
          rc = -errno;
-         vdev_error("waitpid(%d) rc = %d\n", pid );
+         vdev_error("waitpid(%d) rc = %d\n", pid, rc );
          
          close( p[0] );
          
@@ -326,7 +439,7 @@ int vdev_load_all( char const* dir_path, vdev_dirent_loader_t loader, void* cls 
    for( int i = 0; i < num_entries; i++ ) {
       
       // full path...
-      char* fp = fskit_fullpath( dir_path, dirents[i]->d_name, NULL );
+      char* fp = vdev_fullpath( dir_path, dirents[i]->d_name, NULL );
       if( fp == NULL ) {
          
          vdev_dirents_free( dirents, num_entries );
@@ -363,6 +476,10 @@ int vdev_get_passwd( char const* username, struct passwd* pwd, char** pwd_buf ) 
    char* buf = NULL;
    int buf_len = 0;
    int rc = 0;
+   
+   if( pwd == NULL || username == NULL || pwd_buf == NULL ) {
+      return -EINVAL;
+   }
    
    memset( pwd, 0, sizeof(struct passwd) );
    
@@ -409,6 +526,10 @@ int vdev_get_group( char const* groupname, struct group* grp, char** grp_buf ) {
    char* buf = NULL;
    int buf_len = 0;
    int rc = 0;
+   
+   if( grp == NULL || groupname == NULL || grp_buf == NULL ) {
+      return -EINVAL;
+   }
    
    memset( grp, 0, sizeof(struct group) );
    
@@ -567,7 +688,7 @@ int vdev_rmdirs( char const* dirp ) {
       }
       else {
          
-         char* tmp = fskit_dirname( dirname, NULL );
+         char* tmp = vdev_dirname( dirname, NULL );
          
          free( dirname );
          
@@ -600,7 +721,7 @@ int vdev_rmdirsat( int dirfd, char const* dirp ) {
       }
       else {
          
-         char* tmp = fskit_dirname( dirname, NULL );
+         char* tmp = vdev_dirname( dirname, NULL );
          
          free( dirname );
          
@@ -766,7 +887,7 @@ int vdev_validate_uid( uid_t uid ) {
          rc = -errno;
          free( buf );
          
-         vdev_error("getpwuid_r(%" PRIu64 ") errno = %d\n", uid, rc);
+         vdev_error("getpwuid_r(%d) errno = %d\n", uid, rc);
          return rc;
       }
    }
@@ -815,7 +936,7 @@ int vdev_validate_gid( gid_t gid ) {
          rc = -errno;
          free( buf );
          
-         vdev_error("getgrgid_r(%" PRIu64 ") errno = %d\n", gid, rc);
+         vdev_error("getgrgid_r(%d) errno = %d\n", gid, rc);
          return rc;
       }
    }
