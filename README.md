@@ -32,7 +32,7 @@ Building
 
 To build, type:
 
-    $ make OS=$OS_TYPE
+    $ make OS=$OS_TYPE USE_FS=1
 
 Substitute $OS_TYPE with:
 * "LINUX" to build for Linux
@@ -40,6 +40,8 @@ Substitute $OS_TYPE with:
 * "OPENBSD" to build for OpenBSD (coming soon)
 
 $OS_TYPE defaults to "LINUX".
+
+If you do not want to build the vdev filesystem that allows it to equivocate about device files to different processes, omit the `USE_FS=1` option.
 
 To install, type:
 
