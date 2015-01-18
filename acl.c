@@ -31,6 +31,7 @@
 #include "match.h"
 #include "config.h"
 
+SGLIB_DEFINE_VECTOR_FUNCTIONS( struct vdev_acl );
 
 // parse the ACL mode 
 static int vdev_acl_parse_mode( mode_t* mode, char const* mode_str ) {
@@ -345,14 +346,16 @@ int vdev_acl_load( char const* path, struct vdev_acl* acl ) {
 
 
 // free a vector of acls
-static void vdev_acl_free_vector( vector<struct vdev_acl>* acls ) {
+static void vdev_acl_free_vector( struct sglib_vdev_acl_vector* acls ) {
    
-   for( unsigned int i = 0; i < acls->size(); i++ ) {
+   for( unsigned long i = 0; i < sglib_vdev_acl_vector_size( acls ); i++ ) {
       
-      vdev_acl_free( &acls->at(i) );
+      struct vdev_acl* acl = sglib_vdev_acl_vector_at_ref( acls, i );
+      
+      vdev_acl_free( acl );
    }
    
-   acls->clear();
+   sglib_vdev_acl_vector_clear( acls );
 }
 
 // free a C-style list of acls (including the list itself)
@@ -382,6 +385,8 @@ int vdev_acl_loader( char const* fp, void* cls ) {
    int rc = 0;
    struct stat sb;
    
+   struct sglib_vdev_acl_vector* acls = (struct sglib_vdev_acl_vector*)cls;
+   
    // skip if not a regular file 
    rc = stat( fp, &sb );
    if( rc != 0 ) {
@@ -398,8 +403,6 @@ int vdev_acl_loader( char const* fp, void* cls ) {
    
    vdev_debug("Load ACL %s\n", fp );
    
-   vector<struct vdev_acl>* acls = (vector<struct vdev_acl>*)cls;
-
    memset( &acl, 0, sizeof(struct vdev_acl) );
    
    rc = vdev_acl_load( fp, &acl );
@@ -410,12 +413,12 @@ int vdev_acl_loader( char const* fp, void* cls ) {
    }
    
    // save this acl 
-   try {
-      acls->push_back( acl );
-   }
-   catch( bad_alloc& ba ) {
+   rc = sglib_vdev_acl_vector_push_back( acls, &acl );
+   if( rc != 0 ) {
       
-      return -ENOMEM;
+      // OOM 
+      vdev_acl_free( &acl );
+      return rc;
    }
    
    return 0;
@@ -426,7 +429,9 @@ int vdev_acl_loader( char const* fp, void* cls ) {
 int vdev_acl_load_all( char const* dir_path, struct vdev_acl** ret_acls, size_t* ret_num_acls ) {
    
    int rc = 0;
-   vector<struct vdev_acl> acls;
+   struct sglib_vdev_acl_vector acls;
+   
+   sglib_vdev_acl_vector_init( &acls );
    
    rc = vdev_load_all( dir_path, vdev_acl_loader, &acls );
    
@@ -446,18 +451,11 @@ int vdev_acl_load_all( char const* dir_path, struct vdev_acl** ret_acls, size_t*
       else {
       
          // extract values
-         struct vdev_acl* acl_list = VDEV_CALLOC( struct vdev_acl, acls.size() );
-         if( acl_list == NULL ) {
-            
-            vdev_acl_free_vector( &acls );
-            return -ENOMEM;   
-         }
+         unsigned long len = 0;
          
-         // NOTE: vectors are contiguous in memory 
-         memcpy( acl_list, &acls[0], sizeof(struct vdev_acl) * acls.size() );
+         sglib_vdev_acl_vector_yoink( &acls, ret_acls, len );
          
-         *ret_acls = acl_list;
-         *ret_num_acls = acls.size();
+         *ret_num_acls = len;
       }
    }
    

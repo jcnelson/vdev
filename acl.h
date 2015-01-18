@@ -85,7 +85,7 @@ struct vdev_acl {
 // prototype...
 struct vdev_config;
 
-extern "C" {
+C_LINKAGE_BEGIN
 
 int vdev_acl_init( struct vdev_acl* acl );
 int vdev_acl_load_all( char const* dir_path, struct vdev_acl** ret_acls, size_t* ret_num_acls );
@@ -94,7 +94,7 @@ int vdev_acl_free_all( struct vdev_acl* acl_list, size_t num_acls );
 
 int vdev_acl_apply_all( struct vdev_config* conf, struct vdev_acl* acls, size_t num_acls, char const* path, struct pstat* caller_proc, uid_t caller_uid, gid_t caller_gid, struct stat* sb );
 
-}
+C_LINKAGE_END
 
 #endif
 
