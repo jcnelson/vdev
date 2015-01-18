@@ -41,27 +41,16 @@ int vdev_device_request_init( struct vdev_device_request* req, struct vdev_state
    
    req->state = state;
    req->type = req_type;
-   req->params = new (nothrow) vdev_device_params_t();
-   
-   if( req->params == NULL ) {
-      
-      if( req->path != NULL ) {
-         free( req->path );
-      }
-      
-      return -ENOMEM;
-   }
    
    return 0;
 }
-
 
 // free a request 
 int vdev_device_request_free( struct vdev_device_request* req ) {
    
    if( req->params != NULL ) {
       
-      delete req->params;
+      vdev_params_free( req->params );
       req->params = NULL;
    }
    
@@ -88,23 +77,7 @@ int vdev_device_request_free( struct vdev_device_request* req ) {
 // return -ENOMEM if OOM
 int vdev_device_request_add_param( struct vdev_device_request* req, char const* key, char const* value ) {
    
-   try {
-      
-      vdev_device_params_t::iterator itr = req->params->find( string(key) );
-      if( itr == req->params->end() ) {
-         
-         (*req->params)[ string(key) ] = string(value);
-      }
-      else {
-         
-         return -EEXIST;
-      }
-   }
-   catch ( bad_alloc& ba ) {
-      return -ENOMEM;
-   }
-   
-   return 0;
+   return vdev_params_add( &req->params, key, value );
 }
 
 
@@ -174,11 +147,14 @@ int vdev_device_request_to_env( struct vdev_device_request* req, char*** ret_env
    // mountpoint --> VDEV_MOUNTPOINT
    // helpers --> VDEV_HELPERS
    
-   size_t num_vars = 8 + req->params->size();
+   size_t num_vars = 8 + sglib_vdev_params_len( req->params );
    int i = 0;
    int rc = 0;
    char dev_buf[50];
+   struct vdev_param_t* dp = NULL;
+   struct sglib_vdev_params_iterator itr;
    char* vdev_path = req->renamed_path;
+   
    if( vdev_path == NULL ) {
       vdev_path = req->path;
    }
@@ -257,10 +233,10 @@ int vdev_device_request_to_env( struct vdev_device_request* req, char*** ret_env
    i++;
    
    // add all OS-specific parameters 
-   for( vdev_device_params_t::iterator itr = req->params->begin(); itr != req->params->end(); itr++ ) {
+   for( dp = sglib_vdev_params_it_init_inorder( &itr, req->params ); dp != NULL; dp = sglib_vdev_params_it_next( &itr ) ) {
       
-      char const* param_key = itr->first.c_str();
-      char const* param_value = itr->second.c_str();
+      char const* param_key = dp->key;
+      char const* param_value = dp->value;
       
       // prepend with "VDEV_OS_"
       char* varname = VDEV_CALLOC( char, strlen(param_key) + 1 + strlen("VDEV_OS_") );
@@ -330,12 +306,6 @@ int vdev_device_request_sanity_check( struct vdev_device_request* req ) {
       return -EINVAL;
    }
    
-   if( req->params == NULL ) {
-      
-      vdev_error("request %p has no params\n", req );
-      return -EINVAL;
-   }
-   
    return 0;
 }
 
@@ -361,12 +331,14 @@ int vdev_device_request_set_mode( struct vdev_device_request* req, mode_t mode )
 static int vdev_device_add_metadata( struct vdev_device_request* req, char const* fp ) {
 
    int rc = 0;
+   struct sglib_vdev_params_iterator itr;
+   struct vdev_param_t* dp;
    
    // save all OS-specific attributes to this, via setxattr 
-   for( vdev_device_params_t::iterator itr = req->params->begin(); itr != req->params->end(); itr++ ) {
+   for( dp = sglib_vdev_params_it_init_inorder( &itr, req->params ); dp != NULL; dp = sglib_vdev_params_it_next( &itr ) ) {
       
-      char const* param_name = itr->first.c_str();
-      char const* param_value = itr->second.c_str();
+      char const* param_name = dp->key;
+      char const* param_value = dp->value;
       
       char* vdev_param_name = VDEV_CALLOC( char, strlen(VDEV_OS_XATTR_NAMESPACE) + 1 + strlen(param_name) + 1 );
       

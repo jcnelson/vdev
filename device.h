@@ -23,23 +23,20 @@
 #define _VDEV_DEVICE_H_
 
 #include "util.h"
-
-#include <map>
-using namespace std;
+#include "param.h"
+#include "workqueue.h"
 
 #define VDEV_NAME_MAX 256
 
 #define VDEV_OS_XATTR_NAMESPACE    "vdev.VDEV_OS_"
 
 // device request type 
-enum vdev_device_request_t {
+typedef enum {
    VDEV_DEVICE_INVALID = 0,             // invalid request
    VDEV_DEVICE_ADD,
    VDEV_DEVICE_REMOVE,   
    VDEV_DEVICE_ANY                      // only useful for actions
-};
-
-typedef map<string, string> vdev_device_params_t;
+} vdev_device_request_t;
 
 struct vdev_state;
 
@@ -63,14 +60,17 @@ struct vdev_device_request {
    mode_t mode;
    
    // OS-specific driver parameters 
-   vdev_device_params_t* params;
+   vdev_params* params;
    
    // reference to vdev state, so we can call other methods when working
    struct vdev_state* state;
+   
+   // reference to the next item, since this structure often gets used for linked lists 
+   struct vdev_device_request* next;
 };
 
 
-extern "C" {
+C_LINKAGE_BEGIN
 
 // memory management
 int vdev_device_request_init( struct vdev_device_request* req, struct vdev_state* state, vdev_device_request_t type, char const* path );
@@ -92,6 +92,6 @@ int vdev_device_request_enqueue( struct vdev_wq* wq, struct vdev_device_request*
 // sanity check structure 
 int vdev_device_request_sanity_check( struct vdev_device_request* req );
 
-}
+C_LINKAGE_END
 
 #endif
