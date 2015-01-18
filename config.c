@@ -31,6 +31,7 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
    
    struct vdev_config* conf = (struct vdev_config*)userdata;
    bool success = false;
+   int rc = 0;
    
    if( strcmp(section, VDEV_CONFIG_NAME) == 0 ) {
       
@@ -90,15 +91,12 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
    if( strcmp( section, VDEV_OS_CONFIG_NAME) == 0 ) {
       
       // OS-specific config value
-      try {
-         (*conf->os_config)[ string(name) ] = string(value);
-         return 1;
-      }
-      catch( bad_alloc& ba ) {
+      rc = vdev_params_add( &conf->os_config, name, value );
+      if( rc != 0 ) {
          
-         // out of memory 
          return 0;
       }
+      return 1;
    }
    
    fprintf(stderr, "Unrecognized field '%s'\n", name);
@@ -130,13 +128,6 @@ int vdev_config_sanity_check( struct vdev_config* conf ) {
 int vdev_config_init( struct vdev_config* conf ) {
    
    memset( conf, 0, sizeof(struct vdev_config) );
-   
-   conf->os_config = new (nothrow) vdev_config_map_t();
-   
-   if( conf->os_config == NULL ) {
-      return -ENOMEM;
-   }
-   
    return 0;
 }
 
@@ -194,7 +185,7 @@ int vdev_config_free( struct vdev_config* conf ) {
    
    if( conf->os_config != NULL ) {
       
-      delete conf->os_config;
+      vdev_params_free( conf->os_config );
       conf->os_config = NULL;
    }
    

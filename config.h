@@ -22,8 +22,8 @@
 #ifndef _VDEV_CONFIG_H_
 #define _VDEV_CONFIG_H_
 
-#include "fskit/fskit.h"
 #include "util.h"
+#include "param.h"
 
 #define VDEV_CONFIG_NAME        "vdev-config"
 #define VDEV_OS_CONFIG_NAME     "vdev-OS"
@@ -35,8 +35,6 @@
 #define VDEV_CONFIG_HELPERS       "helpers"
 #define VDEV_CONFIG_DEFAULT_MODE  "default_permissions"
 #define VDEV_CONFIG_DEFAULT_POLICY "default_policy"     // allow or deny
-
-typedef map<string, string> vdev_config_map_t;
 
 struct vdev_config {
    
@@ -59,19 +57,19 @@ struct vdev_config {
    int default_policy;
    
    // OS-specific configuration (for keys under "OS")
-   vdev_config_map_t* os_config;
+   vdev_params* os_config;
    
    // default permission bits for mknod 
    mode_t default_mode;
 };
 
-extern "C" {
+C_LINKAGE_BEGIN
 
 int vdev_config_init( struct vdev_config* conf );
 int vdev_config_load( char const* path, struct vdev_config* conf );
 int vdev_config_load_file( FILE* file, struct vdev_config* conf );
 int vdev_config_free( struct vdev_config* conf );
 
-};
+C_LINKAGE_END
 
 #endif
