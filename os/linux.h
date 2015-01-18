@@ -25,6 +25,8 @@
 // build Linux-specific method implementations
 #ifdef _VDEV_OS_LINUX
 
+#define _GNU_SOURCE 
+
 #include "vdev.h"
 
 #include <sys/poll.h>
@@ -35,6 +37,7 @@
 
 #include <linux/types.h>
 #include <linux/netlink.h>
+#include <linux/socket.h>
 
 #define VDEV_LINUX_NETLINK_BUF_MAX 4097
 #define VDEV_LINUX_NETLINK_RECV_BUF_MAX 128 * 1024 * 1024
@@ -60,17 +63,18 @@ struct vdev_linux_context {
    struct vdev_os_context* os_ctx;
    
    // initial device requests 
-   vector<struct vdev_device_request*>* initial_requests;
+   struct vdev_device_request* initial_requests;
+   struct vdev_device_request* initial_requests_tail;
 };
 
-extern "C" {
+C_LINKAGE_BEGIN
 
 int vdev_os_init( struct vdev_os_context* ctx, void** cls );
 int vdev_os_shutdown( void* cls );
 
 int vdev_os_next_device( struct vdev_device_request* request, void* cls );
 
-}
+C_LINKAGE_END
 
 #endif
 #endif

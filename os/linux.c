@@ -22,7 +22,6 @@
 #ifdef _VDEV_OS_LINUX
 
 #include "linux.h"
-
 #include "workqueue.h"
 
 // parse a uevent action 
@@ -423,7 +422,7 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
       // subsystem given?
       else if( strcmp(key, "SUBSYSTEM") == 0 ) {
          
-         subsystem = value;
+         subsystem = vdev_strdup_or_null( value );
          
          // early check--if this is a block, remember so 
          if( strcasecmp(value, "block") == 0 ) {
@@ -566,6 +565,10 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
       }
    }
    
+   if( subsystem != NULL ) {
+      free( subsystem );
+   }
+   
    return 0;
 }
 
@@ -586,11 +589,13 @@ int vdev_os_next_device( struct vdev_device_request* vreq, void* cls ) {
    struct sockaddr_nl cnls;
    
    // do we have initial requests?
-   if( ctx->initial_requests->size() > 0 ) {
+   if( ctx->initial_requests != NULL ) {
       
       // next request
-      struct vdev_device_request* req = ctx->initial_requests->front();
-      ctx->initial_requests->erase( ctx->initial_requests->begin() );
+      struct vdev_device_request* req = ctx->initial_requests;
+      
+      // consume 
+      ctx->initial_requests = ctx->initial_requests->next;
       
       memcpy( vreq, req, sizeof(struct vdev_device_request) );
       free( req );
@@ -1115,11 +1120,16 @@ static int vdev_linux_sysfs_register_device( struct vdev_linux_context* ctx, cha
    
    free( full_devpath );
    
-   try {
-      ctx->initial_requests->push_back( vreq );
+   // append 
+   if( ctx->initial_requests == NULL ) {
+      
+      ctx->initial_requests = vreq;
+      ctx->initial_requests_tail = ctx->initial_requests;
    }
-   catch( bad_alloc& ba ) {
-      rc = -ENOMEM;
+   else {
+      
+      ctx->initial_requests_tail->next = vreq;
+      ctx->initial_requests_tail = vreq;
    }
    
    free( fp_parent );
@@ -1359,11 +1369,6 @@ static int vdev_linux_context_init( struct vdev_os_context* os_ctx, struct vdev_
    
    memset( ctx, 0, sizeof(struct vdev_linux_context) );
    
-   ctx->initial_requests = new (nothrow) vector<struct vdev_device_request*>();
-   if( ctx->initial_requests == NULL ) {
-      return -ENOMEM;
-   }
-   
    ctx->os_ctx = os_ctx;
    
    ctx->nl_addr.nl_family = AF_NETLINK;
@@ -1447,13 +1452,21 @@ static int vdev_linux_context_shutdown( struct vdev_linux_context* ctx ) {
       
       if( ctx->initial_requests != NULL ) {
          
-         for( unsigned int i = 0; i < ctx->initial_requests->size(); i++ ) {
+         struct vdev_device_request* itr = ctx->initial_requests;
+         struct vdev_device_request* next = NULL;
+         
+         while( itr != NULL ) {
             
-            vdev_device_request_free( ctx->initial_requests->at(i) );
-            free( ctx->initial_requests->at(i) );
+            next = itr->next;
+            
+            vdev_device_request_free( itr );
+            free( itr );
+            
+            itr = next;
          }
          
-         delete ctx->initial_requests;
+         ctx->initial_requests = NULL;
+         ctx->initial_requests_tail = NULL;
       }
    }
    
