@@ -21,11 +21,61 @@
 
 #include "main.h"
 
+#ifdef _USE_FS
+
+// start the front-end 
+// return the pid on success
+// return negative on error 
+pid_t vdev_frontend_mount( struct vdev_state* vdev, struct vdev_fs* fs_frontend ) {
+   
+   int rc = 0;
+   
+   // load the front-end 
+   rc = vdev_frontend_init( fs_frontend, vdev );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_frontend_init rc = %d\n", rc );
+      return rc;
+   }
+   
+   vdev->fs_frontend = fs_frontend;
+   
+   pid = fork();
+   if( pid == 0 ) {
+      
+      // child 
+      // run front-end
+      rc = vdev_frontend_main( fs_frontend, vdev->fuse_argc, vdev->fuse_argv );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_frontend_main rc = %d\n", rc );
+         return rc;
+      }
+      
+      // clean up
+      vdev_frontend_stop( fs_frontend );
+      vdev_frontend_shutdown( fs_frontend );
+   }  
+   
+   return pid;
+}
+
+#else 
+
+// no-op 
+pid_t vdev_frontend_mount( struct vdev_state* vdev, struct vdev_fs* fs_frontend ) {
+   
+   return 1;
+}
+
+#endif
+
+
 // run! 
 int main( int argc, char** argv ) {
    
    int rc = 0;
-   pid_t pid = 1;
+   pid_t pid = 0;
    struct vdev_state vdev;
    struct vdev_fs fs_frontend;
    
@@ -52,43 +102,12 @@ int main( int argc, char** argv ) {
       exit(1);
    }
    
-#ifdef _USE_FS
-   // load the front-end 
-   rc = vdev_frontend_init( &fs_frontend, &vdev );
-   if( rc != 0 ) {
-      
-      vdev_error("vdev_frontend_init rc = %d\n", rc );
-      
-      vdev_backend_stop( &vdev );
-      vdev_shutdown( &vdev );
-      exit(1);
-   }
+   pid = vdev_frontend_mount( &vdev, &fs_frontend );
    
-   vdev.fs_frontend = &fs_frontend;
-   
-   pid = fork();
-   if( pid == 0 ) {
-      
-      // run 
-      rc = vdev_frontend_main( &fs_frontend, vdev.fuse_argc, vdev.fuse_argv );
-      if( rc != 0 ) {
-         
-         vdev_error("vdev_frontend_main rc = %d\n", rc );
-         
-         vdev_backend_stop( &vdev );
-         vdev_shutdown( &vdev );
-         exit(1);
-      }
-      
-      // clean up
-      vdev_frontend_stop( &fs_frontend );
-      vdev_frontend_shutdown( &fs_frontend );
-   }   
-#endif
-
    if( pid > 0 ) {
       
-      // start 
+      // parent process
+      // start back-end
       rc = vdev_backend_start( &vdev );
       if( rc != 0 ) {
          
@@ -113,7 +132,14 @@ int main( int argc, char** argv ) {
       // clean up 
       vdev_backend_stop( &vdev );
    }
+   else if( pid < 0 ) {
+      
+      // error 
+      // shut down back-end 
+      vdev_backend_stop( &vdev );
+   }
    
+   // both parent and child: shutdown
    vdev_shutdown( &vdev );
    
    return 0;
