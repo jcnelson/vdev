@@ -22,12 +22,12 @@
 #ifndef _VDEV_FS_H_
 #define _VDEV_FS_H_
 
+#include "util.h"
+
 #ifdef _USE_FS
 
 #include "fskit/fskit.h"
 #include "fskit/fuse/fskit_fuse.h"
-
-#include "util.h"
 
 struct vdev_state;
 
@@ -48,8 +48,7 @@ struct vdev_fs {
    bool running;
 };
 
-extern "C" {
-
+C_LINKAGE_BEGIN
    
 int vdev_stat( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct stat* sb );
 int vdev_readdir( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct fskit_dir_entry** dirents, size_t num_dirents );
@@ -62,7 +61,7 @@ int vdev_frontend_shutdown( struct vdev_fs* fs_frontend );
 int vdev_frontend_send_mount_info( struct vdev_state* state );
 int vdev_frontend_recv_mount_info( int pipe_back, char** ret_mountpoint, size_t* ret_mountpoint_len );
 
-};
+C_LINKAGE_END
 
 #else  // _USE_FS
 

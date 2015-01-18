@@ -34,7 +34,7 @@
 #include "test.h"
 #endif
 
-extern "C" {
+C_LINKAGE_BEGIN
 
 int vdev_os_init( struct vdev_os_context* ctx, void** cls );
 int vdev_os_shutdown( void* cls );
@@ -45,6 +45,6 @@ int vdev_os_shutdown( void* cls );
 // return negative on error.
 int vdev_os_next_device( struct vdev_device_request* request, void* cls );
 
-}
+C_LINKAGE_END
 
 #endif 

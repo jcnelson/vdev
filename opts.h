@@ -41,13 +41,13 @@ struct vdev_opts {
 };
 
 
-extern "C" {
+C_LINKAGE_BEGIN
    
 int vdev_opts_parse( struct vdev_opts* opts, int argc, char** argv, int* fuse_argc, char** fuse_argv );
 int vdev_opts_free( struct vdev_opts* opts );
 
 int vdev_usage( char const* progname );
 
-}
+C_LINKAGE_END
 
 #endif 

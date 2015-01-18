@@ -30,15 +30,9 @@
 #include "device.h"
 #include "workqueue.h"
 
-#include <map>
-#include <string>
-#include <set>
-
 #define VDEV_CONFIG_DEFAULT_PATH                "/etc/vdev.d/vdev.conf"
 #define VDEV_CONFIG_DEFAULT_DEBUG_LEVEL         0
 #define VDEV_CONFIG_DEFAULT_LOGFILE_PATH        NULL
-
-using namespace std;
 
 // global vdev state 
 struct vdev_state {
@@ -82,7 +76,7 @@ struct vdev_state {
 };
 
 
-extern "C" {
+C_LINKAGE_BEGIN
 
 int vdev_init( struct vdev_state* vdev, int argc, char** argv );
 int vdev_shutdown( struct vdev_state* state );
@@ -95,6 +89,6 @@ int vdev_backend_stop( struct vdev_state* state );
 int vdev_send_mount_info( int pipe_front, char const* mountpoint );
 int vdev_recv_mount_info( int pipe_back, char** ret_mountpoint );
 
-}
+C_LINKAGE_END
 
 #endif

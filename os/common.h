@@ -35,7 +35,7 @@ struct vdev_os_context {
    struct vdev_state* state;
 };
 
-extern "C" {
+C_LINKAGE_BEGIN
 
 // context management
 int vdev_os_context_init( struct vdev_os_context* vos, struct vdev_state* state );
@@ -43,6 +43,6 @@ int vdev_os_context_free( struct vdev_os_context* vos );
 
 int vdev_os_main( struct vdev_os_context* vos );
 
-}
+C_LINKAGE_END
 
 #endif 
