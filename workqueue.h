@@ -24,9 +24,7 @@
 
 #include "util.h"
 
-#include <queue>
-
-using namespace std;
+struct vdev_wreq;
 
 // vdev workqueue callback type
 typedef int (*vdev_wq_func_t)( struct vdev_wreq* wreq, void* cls );
@@ -40,14 +38,9 @@ struct vdev_wreq {
    // user-supplied arguments
    void* work_data;
 
-   // promise semaphore, to wake up the caller.
-   // only initialized of FSKIT_WQ_PROMISE is specified
-   sem_t promise_sem;
-   int promise_ret;
+   // next item 
+   struct vdev_wreq* next;
 };
-
-// workqueue type
-typedef queue< struct vdev_wreq > vdev_wq_queue_t;
 
 // vdev workqueue
 struct vdev_wq {
@@ -59,10 +52,11 @@ struct vdev_wq {
    bool running;
 
    // things to do (double-bufferred)
-   vdev_wq_queue_t* work;
+   struct vdev_wreq* work;
+   struct vdev_wreq* tail;
 
-   vdev_wq_queue_t* work_1;
-   vdev_wq_queue_t* work_2;
+   struct vdev_wreq* work_1;
+   struct vdev_wreq* work_2;
 
    // lock governing access to work
    pthread_mutex_t work_lock;
@@ -71,7 +65,7 @@ struct vdev_wq {
    sem_t work_sem;
 };
 
-extern "C" {
+C_LINKAGE_BEGIN
 
 int vdev_wq_init( struct vdev_wq* wq );
 int vdev_wq_start( struct vdev_wq* wq );
@@ -83,6 +77,6 @@ int vdev_wreq_free( struct vdev_wreq* wreq );
 
 int vdev_wq_add( struct vdev_wq* wq, struct vdev_wreq* wreq );
 
-}
+C_LINKAGE_END
 
 #endif

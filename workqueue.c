@@ -26,8 +26,10 @@
 static void* vdev_wq_main( void* cls ) {
 
    struct vdev_wq* wq = (struct vdev_wq*)cls;
-   vdev_wq_queue_t* work = NULL;
-   struct vdev_wreq wreq;
+   
+   struct vdev_wreq* work_itr = NULL;
+   struct vdev_wreq* next = NULL;
+   
    int rc = 0;
 
    while( wq->running ) {
@@ -40,34 +42,46 @@ static void* vdev_wq_main( void* cls ) {
          break;
       }
 
-      // exchange buffers--we have work
+      // exchange buffers--we have work to do
       pthread_mutex_lock( &wq->work_lock );
 
-      work = wq->work;
+      work_itr = wq->work;
 
       if( wq->work == wq->work_1 ) {
+         wq->work_1 = NULL;
          wq->work = wq->work_2;
       }
       else {
+         wq->work_2 = NULL;
          wq->work = wq->work_1;
       }
+      
+      wq->tail = NULL;
 
       pthread_mutex_unlock( &wq->work_lock );
+      
+      if( work_itr == NULL ) {
+         // nothing to do
+         continue;
+      }
 
-      // safe to use work buffer (we'll clear it out)
-      while( work->size() > 0 ) {
-
-         // next work
-         wreq = work->front();
-         work->pop();
+      // safe to use work buffer (we'll clear it out in the process)
+      while( work_itr != NULL ) {
 
          // carry out work
-         rc = (*wreq.work)( &wreq, wreq.work_data );
+         rc = (*work_itr->work)( work_itr, work_itr->work_data );
          
          if( rc != 0 ) {
             
-            vdev_error("WARN: work %p rc = %d\n", wreq.work, rc );
+            vdev_error("WARN: work %p rc = %d\n", work_itr->work, rc );
          }
+         
+         next = work_itr->next;
+         
+         vdev_wreq_free( work_itr );
+         free( work_itr );
+         
+         work_itr = next;
       }
    }
 
@@ -83,25 +97,7 @@ int vdev_wq_init( struct vdev_wq* wq ) {
    int rc = 0;
 
    memset( wq, 0, sizeof(struct vdev_wq) );
-
-   wq->work_1 = new (nothrow) vdev_wq_queue_t;
-   wq->work_2 = new (nothrow) vdev_wq_queue_t;
-
-   if( wq->work_1 == NULL || wq->work_2 == NULL ) {
-
-      if( wq->work_1 != NULL ) {
-         delete wq->work_1;
-      }
-      
-      if( wq->work_2 != NULL ) {
-         delete wq->work_2;
-      }
-      
-      return -ENOMEM;
-   }
-
-   wq->work = wq->work_1;
-
+   
    pthread_mutex_init( &wq->work_lock, NULL );
    sem_init( &wq->work_sem, 0, 0 );
 
@@ -164,18 +160,20 @@ int vdev_wq_stop( struct vdev_wq* wq ) {
 
 
 // free a work request queue
-static int vdev_wq_queue_free( vdev_wq_queue_t* wqueue ) {
+static int vdev_wq_queue_free( struct vdev_wreq* wqueue ) {
 
-   if( wqueue != NULL ) {
-      while( wqueue->size() > 0 ) {
-
-         struct vdev_wreq wreq = wqueue->front();
-         wqueue->pop();
-
-         vdev_wreq_free( &wreq );
-      }
+   struct vdev_wreq* next = NULL;
+   
+   while( wqueue != NULL ) {
+      
+      next = wqueue->next;
+      
+      vdev_wreq_free( wqueue );
+      free( wqueue );
+      
+      wqueue = next;
    }
-
+   
    return 0;
 }
 
@@ -192,14 +190,6 @@ int vdev_wq_free( struct vdev_wq* wq ) {
    // free all
    vdev_wq_queue_free( wq->work_1 );
    vdev_wq_queue_free( wq->work_2 );
-
-   if( wq->work_1 != NULL ) {
-      delete wq->work_1;
-   }
-   
-   if( wq->work_2 != NULL ) {
-      delete wq->work_2;
-   }
    
    pthread_mutex_destroy( &wq->work_lock );
    sem_destroy( &wq->work_sem );
@@ -233,20 +223,36 @@ int vdev_wreq_free( struct vdev_wreq* wreq ) {
 int vdev_wq_add( struct vdev_wq* wq, struct vdev_wreq* wreq ) {
 
    int rc = 0;
-
+   struct vdev_wreq* next = NULL;
+   
    if( !wq->running ) {
       return -EINVAL;
    }
 
+   // duplicate this work item 
+   next = VDEV_CALLOC( struct vdev_wreq, 1 );
+   if( next == NULL ) {
+      return -ENOMEM;
+   }
+   
+   next->work = wreq->work;
+   next->work_data = wreq->work_data;
+   next->next = NULL;
+   
    pthread_mutex_lock( &wq->work_lock );
 
-   try {
-      wq->work->push( *wreq );
+   if( wq->work == NULL ) {
+      
+      wq->work = next;
+      wq->tail = next;
    }
-   catch( bad_alloc& ba ) {
-      rc = -ENOMEM;
+   else {
+      
+      // append 
+      wq->tail->next = next;
+      wq->tail = next;
    }
-
+   
    pthread_mutex_unlock( &wq->work_lock );
 
    if( rc == 0 ) {
