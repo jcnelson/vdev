@@ -26,17 +26,111 @@
 
 #include "ini.h"
 
+
+   struct sglib_vdev_action_vector { 
+      vdev_action *buf; 
+      unsigned long len; 
+      unsigned long exp; 
+   }; 
+   extern int sglib___vdev_action_vector_grow( struct sglib_vdev_action_vector* v );  
+   extern void sglib_vdev_action_vector_init( struct sglib_vdev_action_vector* v );  
+   extern void sglib_vdev_action_vector_free( struct sglib_vdev_action_vector* v );  
+   extern int sglib_vdev_action_vector_push_back( struct sglib_vdev_action_vector* v, struct vdev_action t );  
+   extern vdev_action sglib_vdev_action_vector_pop_back( struct sglib_vdev_action_vector* v, struct vdev_action t );  
+   extern int sglib_vdev_action_vector_set( struct sglib_vdev_action_vector* v, struct vdev_action t, unsigned long i );  
+   extern void sglib_vdev_action_vector_clear( struct sglib_vdev_action_vector* v );  
+   extern vdev_action sglib_vdev_action_vector_at( struct sglib_vdev_action_vector* v, unsigned long i );  
+   extern vdev_action* sglib_vdev_action_vector_at_ref( struct sglib_vdev_action_vector* v, unsigned long i );  
+   extern unsigned long sglib_vdev_action_vector_size( struct sglib_vdev_action_vector* v );  
+   extern void sglib_vdev_action_vector_yoink( struct sglib_vdev_action_vector* v, vdev_action** buf, unsigned long* len );
+
+
+   int sglib___vdev_action_vector_grow( struct sglib_vdev_action_vector* v ) {  
+      vdev_action* new_buf = NULL;  
+      v->exp ++;  
+      new_buf = (vdev_action*)realloc( v->buf, (1L << v->exp) * sizeof(vdev_action) );  
+      if( new_buf == NULL ) {  
+         return -ENOMEM;  
+      }  
+      v->buf = new_buf;  
+      return 0;  
+   }  
+    
+   void sglib_vdev_action_vector_init( struct sglib_vdev_action_vector* v ) {  
+      v->exp = 0;  
+      v->len = 0;  
+      v->buf = NULL;  
+   }  
+    
+   void sglib_vdev_action_vector_free( struct sglib_vdev_action_vector* v ) {  
+      if( v->buf != NULL ) {  
+         free( v->buf );  
+         v->buf = NULL;  
+      }  
+      v->len = 0;  
+      v->exp = 0;  
+   }  
+    
+   int sglib_vdev_action_vector_push_back( struct sglib_vdev_action_vector* v, struct vdev_action t ) {  
+      int rc = 0;  
+      if( v->len + 1 >= (1L << v->exp) ) {  
+         rc = sglib___vdev_action_vector_grow( v );  
+         if( rc == -ENOMEM ) {  
+            return rc;  
+         }  
+      }  
+      v->buf[ v->len ] = t;  
+      v->len ++;  
+      return 0;  
+   }  
+    
+   vdev_action sglib_vdev_action_vector_pop_back( struct sglib_vdev_action_vector* v, struct vdev_action t ) {  
+      return v->buf[ v->len-- ];  
+   }  
+    
+   int sglib_vdev_action_vector_set( struct sglib_vdev_action_vector* v, struct vdev_action t, unsigned long i ) {  
+      if( i >= v->len ) {  
+         return -EINVAL;  
+      }  
+      v->buf[i] = t;  
+      return 0;  
+   }  
+    
+   void sglib_vdev_action_vector_clear( struct sglib_vdev_action_vector* v ) {  
+      if( v->buf != NULL ) {  
+         free( v->buf );  
+         v->buf = NULL;  
+      }  
+      v->len = 0;  
+      v->exp = 0;  
+   }  
+    
+   vdev_action sglib_vdev_action_vector_at( struct sglib_vdev_action_vector* v, unsigned long i ) {  
+      return v->buf[i];  
+   } 
+    
+   vdev_action* sglib_vdev_action_vector_at_ref( struct sglib_vdev_action_vector* v, unsigned long i ) {  
+      return &v->buf[i];  
+   } 
+    
+   unsigned long sglib_vdev_action_vector_size( struct sglib_vdev_action_vector* v ) {  
+      return v->len;  
+   } 
+    
+   void sglib_vdev_action_vector_yoink( struct sglib_vdev_action_vector* v, vdev_action** buf, unsigned long* len ) {  
+      *buf = v->buf;  
+      *len = v->len;  
+      v->buf = NULL;  
+      v->len = 0;  
+      v->exp = 1;  
+   }  
+    
+   
 // initialize an action 
 int vdev_action_init( struct vdev_action* act, vdev_device_request_t trigger, char* path, char* command, bool async ) {
    
    int rc = 0;
    memset( act, 0, sizeof(struct vdev_action) );
-   
-   act->dev_params = new (nothrow) vdev_device_params_t();
-   
-   if( act->dev_params == NULL ) {
-      return -ENOMEM;
-   }
    
    act->trigger = trigger;
    act->path = vdev_strdup_or_null( path );
@@ -49,7 +143,7 @@ int vdev_action_init( struct vdev_action* act, vdev_device_request_t trigger, ch
       
       if( rc != 0 ) {
          
-         vdev_error("vdev_match_regex_init('%s') rc = %d\n", path, rc );
+         vdev_error("vdev_match_regex_init('%s') rc = %d n", path, rc );
          vdev_action_free( act );
          return rc;
       }
@@ -60,14 +154,7 @@ int vdev_action_init( struct vdev_action* act, vdev_device_request_t trigger, ch
 
 // add a device parameter to match on 
 int vdev_action_add_param( struct vdev_action* act, char const* name, char const* value ) {
-   
-   try {
-      (*act->dev_params)[ string(name) ] = string(value);
-      return 0;
-   }
-   catch( bad_alloc& ba ) {
-      return -ENOMEM;
-   }
+   return vdev_params_add( &act->dev_params, name, value );
 }
 
 // free an action 
@@ -87,7 +174,7 @@ int vdev_action_free( struct vdev_action* act ) {
    
    if( act->dev_params != NULL ) {
       
-      delete act->dev_params;
+      vdev_params_free( act->dev_params );
       act->dev_params = NULL;
    }
    
@@ -154,7 +241,7 @@ static int vdev_action_ini_parser( void* userdata, char const* section, char con
             
             if( rc != 0 ) {
                
-               vdev_error("vdev_match_regex_init('%s') rc = %d\n", act->path, rc );
+               vdev_error("vdev_match_regex_init('%s') rc = %d n", act->path, rc );
                return 0;
             }
          }
@@ -180,7 +267,7 @@ static int vdev_action_ini_parser( void* userdata, char const* section, char con
          
          if( act->trigger == VDEV_DEVICE_INVALID ) {
             
-            fprintf(stderr, "Invalid event type '%s'\n", value);
+            fprintf(stderr, "Invalid event type '%s' n", value);
             return 0;
          }
          else {
@@ -215,7 +302,7 @@ static int vdev_action_ini_parser( void* userdata, char const* section, char con
          }
          else {
             
-            fprintf(stderr, "Invalid async value '%s'\n", value);
+            fprintf(stderr, "Invalid async value '%s' n", value);
             return 0;
          }
       }
@@ -237,16 +324,16 @@ static int vdev_action_ini_parser( void* userdata, char const* section, char con
             return 1;
          }
          else {
-            vdev_error("vdev_action_add_param( '%s', '%s' ) rc = %d\n", name, value, rc );
+            vdev_error("vdev_action_add_param( '%s', '%s' ) rc = %d n", name, value, rc );
             return 0;
          }
       }
       
-      fprintf(stderr, "Unknown field '%s' in section '%s'\n", name, section );
+      fprintf(stderr, "Unknown field '%s' in section '%s' n", name, section );
       return 0;
    }
    
-   fprintf(stderr, "Unknown section '%s'\n", section);
+   fprintf(stderr, "Unknown section '%s' n", section);
    return 0;
 }
 
@@ -259,13 +346,13 @@ int vdev_action_sanity_check( struct vdev_action* act ) {
    
    if( act->command == NULL && act->rename_command == NULL ) {
       
-      fprintf(stderr, "Action is missing 'command=' or 'rename_command='\n");
+      fprintf(stderr, "Action is missing 'command=' or 'rename_command=' n");
       rc = -EINVAL;
    }
    
    if( act->trigger == VDEV_DEVICE_INVALID ) {
       
-      fprintf(stderr, "Action is missing 'event='\n");
+      fprintf(stderr, "Action is missing 'event=' n");
       rc = -EINVAL;
    }
    
@@ -281,7 +368,7 @@ int vdev_action_load( char const* path, struct vdev_action* act ) {
    rc = vdev_action_init( act, VDEV_DEVICE_INVALID, NULL, NULL, false );
    if( rc != 0 ) {
       
-      vdev_error("vdev_action_init('%s') rc = %d\n", path, rc );
+      vdev_error("vdev_action_init('%s') rc = %d n", path, rc );
       return rc;
    }
    
@@ -301,7 +388,7 @@ int vdev_action_load( char const* path, struct vdev_action* act ) {
    if( rc == -EINVAL ) {
       
       vdev_action_free( act );
-      vdev_error("Invalid action '%s'\n", path );
+      vdev_error("Invalid action '%s' n", path );
    }
    
    return rc;
@@ -315,24 +402,13 @@ int vdev_action_load_file( FILE* f, struct vdev_action* act ) {
    
    rc = ini_parse_file( f, vdev_action_ini_parser, act );
    if( rc != 0 ) {
-      vdev_error("ini_parse_file(action) rc = %d\n", rc );
+      vdev_error("ini_parse_file(action) rc = %d n", rc );
    }
    else {
       rc = vdev_action_sanity_check( act );
    }
    
    return rc;
-}
-
-// free a vector of actions
-static void vdev_action_free_vector( vector<struct vdev_action>* acts ) {
-   
-   for( unsigned int i = 0; i < acts->size(); i++ ) {
-      
-      vdev_action_free( &acts->at(i) );
-   }
-   
-   acts->clear();
 }
 
 // free a C-style list of actions (including the list itself)
@@ -361,12 +437,14 @@ int vdev_action_loader( char const* path, void* cls ) {
    struct vdev_action act;
    struct stat sb;
    
+   struct sglib_vdev_action_vector* acts = (struct sglib_vdev_action_vector*)cls;
+   
    // skip if not a regular file 
    rc = stat( path, &sb );
    if( rc != 0 ) {
       
       rc = -errno;
-      vdev_error("stat(%s) rc = %d\n", path, rc );
+      vdev_error("stat(%s) rc = %d n", path, rc );
       return rc;
    }
    
@@ -377,8 +455,6 @@ int vdev_action_loader( char const* path, void* cls ) {
    
    vdev_debug("Load Action %s\n", path );
    
-   vector<struct vdev_action>* acts = (vector<struct vdev_action>*)cls;
-
    memset( &act, 0, sizeof(struct vdev_action) );
    
    rc = vdev_action_load( path, &act );
@@ -389,14 +465,28 @@ int vdev_action_loader( char const* path, void* cls ) {
    }
    
    // save this action 
-   try {
-      acts->push_back( act );
-   }
-   catch( bad_alloc& ba ) {
+   rc = sglib_vdev_action_vector_push_back( acts, act );
+   if( rc != 0 ) {
       
-      return -ENOMEM;
+      // OOM
+      vdev_action_free( &act );
+      return rc;
    }
    
+   return 0;
+}
+
+// free a vector of actions 
+static int vdev_action_vector_free( struct sglib_vdev_action_vector* acts ) {
+   
+   for( unsigned long i = 0; i < sglib_vdev_action_vector_size( acts ); i++ ) {
+      
+      struct vdev_action* act = sglib_vdev_action_vector_at_ref( acts, i );
+      
+      vdev_action_free( act );
+   }
+   
+   sglib_vdev_action_vector_clear( acts );
    return 0;
 }
 
@@ -407,18 +497,22 @@ int vdev_action_loader( char const* path, void* cls ) {
 int vdev_action_load_all( char const* dir_path, struct vdev_action** ret_acts, size_t* ret_num_acts ) {
    
    int rc = 0;
-   vector<struct vdev_action> acts;
+   struct sglib_vdev_action_vector acts;
+   
+   sglib_vdev_action_vector_init( &acts );
    
    rc = vdev_load_all( dir_path, vdev_action_loader, &acts );
    
    if( rc != 0 ) {
       
-      vdev_action_free_vector( &acts );
+      vdev_action_vector_free( &acts );
+      sglib_vdev_action_vector_free( &acts );
+      
       return rc;
    }
    else {
          
-      if( acts.size() == 0 ) {
+      if( sglib_vdev_action_vector_size( &acts ) == 0 ) {
          
          // nothing 
          *ret_acts = NULL;
@@ -427,18 +521,11 @@ int vdev_action_load_all( char const* dir_path, struct vdev_action** ret_acts, s
       else {
       
          // extract values
-         struct vdev_action* act_list = VDEV_CALLOC( struct vdev_action, acts.size() );
-         if( act_list == NULL ) {
-            
-            vdev_action_free_vector( &acts );
-            return -ENOMEM;   
-         }
+         unsigned long len_acts = 0;
          
-         // NOTE: vectors are contiguous in memory 
-         memcpy( act_list, &acts[0], sizeof(struct vdev_action) * acts.size() );
+         sglib_vdev_action_vector_yoink( &acts, ret_acts, &len_acts );
          
-         *ret_acts = act_list;
-         *ret_num_acts = acts.size();
+         *ret_num_acts = len_acts;
       }
    }
    
@@ -596,17 +683,18 @@ int vdev_action_match( struct vdev_device_request* vreq, struct vdev_action* act
    // OS parameter match?
    if( act->dev_params != NULL ) {
       
-      for( vdev_device_params_t::iterator itr = act->dev_params->begin(); itr != act->dev_params->end(); itr++ ) {
+      struct sglib_vdev_params_iterator itr;
+      struct vdev_param_t* dp = NULL;
+      
+      for( dp = sglib_vdev_params_it_init_inorder( &itr, act->dev_params ); dp != NULL; dp = sglib_vdev_params_it_next( &itr ) ) {
+      
+         struct vdev_param_t* match = sglib_vdev_params_find_member( vreq->params, dp );
          
-         const string& act_param_name = itr->first;
-         
-         vdev_device_params_t::iterator vreq_itr = vreq->params->find( act_param_name );
-         
-         if( vreq_itr != vreq->params->end() ) {
+         if( match != NULL ) {
             
             // vreq has this parameter
-            char const* vreq_param_value = vreq_itr->second.c_str();
-            char const* act_param_value = itr->second.c_str();
+            char const* vreq_param_value = match->value;
+            char const* act_param_value = dp->value;
             
             // if the action has no value (value of length 0), then it matches any vreq value 
             if( strlen( vreq_param_value ) == 0 ) {

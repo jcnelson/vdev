@@ -24,6 +24,7 @@
 
 #include "util.h"
 #include "device.h"
+#include "param.h"
 
 // action fields
 #define VDEV_ACTION_NAME                "vdev-action"
@@ -61,13 +62,15 @@ struct vdev_action {
    char* command;
    
    // OS-specific fields to match on
-   vdev_device_params_t* dev_params;
+   vdev_params* dev_params;
    
    // synchronous or asynchronous 
    bool async;
 };
 
-extern "C" {
+typedef struct vdev_action vdev_action;
+
+C_LINKAGE_BEGIN
 
 int vdev_action_init( struct vdev_action* act, vdev_device_request_t trigger, char* path, char* command, bool async );
 int vdev_action_add_param( struct vdev_action* act, char const* name, char const* value );
@@ -82,6 +85,6 @@ int vdev_action_load_all( char const* dir, struct vdev_action** acts, size_t* nu
 int vdev_action_create_path( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts, char** path );
 int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts );
 
-};
+C_LINKAGE_END
 
 #endif
