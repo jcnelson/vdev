@@ -45,11 +45,6 @@
 #include <semaphore.h>
 #include <signal.h>
 #include <regex.h>
-#include <iostream>
-#include <list>
-#include <map>
-#include <vector>
-#include <curl/curl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdint.h>
@@ -57,13 +52,14 @@
 #include <signal.h>
 #include <math.h>
 #include <sys/mman.h>
+#include <stdbool.h>
+#include <attr/xattr.h>
 
 #include <pwd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <grp.h>
 
-#include "fskit/fskit.h"
 #include "pstat/libpstat.h"
 
 #define VDEV_WHERESTR "%05d:%05d: [%16s:%04u] %s: "
@@ -100,9 +96,17 @@ extern int _VDEV_ERROR_MESSAGES;
 #define MAX(x,y) ((x) > (y) ? (x) : (y))
 #endif
 
+#ifdef __cplusplus
+#define C_LINKAGE_BEGIN extern "C" {
+#define C_LINKAGE_END }
+#else
+#define C_LINKAGE_BEGIN 
+#define C_LINKAGE_END
+#endif 
+
 typedef int (*vdev_dirent_loader_t)( char const*, void* );
 
-extern "C" {
+C_LINKAGE_BEGIN
 
 // debug functions
 void vdev_set_debug_level( int d );
@@ -125,9 +129,7 @@ int vdev_read_file( char const* path, char* buf, size_t len );
 // directory I/O
 int vdev_load_all( char const* dir_path, vdev_dirent_loader_t loader, void* cls );
 int vdev_mkdirs( char const* dirp, int start, mode_t mode );
-int vdev_mkdirsat( int dir_fd, char const* dirp, int start, mode_t mode );
 int vdev_rmdirs( char const* dirp );
-int vdev_rmdirsat( int dirfd, char const* dirp );
 
 // passwd/group query
 int vdev_get_passwd( char const* username, struct passwd* pwd, char** pwd_buf );
@@ -143,6 +145,6 @@ char* vdev_dirname( char const* path, char* dest );
 size_t vdev_basename_len( char const* path );
 char* vdev_basename( char const* path, char* dest );
 
-}
+C_LINKAGE_END
 
 #endif
