@@ -1,11 +1,11 @@
-CPP    := g++ -Wall -g -fstack-protector -fstack-protector-all
+CPP    := gcc -std=c99 -Wall -g -fstack-protector -fstack-protector-all -Wno-unused-but-set-variable -Wno-unused-variable
 LIB   := -lpthread -lrt -lpstat
 LIB_FS := -lfskit -lfskit_fuse -lfuse
 INC   := -I/usr/include -I/usr/local/include -I. 
 C_SRCS:= $(wildcard *.c) $(wildcard os/*.c)
 CXSRCS:= $(wildcard *.cpp) $(wildcard os/*.cpp)
 OBJ   := $(patsubst %.c,%.o,$(C_SRCS)) $(patsubst %.cpp,%.o,$(CXSRCS))
-DEFS  := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS -D_FILE_OFFSET_BITS=64
+DEFS  := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS -D_FILE_OFFSET_BITS=64 -D_BSD_SOURCE 
 
 VDEV := vdev
 
