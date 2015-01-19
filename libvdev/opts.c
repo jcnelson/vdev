@@ -21,10 +21,6 @@
 
 #include "opts.h"
 
-// for options parsing
-#define _FILE_OFFSET_BITS 64
-#include <fuse.h>
-
 static const char* FUSE_OPT_O = "-o";
 static const char* FUSE_OPT_D = "-d";
 static const char* FUSE_OPT_F = "-f";
