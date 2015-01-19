@@ -91,7 +91,7 @@ struct udev* udev_new( void ) {
       return u;
    }
    
-   pthread_mutex_init( &u->lock );
+   pthread_mutex_init( &u->lock, NULL );
    
    // TODO: read config file and set up udev further
    

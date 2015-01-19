@@ -22,7 +22,7 @@
 #ifndef _LIBUDEV_COMPAT_HWDB_H_
 #define _LIBUDEV_COMPAT_HWDB_H_
 
-#include "libvdev/util.h"
+#include "util.h"
 #include "udev.h"
 #include "list.h"
 

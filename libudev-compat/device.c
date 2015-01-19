@@ -21,9 +21,6 @@
 
 #include "device.h"
 
-#include "vdevd/os/common.h"
-#include "vdevd/os/linux.h"
-
 struct udev_device {
    
    // guard 

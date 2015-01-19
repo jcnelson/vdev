@@ -22,5 +22,6 @@
 #ifndef _LIBUDEV_COMPAT_ENUMERATE_H_
 #define _LIBUDEV_COMPAT_ENUMERATE_H_
 
+#include "util.h"
 
 #endif

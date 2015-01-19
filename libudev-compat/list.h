@@ -22,8 +22,7 @@
 #ifndef _LIBUDEV_COMPAT_LIST_H_
 #define _LIBUDEV_COMPAT_LIST_H_
 
-#include "libvdev/util.h"
-#include "libvdev/sglib.h"
+#include "util.h"
 
 struct udev_list_entry;
 

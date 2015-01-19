@@ -22,7 +22,7 @@
 #ifndef _LIBUDEV_COMPAT_UDEV_H_
 #define _LIBUDEV_COMPAT_UDEV_H_
 
-#include "libvdev/util.h"
+#include "util.h"
 
 struct udev;
 

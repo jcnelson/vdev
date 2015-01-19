@@ -22,8 +22,7 @@
 #ifndef _LIBUDEV_COMPAT_QUEUE_H_
 #define _LIBUDEV_COMPAT_QUEUE_H_
 
-#include "libvdev/sglib.h"
-#include "libvdev/util.h"
+#include "util.h"
 
 struct udev_queue;
 
