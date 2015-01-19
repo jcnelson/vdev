@@ -20,7 +20,6 @@ PREFIX ?= /
 BINDIR ?= $(PREFIX)/bin
 LIBDIR ?= $(PREFIX)/lib
 INCLUDEDIR ?= $(PREFIX)/include/libvdev
-PKGCONFIGDIR ?= $(PREFIX)/lib/pkgconfig
 
 all: libvdev 
 
@@ -29,8 +28,8 @@ libvdev: $(OBJ)
 	$(SHELL) -c "if ! test -L $(LIBVDEV_SO); then /bin/ln -s $(LIBVDEV_LIB) $(LIBVDEV_SO); fi"
 	$(SHELL) -c "if ! test -L $(LIBVDEV); then /bin/ln -s $(LIBVDEV_SO) $(LIBVDEV); fi"
 
-libvdev-install: libvdev $(PC_FILE)
-	mkdir -p $(LIBDIR) $(PKGCONFIGDIR)
+libvdev-install: libvdev
+	mkdir -p $(LIBDIR))
 	cp -a $(LIBVDEV) $(LIBVDEV_SO) $(LIBVDEV_LIB) $(LIBDIR)
 
 libvdev-dev-install: libvdev
@@ -44,4 +43,4 @@ install: libvdev-install libvdev-dev-install
 
 .PHONY: clean
 clean:
-	/bin/rm -f $(OBJ) $(LIBVDEV_LIB) $(LIBVDEV_SO) $(LIBVDEV) $(PC_FILE)
+	/bin/rm -f $(OBJ) $(LIBVDEV_LIB) $(LIBVDEV_SO) $(LIBVDEV)
