@@ -50,9 +50,6 @@ struct vdev_config {
    // helpers directory 
    char* helpers_dir;
    
-   // process stat discipline 
-   int pstat_discipline;
-   
    // default policy (0 for deny, 1 for allow)
    int default_policy;
    

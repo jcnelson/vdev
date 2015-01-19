@@ -9,7 +9,7 @@ DEFS  := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS -fstack-protector -fstack-protect
 HELPERS := stat_optical stat_ata
 HELPER_SCRIPTS := $(wildcard *.sh)
 
-PREFIX ?= /usr
+PREFIX ?= /
 BINDIR ?= $(PREFIX)/lib/vdev/
 
 all: $(HELPERS)

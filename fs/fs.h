@@ -19,33 +19,42 @@
    <http://www.isc.org/downloads/software-support-policy/isc-license/>.
 */
 
-#ifndef _VDEV_FS_H_
-#define _VDEV_FS_H_
+#ifndef _VDEVFS_H_
+#define _VDEVFS_H_
 
-#include "util.h"
-
-#ifdef _USE_FS
+#include "libvdev/util.h"
+#include "libvdev/opts.h"
+#include "libvdev/config.h"
 
 #include "fskit/fskit.h"
 #include "fskit/fuse/fskit_fuse.h"
 
-struct vdev_state;
-
-struct vdev_fs {
+struct vdevfs {
    
-   // pipe between the fs and the back-end event daemon, for sending over the back-end's copy of the mountpoint
-   int pipe_front;
-   int pipe_back;
+   // configuration 
+   struct vdev_config* config;
    
-   // fskit state (front-end)
+   // arguments 
+   int argc;
+   char** argv;
+   
+   // FUSE-filtered arguments
+   int fuse_argc;
+   char** fuse_argv;
+   
+   // mountpoint; where /dev is
+   char* mountpoint;
+   
+   // debug level 
+   int debug_level;
+   
+   // fskit core
    struct fskit_fuse_state* fs;
    
-   // acls (front-end)
+   // acls
    struct vdev_acl* acls;
    size_t num_acls;
    
-   // is the filesystem ready?
-   bool running;
 };
 
 C_LINKAGE_BEGIN
@@ -53,26 +62,10 @@ C_LINKAGE_BEGIN
 int vdev_stat( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct stat* sb );
 int vdev_readdir( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct fskit_dir_entry** dirents, size_t num_dirents );
 
-int vdev_frontend_init( struct vdev_fs* fs_frontend, struct vdev_state* vdev );
-int vdev_frontend_main( struct vdev_fs* fs_frontend, int fuse_argc, char** fuse_argv );
-int vdev_frontend_stop( struct vdev_fs* fs_frontend );
-int vdev_frontend_shutdown( struct vdev_fs* fs_frontend );
-
-int vdev_frontend_send_mount_info( struct vdev_state* state );
-int vdev_frontend_recv_mount_info( int pipe_back, char** ret_mountpoint, size_t* ret_mountpoint_len );
+int vdevfs_init( struct vdevfs* vdev, int argc, char** argv );
+int vdevfs_main( struct vdevfs* vdev, int fuse_argc, char** fuse_argv );
+int vdevfs_shutdown( struct vdevfs* vdev );
 
 C_LINKAGE_END
-
-#else  // _USE_FS
-
-// no-op structure
-struct vdev_fs {
-   
-   // keep GCC happy
-   int pipe_front;
-   int pipe_back;
-};
-
-#endif
 
 #endif  // _VDEV_FS_H_

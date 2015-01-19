@@ -19,45 +19,179 @@
    <http://www.isc.org/downloads/software-support-policy/isc-license/>.
 */
 
-#ifdef _USE_FS
 
 #include "fs.h"
-#include "vdev.h"
 #include "acl.h"
 
-// post-mount callback: tell the back-end to start processing
-static int vdev_postmount_setup( struct fskit_fuse_state* state, void* cls ) {
+static char const* vdev_fuse_odev = "-odev";
+static char const* vdev_fuse_allow_other = "-oallow_other";
+
+// get the mountpoint option, by parsing the FUSE command line 
+static int vdev_get_mountpoint( int fuse_argc, char** fuse_argv, char** ret_mountpoint ) {
    
-   struct vdev_state* vdev = (struct vdev_state*)cls;
+   struct fuse_args fargs = FUSE_ARGS_INIT(fuse_argc, fuse_argv);
+   char* mountpoint = NULL;
+   int unused_1;
+   int unused_2;
+   int rc = 0;
    
-   vdev->fs_frontend->running = true;
-   
-   // start the back-end
-   int rc = vdev_send_mount_info( vdev->fs_frontend->pipe_front, vdev->fs_frontend->fs->mountpoint );
-   if( rc != 0 ) {
-      
-      fprintf(stderr, "vdev_start rc = %d\n", rc );
+   // parse command-line...
+   rc = fuse_parse_cmdline( &fargs, &mountpoint, &unused_1, &unused_2 );
+   if( rc < 0 ) {
+
+      fskit_error("fuse_parse_cmdline rc = %d\n", rc );
+      fuse_opt_free_args(&fargs);
+
       return rc;
    }
    
-   clearenv();
+   else {
+      
+      if( mountpoint != NULL ) {
+         
+         *ret_mountpoint = strdup( mountpoint );
+         free( mountpoint );
+         
+         rc = 0;
+      }
+      else {
+         rc = -ENOMEM;
+      }
+      
+      fuse_opt_free_args(&fargs);
+   }
    
    return 0;
-}
+}     
 
 // initialize the filesystem front-end 
 // call after vdev_init
-int vdev_frontend_init( struct vdev_fs* fs_frontend, struct vdev_state* vdev ) {
+int vdevfs_init( struct vdevfs* vdev, int argc, char** argv ) {
    
    int rc = 0;
    int rh = 0;
-   int vdev_pipe[2];
+   struct vdev_opts opts;
    struct fskit_core* core = NULL;
+   int fuse_argc = 0;
+   char** fuse_argv = NULL;
+   
    struct fskit_fuse_state* fs = VDEV_CALLOC( struct fskit_fuse_state, 1 );
    
    if( fs == NULL ) {
       return -ENOMEM;
    }
+   
+   fuse_argv = VDEV_CALLOC( char*, argc + 4 );
+   
+   if( fuse_argv == NULL ) {
+      
+      free( fs );
+      return -ENOMEM;
+   }
+   
+   // parse opts 
+   rc = vdev_opts_parse( &opts, argc, argv, &fuse_argc, fuse_argv );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_opts_parse rc = %d\n", rc );
+      
+      vdev_usage( argv[0] );
+      
+      free( fs );
+      free( fuse_argv );
+      return rc;
+   }
+   
+   // get the mountpoint, but from FUSE 
+   if( opts.mountpoint != NULL ) {
+      free( opts.mountpoint );
+   }
+   
+   rc = vdev_get_mountpoint( fuse_argc, fuse_argv, &opts.mountpoint );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_get_mountpoint rc = %d\n", rc );
+      
+      vdev_usage( argv[0] );
+      
+      free( fs );
+      free( fuse_argv );
+      return rc;
+   }
+   
+   vdev_set_debug_level( opts.debug_level );
+   
+   // load config 
+   vdev->config = VDEV_CALLOC( struct vdev_config, 1 );
+   if( vdev->config == NULL ) {
+      
+      vdev_opts_free( &opts );
+      
+      free( fs );
+      free( fuse_argv );
+      return -ENOMEM;
+   }
+   
+   vdev_debug("Config file: %s\n", opts.config_file_path );
+   
+   rc = vdev_config_init( vdev->config );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_config_init rc = %d\n", rc );
+      
+      vdevfs_shutdown( vdev );
+      vdev_opts_free( &opts );
+      free( fs );
+      free( fuse_argv );
+      return rc;
+   }
+   
+   rc = vdev_config_load( opts.config_file_path, vdev->config );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_config_load('%s') rc = %d\n", opts.config_file_path, rc );
+      
+      vdevfs_shutdown( vdev );
+      vdev_opts_free( &opts );
+      free( fs );
+      free( fuse_argv );
+      return rc;
+   }
+   
+   vdev_debug("vdev ACLs dir:    %s\n", vdev->config->acls_dir );
+   
+   // force -odev, since we'll create device nodes 
+   fuse_argv[fuse_argc] = (char*)vdev_fuse_odev;
+   fuse_argc++;
+   
+   // force -oallow_other, since we'll want to expose this to everyone 
+   fuse_argv[fuse_argc] = (char*)vdev_fuse_allow_other;
+   fuse_argc++;
+   
+   vdev->mountpoint = vdev_strdup_or_null( opts.mountpoint );
+   vdev->debug_level = opts.debug_level;
+   
+   if( vdev->mountpoint == NULL ) {
+      
+      vdev_error("Failed to set mountpoint, opts.mountpount = '%s'\n", opts.mountpoint );
+      
+      vdevfs_shutdown( vdev );
+      vdev_opts_free( &opts );
+      free( fuse_argv );
+      free( fs );
+      return -EINVAL;
+   }
+   else {
+      
+      vdev_debug("mountpoint:       %s\n", vdev->mountpoint );
+   }
+   
+   vdev_opts_free( &opts );
+   
+   vdev->argc = argc;
+   vdev->argv = argv;
+   vdev->fuse_argc = fuse_argc;
+   vdev->fuse_argv = fuse_argv;
    
    fskit_set_debug_level( vdev->debug_level );
    
@@ -67,32 +201,19 @@ int vdev_frontend_init( struct vdev_fs* fs_frontend, struct vdev_state* vdev ) {
       
       vdev_error("fskit_fuse_init rc = %d\n", rc );
       free( fs );
+      vdevfs_shutdown( vdev );
       return rc;
    }
    
-   // filesystem: load ACLs 
-   rc = vdev_acl_load_all( vdev->config->acls_dir, &fs_frontend->acls, &fs_frontend->num_acls );
+   // load ACLs 
+   rc = vdev_acl_load_all( vdev->config->acls_dir, &vdev->acls, &vdev->num_acls );
    if( rc != 0 ) {
       
       vdev_error("vdev_acl_load_all('%s') rc = %d\n", vdev->config->acls_dir, rc );
       
       fskit_fuse_shutdown( fs, NULL );
       free( fs );
-      return rc;
-   }
-   
-   // set up the pipe
-   rc = pipe( vdev_pipe );
-   if( rc != 0 ) {
-      
-      rc = -errno;
-      vdev_error("pipe rc = %d\n", rc );
-      
-      fskit_fuse_shutdown( fs, NULL );
-      free( fs );
-      
-      vdev_acl_free_all( fs_frontend->acls, fs_frontend->num_acls );
-      
+      vdevfs_shutdown( vdev );
       return rc;
    }
    
@@ -109,7 +230,7 @@ int vdev_frontend_init( struct vdev_fs* fs_frontend, struct vdev_state* vdev ) {
       
       fskit_fuse_shutdown( fs, NULL );
       free( fs );
-      
+      vdevfs_shutdown( vdev );
       return rh;
    }
    
@@ -120,72 +241,64 @@ int vdev_frontend_init( struct vdev_fs* fs_frontend, struct vdev_state* vdev ) {
       
       fskit_fuse_shutdown( fs, NULL );
       free( fs );
-      
+      vdevfs_shutdown( vdev );
       return rh;
    }
    
+   vdev->fs = fs;
+   
    // set the root to be owned by the effective UID and GID of user
    fskit_chown( core, "/", 0, 0, geteuid(), getegid() );
-   
-   // call our post-mount callback to finish initializing vdev 
-   fskit_fuse_postmount_callback( fs, vdev_postmount_setup, vdev );
-   
-   fs_frontend->fs = fs;
-   fs_frontend->pipe_front = vdev_pipe[1];
-   fs_frontend->pipe_back = vdev_pipe[0];
-   
-   vdev->fs_frontend = fs_frontend;
    
    return 0;
 }
 
 
 // main loop for vdev frontend 
-int vdev_frontend_main( struct vdev_fs* fs_frontend, int fuse_argc, char** fuse_argv ) {
+int vdevfs_main( struct vdevfs* vdev, int fuse_argc, char** fuse_argv ) {
    
    int rc = 0;
    
-   rc = fskit_fuse_main( fs_frontend->fs, fuse_argc, fuse_argv );
+   rc = fskit_fuse_main( vdev->fs, fuse_argc, fuse_argv );
    
    return rc;
 }
 
 
-// stop the front-end of vdev 
-int vdev_frontend_stop( struct vdev_fs* fs_frontend ) {
-   
-   fs_frontend->running = false;
-   return 0;
-}
-
-
 // shut down the front-end 
-int vdev_frontend_shutdown( struct vdev_fs* fs_frontend ) {
+int vdevfs_shutdown( struct vdevfs* vdev ) {
    
-   if( fs_frontend->running ) {
-      return -EINVAL;
+   if( vdev->acls != NULL ) {
+      vdev_acl_free_all( vdev->acls, vdev->num_acls );
    }
    
-   vdev_acl_free_all( fs_frontend->acls, fs_frontend->num_acls );
-   
-   if( fs_frontend->pipe_front >= 0 ) {
-      close( fs_frontend->pipe_front );
-      fs_frontend->pipe_front = -1;
+   if( vdev->config != NULL ) {
+      vdev_config_free( vdev->config );
+      free( vdev->config );
+      vdev->config = NULL;
    }
    
-   if( fs_frontend->pipe_back >= 0 ) {
-      close( fs_frontend->pipe_back );
-      fs_frontend->pipe_back = -1;
-   }
-   
-   if( fs_frontend->fs != NULL ) {
+   if( vdev->fs != NULL ) {
       
-      fskit_fuse_shutdown( fs_frontend->fs, NULL );
-      free( fs_frontend->fs );
-      fs_frontend->fs = NULL;
+      fskit_fuse_shutdown( vdev->fs, NULL );
+      free( vdev->fs );
+      vdev->fs = NULL;
    }
    
-   memset( fs_frontend, 0, sizeof(struct vdev_fs) );
+   if( vdev->mountpoint != NULL ) {
+      
+      free( vdev->mountpoint );
+      vdev->mountpoint = NULL;
+   }
+   
+   if( vdev->fuse_argv != NULL ) {
+      
+      free( vdev->fuse_argv );
+      vdev->fuse_argc = 0;
+      vdev->fuse_argv  = NULL;
+   }
+   
+   memset( vdev, 0, sizeof(struct vdevfs) );
    
    return 0;
 }
@@ -199,7 +312,7 @@ int vdev_stat( struct fskit_core* core, struct fskit_match_group* grp, struct fs
    pid_t pid = 0;
    uid_t uid = 0;
    gid_t gid = 0;
-   struct vdev_state* state = (struct vdev_state*)fskit_core_get_user_data( core );
+   struct vdevfs* vdev = (struct vdevfs*)fskit_core_get_user_data( core );
    struct fskit_fuse_state* fs_state = fskit_fuse_get_state();
    
    // stat the calling process
@@ -210,7 +323,7 @@ int vdev_stat( struct fskit_core* core, struct fskit_match_group* grp, struct fs
    vdev_debug("vdev_stat('%s') from user %d group %d task %d\n", grp->path, uid, gid, pid );
    
    // see who's asking 
-   rc = pstat( pid, &ps, state->config->pstat_discipline );
+   rc = pstat( pid, &ps, 0 );
    if( rc != 0 ) {
       
       vdev_error("pstat(%d) rc = %d\n", pid, rc );
@@ -218,7 +331,7 @@ int vdev_stat( struct fskit_core* core, struct fskit_match_group* grp, struct fs
    }
    
    // apply the ACLs on the stat buffer
-   rc = vdev_acl_apply_all( state->config, state->fs_frontend->acls, state->fs_frontend->num_acls, grp->path, &ps, uid, gid, sb );
+   rc = vdev_acl_apply_all( vdev->config, vdev->acls, vdev->num_acls, grp->path, &ps, uid, gid, sb );
    if( rc < 0 ) {
       
       vdev_error("vdev_acl_apply_all(%s, uid=%d, gid=%d, pid=%d) rc = %d\n", grp->path, uid, gid, pid, rc );
@@ -252,7 +365,7 @@ int vdev_readdir( struct fskit_core* core, struct fskit_match_group* grp, struct
    uid_t uid = 0;
    gid_t gid = 0;
    
-   struct vdev_state* state = (struct vdev_state*)fskit_core_get_user_data( core );
+   struct vdevfs* vdev = (struct vdevfs*)fskit_core_get_user_data( core );
    struct fskit_fuse_state* fs_state = fskit_fuse_get_state();
    
    struct stat sb;
@@ -266,7 +379,7 @@ int vdev_readdir( struct fskit_core* core, struct fskit_match_group* grp, struct
    vdev_debug("vdev_readdir(%s, %zu) from user %d group %d task %d\n", grp->path, num_dirents, uid, gid, pid );
    
    // see who's asking
-   rc = pstat( pid, &ps, state->config->pstat_discipline );
+   rc = pstat( pid, &ps, 0 );
    if( rc != 0 ) { 
       
       vdev_error("pstat(%d) rc = %d\n", pid, rc );
@@ -307,7 +420,7 @@ int vdev_readdir( struct fskit_core* core, struct fskit_match_group* grp, struct
       }
       
       // filter it 
-      rc = vdev_acl_apply_all( state->config, state->fs_frontend->acls, state->fs_frontend->num_acls, child_path, &ps, uid, gid, &sb );
+      rc = vdev_acl_apply_all( vdev->config, vdev->acls, vdev->num_acls, child_path, &ps, uid, gid, &sb );
       if( rc < 0 ) {
          
          vdev_error("vdev_acl_apply_all('%s', uid=%d, gid=%d, pid=%d) rc = %d\n", child_path, uid, gid, pid, rc );
@@ -345,5 +458,3 @@ int vdev_readdir( struct fskit_core* core, struct fskit_match_group* grp, struct
    
    return rc;
 }
-
-#endif  // _USE_FS

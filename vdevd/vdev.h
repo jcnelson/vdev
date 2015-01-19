@@ -22,17 +22,11 @@
 #ifndef _VDEV_H_
 #define _VDEV_H_
 
-#include "acl.h"
-#include "fs.h"
-#include "config.h"
-#include "util.h"
+#include "libvdev/config.h"
+#include "libvdev/util.h"
 #include "os/common.h"
 #include "device.h"
 #include "workqueue.h"
-
-#define VDEV_CONFIG_DEFAULT_PATH                "/etc/vdev.d/vdev.conf"
-#define VDEV_CONFIG_DEFAULT_DEBUG_LEVEL         0
-#define VDEV_CONFIG_DEFAULT_LOGFILE_PATH        NULL
 
 // global vdev state 
 struct vdev_state {
@@ -44,28 +38,20 @@ struct vdev_state {
    int argc;
    char** argv;
    
-   // fs front-end
-   struct vdev_fs* fs_frontend;
-   
-   // FUSE arguments (front-end)
-   // pretty much unused if _USE_FS is not defined
-   int fuse_argc;
-   char** fuse_argv;
-   
    // mountpoint; where /dev is
    char* mountpoint;
    
    // debug level 
    int debug_level;
    
-   // OS context (back-end)
+   // OS context
    struct vdev_os_context* os;
    
-   // actions (back-end)
+   // actions
    struct vdev_action* acts;
    size_t num_acts;
    
-   // pending requests (back-end)
+   // pending requests
    struct vdev_pending_context* pending;
    
    // device processing workqueue (back-end)
@@ -79,15 +65,10 @@ struct vdev_state {
 C_LINKAGE_BEGIN
 
 int vdev_init( struct vdev_state* vdev, int argc, char** argv );
-int vdev_shutdown( struct vdev_state* state );
-
-int vdev_backend_init( struct vdev_state* vdev );
-int vdev_backend_start( struct vdev_state* vdev );
-int vdev_backend_main( struct vdev_state* state );
-int vdev_backend_stop( struct vdev_state* state );
-
-int vdev_send_mount_info( int pipe_front, char const* mountpoint );
-int vdev_recv_mount_info( int pipe_back, char** ret_mountpoint );
+int vdev_start( struct vdev_state* vdev );
+int vdev_main( struct vdev_state* vdev );
+int vdev_stop( struct vdev_state* vdev );
+int vdev_shutdown( struct vdev_state* vdev );
 
 C_LINKAGE_END
 

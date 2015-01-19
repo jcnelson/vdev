@@ -19,17 +19,14 @@
    <http://www.isc.org/downloads/software-support-policy/isc-license/>.
 */
 
-#ifdef _USE_FS
-
 #include "acl.h"
 
 #define INI_MAX_LINE 4096 
 #define INI_STOP_ON_FIRST_ERROR 1
 
-#include "ini.h"
-#include "vdev.h"
-#include "match.h"
-#include "config.h"
+#include "libvdev/ini.h"
+#include "libvdev/match.h"
+#include "libvdev/config.h"
 
 SGLIB_DEFINE_VECTOR_PROTOTYPES( vdev_acl );
 SGLIB_DEFINE_VECTOR_FUNCTIONS( vdev_acl );
@@ -414,7 +411,7 @@ int vdev_acl_loader( char const* fp, void* cls ) {
    }
    
    // save this acl 
-   rc = sglib_vdev_acl_vector_push_back( acls, &acl );
+   rc = sglib_vdev_acl_vector_push_back( acls, acl );
    if( rc != 0 ) {
       
       // OOM 
@@ -443,7 +440,7 @@ int vdev_acl_load_all( char const* dir_path, struct vdev_acl** ret_acls, size_t*
    }
    else {
          
-      if( acls.size() == 0 ) {
+      if( sglib_vdev_acl_vector_size( &acls ) == 0 ) {
          
          // nothing 
          *ret_acls = NULL;
@@ -454,7 +451,7 @@ int vdev_acl_load_all( char const* dir_path, struct vdev_acl** ret_acls, size_t*
          // extract values
          unsigned long len = 0;
          
-         sglib_vdev_acl_vector_yoink( &acls, ret_acls, len );
+         sglib_vdev_acl_vector_yoink( &acls, ret_acls, &len );
          
          *ret_num_acls = len;
       }
@@ -762,5 +759,3 @@ int vdev_acl_apply_all( struct vdev_config* config, struct vdev_acl* acls, size_
    
    return rc;
 }
-
-#endif // _USE_FS

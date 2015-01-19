@@ -19,116 +19,15 @@
    <http://www.isc.org/downloads/software-support-policy/isc-license/>.
 */
 #include "action.h"
-#include "match.h"
+#include "libvdev/match.h"
 
 #define INI_MAX_LINE 4096
 #define INI_STOP_ON_FIRST_ERROR 1
 
-#include "ini.h"
+#include "libvdev/ini.h"
 
 SGLIB_DEFINE_VECTOR_PROTOTYPES( vdev_action );
 SGLIB_DEFINE_VECTOR_FUNCTIONS( vdev_action );
-
-/*
-   struct sglib_vdev_action_vector { 
-      vdev_action *buf; 
-      unsigned long len; 
-      unsigned long exp; 
-   }; 
-   extern int sglib___vdev_action_vector_grow( struct sglib_vdev_action_vector* v );  
-   extern void sglib_vdev_action_vector_init( struct sglib_vdev_action_vector* v );  
-   extern void sglib_vdev_action_vector_free( struct sglib_vdev_action_vector* v );  
-   extern int sglib_vdev_action_vector_push_back( struct sglib_vdev_action_vector* v, struct vdev_action t );  
-   extern vdev_action sglib_vdev_action_vector_pop_back( struct sglib_vdev_action_vector* v, struct vdev_action t );  
-   extern int sglib_vdev_action_vector_set( struct sglib_vdev_action_vector* v, struct vdev_action t, unsigned long i );  
-   extern void sglib_vdev_action_vector_clear( struct sglib_vdev_action_vector* v );  
-   extern vdev_action sglib_vdev_action_vector_at( struct sglib_vdev_action_vector* v, unsigned long i );  
-   extern vdev_action* sglib_vdev_action_vector_at_ref( struct sglib_vdev_action_vector* v, unsigned long i );  
-   extern unsigned long sglib_vdev_action_vector_size( struct sglib_vdev_action_vector* v );  
-   extern void sglib_vdev_action_vector_yoink( struct sglib_vdev_action_vector* v, vdev_action** buf, unsigned long* len );
-
-
-   int sglib___vdev_action_vector_grow( struct sglib_vdev_action_vector* v ) {  
-      vdev_action* new_buf = NULL;  
-      v->exp ++;  
-      new_buf = (vdev_action*)realloc( v->buf, (1L << v->exp) * sizeof(vdev_action) );  
-      if( new_buf == NULL ) {  
-         return -ENOMEM;  
-      }  
-      v->buf = new_buf;  
-      return 0;  
-   }  
-    
-   void sglib_vdev_action_vector_init( struct sglib_vdev_action_vector* v ) {  
-      v->exp = 0;  
-      v->len = 0;  
-      v->buf = NULL;  
-   }  
-    
-   void sglib_vdev_action_vector_free( struct sglib_vdev_action_vector* v ) {  
-      if( v->buf != NULL ) {  
-         free( v->buf );  
-         v->buf = NULL;  
-      }  
-      v->len = 0;  
-      v->exp = 0;  
-   }  
-    
-   int sglib_vdev_action_vector_push_back( struct sglib_vdev_action_vector* v, struct vdev_action t ) {  
-      int rc = 0;  
-      if( v->len + 1 >= (1L << v->exp) ) {  
-         rc = sglib___vdev_action_vector_grow( v );  
-         if( rc == -ENOMEM ) {  
-            return rc;  
-         }  
-      }  
-      v->buf[ v->len ] = t;  
-      v->len ++;  
-      return 0;  
-   }  
-    
-   vdev_action sglib_vdev_action_vector_pop_back( struct sglib_vdev_action_vector* v, struct vdev_action t ) {  
-      return v->buf[ v->len-- ];  
-   }  
-    
-   int sglib_vdev_action_vector_set( struct sglib_vdev_action_vector* v, struct vdev_action t, unsigned long i ) {  
-      if( i >= v->len ) {  
-         return -EINVAL;  
-      }  
-      v->buf[i] = t;  
-      return 0;  
-   }  
-    
-   void sglib_vdev_action_vector_clear( struct sglib_vdev_action_vector* v ) {  
-      if( v->buf != NULL ) {  
-         free( v->buf );  
-         v->buf = NULL;  
-      }  
-      v->len = 0;  
-      v->exp = 0;  
-   }  
-    
-   vdev_action sglib_vdev_action_vector_at( struct sglib_vdev_action_vector* v, unsigned long i ) {  
-      return v->buf[i];  
-   } 
-    
-   vdev_action* sglib_vdev_action_vector_at_ref( struct sglib_vdev_action_vector* v, unsigned long i ) {  
-      return &v->buf[i];  
-   } 
-    
-   unsigned long sglib_vdev_action_vector_size( struct sglib_vdev_action_vector* v ) {  
-      return v->len;  
-   } 
-    
-   void sglib_vdev_action_vector_yoink( struct sglib_vdev_action_vector* v, vdev_action** buf, unsigned long* len ) {  
-      *buf = v->buf;  
-      *len = v->len;  
-      v->buf = NULL;  
-      v->len = 0;  
-      v->exp = 1;  
-   }  
-   */
-    
    
 // initialize an action 
 int vdev_action_init( struct vdev_action* act, vdev_device_request_t trigger, char* path, char* command, bool async ) {

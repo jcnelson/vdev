@@ -19,8 +19,8 @@
    <http://www.isc.org/downloads/software-support-policy/isc-license/>.
 */
 
+#include "libvdev/util.h"
 #include "workqueue.h"
-#include "util.h"
 
 // work queue main method
 static void* vdev_wq_main( void* cls ) {

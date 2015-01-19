@@ -19,12 +19,31 @@
    <http://www.isc.org/downloads/software-support-policy/isc-license/>.
 */
 
-#ifndef _VDEV_MAIN_H_
-#define _VDEV_MAIN_H_
+#include "main.h"
 
-#include "vdev.h"
-#include "acl.h"
-#include "fs.h"
-#include "config.h"
+// run! 
+int main( int argc, char** argv ) {
+   
+   int rc = 0;
+   pid_t pid = 0;
+   struct vdevfs vdev;
+   
+   memset( &vdev, 0, sizeof(struct vdevfs) );
+   
+   // set up global vdev state
+   rc = vdevfs_init( &vdev, argc, argv );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_init rc = %d\n", rc );
+      
+      exit(1);
+   }
+   
+   // run!
+   rc = vdevfs_main( &vdev, vdev.fuse_argc, vdev.fuse_argv );
+   
+   vdevfs_shutdown( &vdev );
+   
+   return rc;
+}
 
-#endif

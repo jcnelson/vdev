@@ -19,30 +19,49 @@
    <http://www.isc.org/downloads/software-support-policy/isc-license/>.
 */
 
-#ifndef _VDEV_OS_COMMON_H_
-#define _VDEV_OS_COMMON_H_
+#include "main.h"
 
-#include "util.h"
-
-// connection to the OS's device notification 
-struct vdev_os_context {
+// run! 
+int main( int argc, char** argv ) {
    
-   void* os_cls;        // OS-specific data
+   int rc = 0;
+   pid_t pid = 0;
+   struct vdev_state vdev;
    
-   bool running;
+   memset( &vdev, 0, sizeof(struct vdev_state) );
    
-   // reference to global state 
-   struct vdev_state* state;
-};
+   // set up global vdev state
+   rc = vdev_init( &vdev, argc, argv );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_init rc = %d\n", rc );
+      
+      exit(1);
+   }
 
-C_LINKAGE_BEGIN
+   
+   // start up
+   rc = vdev_start( &vdev );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_backend_init rc = %d\n", rc );
+      
+      vdev_stop( &vdev );
+      vdev_shutdown( &vdev );
+      exit(1);
+   }
+   
+   // run 
+   rc = vdev_main( &vdev );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_backend_main rc = %d\n", rc );
+      
+   }
 
-// context management
-int vdev_os_context_init( struct vdev_os_context* vos, struct vdev_state* state );
-int vdev_os_context_free( struct vdev_os_context* vos );
+   vdev_stop( &vdev );
+   vdev_shutdown( &vdev );
+   
+   return rc;
+}
 
-int vdev_os_main( struct vdev_os_context* vos );
-
-C_LINKAGE_END
-
-#endif 

@@ -19,20 +19,38 @@ Project Non-Goals
 * **Init system integration**.  vdev is meant to run with full functionality regardless of which init system, daemon manager, service manager, plumbing layer, etc. the user runs, since they address orthogonal concerns.  It will coexist with and complement them, but neither forcibly replace them nor require them to be present.
 
 Dependencies
-------------
+-----------
+
+There are two binaries in vdev:  the hotplug daemon vdevd, and the equivocating filesystem vdevfs.  You can use one without the other.
+
+To build vdevd, you'll need:
 * libc
-* libstdc++
 * libpthread
+* [libpstat](https://github.com/jcnelson/libpstat)
+
+For vdevfs, you'll need all of the above, plus:
+* libstdc++
 * FUSE
 * [fskit](https://github.com/jcnelson/fskit)
-* [libpstat](https://github.com/jcnelson/libpstat)
 
 Building
 --------
 
-To build, type:
+To do things the fast way, with default options:
 
-    $ make OS=$OS_TYPE USE_FS=1
+    $ make
+    $ sudo make install 
+
+
+To do things the careful way, you'll need to build and install libvdev.  To do so, use the following commands:
+
+    $ make -C libudev 
+    $ sudo make libvdev-install 
+
+To build and install vdevd, type:
+
+    $ make -C vdevd OS=$OS_TYPE
+    $ sudo make -C vdevd install
 
 Substitute $OS_TYPE with:
 * "LINUX" to build for Linux
@@ -41,13 +59,16 @@ Substitute $OS_TYPE with:
 
 $OS_TYPE defaults to "LINUX".
 
-If you do not want to build the vdev filesystem that allows it to equivocate about device files to different processes, omit the `USE_FS=1` option.
 
-To install, type:
+To build vdevfs, type:
 
-    $ make install
+    $ make -C fs
+    $ sudo make -C fs install
 
-The binaries will be installed by default to /usr/local/bin.
+
+By default, libvdev is installed to /lib/.
+By default, vdevd is installed to /sbin/vdevd and its helper programs are installed to /lib/vdev/.
+By default, vdevfs is installed to /usr/sbin/vdevfs.
 
 FAQ
 ---

@@ -22,7 +22,7 @@
 #ifndef _VDEV_WORKQUEUE_H_
 #define _VDEV_WORKQUEUE_H_
 
-#include "util.h"
+#include "libvdev/util.h"
 
 struct vdev_wreq;
 

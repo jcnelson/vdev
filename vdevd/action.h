@@ -22,9 +22,11 @@
 #ifndef _VDEV_ACTION_H_
 #define _VDEV_ACTION_H_
 
-#include "util.h"
+#include "libvdev/util.h"
+#include "libvdev/param.h"
+
 #include "device.h"
-#include "param.h"
+
 
 // action fields
 #define VDEV_ACTION_NAME                "vdev-action"

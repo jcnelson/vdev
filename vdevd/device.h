@@ -22,8 +22,8 @@
 #ifndef _VDEV_DEVICE_H_
 #define _VDEV_DEVICE_H_
 
-#include "util.h"
-#include "param.h"
+#include "libvdev/util.h"
+#include "libvdev/param.h"
 #include "workqueue.h"
 
 #define VDEV_NAME_MAX 256

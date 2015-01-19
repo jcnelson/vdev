@@ -25,6 +25,10 @@
 #include "util.h"
 #include <getopt.h>
 
+#define VDEV_CONFIG_DEFAULT_PATH                "/etc/vdev.d/vdev.conf"
+#define VDEV_CONFIG_DEFAULT_DEBUG_LEVEL         0
+#define VDEV_CONFIG_DEFAULT_LOGFILE_PATH        NULL
+
 struct vdev_opts {
    
    // path to config file 

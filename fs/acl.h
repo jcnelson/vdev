@@ -19,12 +19,10 @@
    <http://www.isc.org/downloads/software-support-policy/isc-license/>.
 */
 
-#ifdef _USE_FS
-
 #ifndef _VDEV_ACL_H_
 #define _VDEV_ACL_H_
 
-#include "util.h"
+#include "libvdev/util.h"
 
 #include <regex.h>
 #include <dirent.h>
@@ -99,5 +97,3 @@ int vdev_acl_apply_all( struct vdev_config* conf, struct vdev_acl* acls, size_t 
 C_LINKAGE_END
 
 #endif
-
-#endif  // _USE_FS
