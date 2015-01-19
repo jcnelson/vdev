@@ -29,7 +29,7 @@ libvdev: $(OBJ)
 	$(SHELL) -c "if ! test -L $(LIBVDEV); then /bin/ln -s $(LIBVDEV_SO) $(LIBVDEV); fi"
 
 libvdev-install: libvdev
-	mkdir -p $(LIBDIR))
+	mkdir -p $(LIBDIR)
 	cp -a $(LIBVDEV) $(LIBVDEV_SO) $(LIBVDEV_LIB) $(LIBDIR)
 
 libvdev-dev-install: libvdev
