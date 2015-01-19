@@ -31,7 +31,8 @@
 #include "match.h"
 #include "config.h"
 
-SGLIB_DEFINE_VECTOR_FUNCTIONS( struct vdev_acl );
+SGLIB_DEFINE_VECTOR_PROTOTYPES( vdev_acl );
+SGLIB_DEFINE_VECTOR_FUNCTIONS( vdev_acl );
 
 // parse the ACL mode 
 static int vdev_acl_parse_mode( mode_t* mode, char const* mode_str ) {

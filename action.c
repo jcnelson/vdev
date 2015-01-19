@@ -26,7 +26,10 @@
 
 #include "ini.h"
 
+SGLIB_DEFINE_VECTOR_PROTOTYPES( vdev_action );
+SGLIB_DEFINE_VECTOR_FUNCTIONS( vdev_action );
 
+/*
    struct sglib_vdev_action_vector { 
       vdev_action *buf; 
       unsigned long len; 
@@ -124,6 +127,7 @@
       v->len = 0;  
       v->exp = 1;  
    }  
+   */
     
    
 // initialize an action 

@@ -82,6 +82,8 @@ struct vdev_acl {
    size_t num_paths;
 };
 
+typedef struct vdev_acl vdev_acl;
+
 // prototype...
 struct vdev_config;
 
