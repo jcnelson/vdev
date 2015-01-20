@@ -38,79 +38,41 @@ static vdev_device_request_t vdev_linux_parse_device_request_type( char const* t
 }
 
 // see if a device is a block or character device, based on sysfs.
-// set *mode to S_IFBLK if block, S_IFCHR if character, or 0 if neither 
+// if mode == S_IFCHR, then check if it's a charaacter device.  If mode == S_IFBLK, check block.
 // return 0 on success
 // return negative on error (failed result of stating /sys/dev/(block|char)/$major:$minor)
-static int vdev_linux_sysfs_read_device_mode( struct vdev_linux_context* ctx, unsigned int major, unsigned int minor, mode_t* mode ) {
+static int vdev_linux_sysfs_confirm_mode( struct vdev_linux_context* ctx, unsigned int major, unsigned int minor, mode_t mode ) {
    
    int rc = 0;
    struct stat sb;
    
-   char char_dev_buf[100];
-   char block_dev_buf[100];
+   char dev_buf[100];
+   char* sysfs_path = NULL;
    
-   char* sysfs_char_path = NULL;
-   char* sysfs_block_path = NULL;
+   if( mode == S_IFBLK ) {
+      sprintf( dev_buf, "/dev/block/%u:%u", major, minor );
+   }
+   else if( mode == S_IFCHR ) {
+      sprintf( dev_buf, "/dev/char/%u:%u", major, minor );
+   }
+   else {
+      return -EINVAL;
+   }
    
-   sprintf( char_dev_buf, "/dev/char/%u:%u", major, minor );
-   sprintf( block_dev_buf, "/dev/block/%u:%u", major, minor );
-   
-   sysfs_char_path = vdev_fullpath( ctx->sysfs_mountpoint, char_dev_buf, NULL );
-   if( sysfs_char_path == NULL ) {
+   sysfs_path = vdev_fullpath( ctx->sysfs_mountpoint, dev_buf, NULL );
+   if( sysfs_path == NULL ) {
       
       return -ENOMEM;
    }
    
-   sysfs_block_path = vdev_fullpath( ctx->sysfs_mountpoint, block_dev_buf, NULL );
-   if( sysfs_block_path == NULL ) {
-      
-      free( sysfs_char_path );
-      return -ENOMEM;
-   }
-   
-   rc = stat( sysfs_char_path, &sb );
+   // confirm that it exists
+   rc = stat( sysfs_path, &sb );
    if( rc != 0 ) {
       
       rc = -errno;
-      if( rc != -ENOENT ) {
-         
-         // some other error 
-         vdev_error("stat('%s') rc = %d\n", sysfs_char_path, rc );
-      }
-      else {
-         
-         // not found; maybe it's a block device 
-         rc = stat( sysfs_block_path, &sb );
-         
-         if( rc != 0 ) {
-            
-            rc = -errno;
-            if( rc != -ENOENT ) {
-               
-               // some other error 
-               vdev_error("stat('%s') rc = %d\n", sysfs_block_path, rc );
-            }
-            else {
-               
-               // not found--neither a block nor a char 
-               *mode = 0;
-            }
-         }
-         else {
-            
-            // this is a block device 
-            *mode = S_IFBLK;
-         }
-      }
-   }
-   else {
-      
-      // this is a character device 
-      *mode = S_IFCHR;
    }
    
-   free( sysfs_block_path );
-   free( sysfs_char_path );
+   free( sysfs_path );
    
    return rc;
 }
@@ -549,13 +511,23 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
          
          // this is a block 
          dev_mode = S_IFBLK;
-         rc = 0;
       }
       
       else {
          
-         // check sysfs
-         rc = vdev_linux_sysfs_read_device_mode( ctx, major, minor, &dev_mode );
+         // this is a character device--we have major/minor numbers
+         // confirm, though
+         rc = vdev_linux_sysfs_confirm_mode( ctx, major, minor, S_IFCHR );
+         if( rc != 0 ) {
+            
+            vdev_error("Expected (%u,%u) to be a character device; rc = %d\n", major, minor, rc );
+            
+            if( subsystem != NULL ) {
+               free( subsystem );
+            }
+            
+            return -EINVAL;
+         }
       }
    
       if( rc == 0 ) {
@@ -569,7 +541,7 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
       free( subsystem );
    }
    
-   return 0;
+   return rc;
 }
 
 
