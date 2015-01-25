@@ -41,10 +41,10 @@
 #include <scsi/scsi.h>
 
 struct scsi_ioctl_command {
-        unsigned int inlen;        /* excluding scsi command length */
-        unsigned int outlen;
-        unsigned char data[1];
-        /* on input, scsi command starts here then opt. data */
+   unsigned int inlen;        /* excluding scsi command length */
+   unsigned int outlen;
+   unsigned char data[1];
+   /* on input, scsi command starts here then opt. data */
 };
 
 /*
@@ -247,7 +247,6 @@ static const struct option options[] = {
    { "sg-version",         required_argument, NULL, 's' },
    { "verbose",            no_argument,       NULL, 'v' },
    { "version",            no_argument,       NULL, 'V' }, /* don't advertise -V */
-   { "export",             no_argument,       NULL, 'x' },
    { "help",               no_argument,       NULL, 'h' },
    {}
 };
@@ -258,7 +257,6 @@ static char config_file[MAX_PATH_LEN] = "/etc/scsi_id.config";
 static enum page_code default_page_code = PAGE_UNSPECIFIED;
 static int sg_version = 4;
 static bool reformat_serial = false;
-static bool export = false;
 static char vendor_str[64];
 static char model_str[64];
 static char vendor_enc_str[256];
@@ -1393,7 +1391,7 @@ static int get_file_options(const char *vendor, const char *model, int *argc, ch
 }
 
 static void help( char const* progname ) {
-   printf("Usage: %s [OPTION...] DEVICE\n\n"
+   printf("Usage: %s [OPTION...] /path/to/device/file\n\n"
       "SCSI device identification.\n\n"
       "  -h --help                        Print this message\n"
       "     --version                     Print version of the program\n\n"
@@ -1405,7 +1403,6 @@ static void help( char const* progname ) {
       "  -g --whitelisted                 Treat device as whitelisted\n"
       "  -u --replace-whitespace          Replace all whitespace by underscores\n"
       "  -v --verbose                     Verbose logging\n"
-      "  -x --export                      Print values as environment keys\n"
       , progname);
 
 }
@@ -1420,7 +1417,7 @@ static int set_options( int argc, char **argv, char *maj_min_dev) {
    * file) we have to reset this back to 1.
    */
    optind = 1;
-   while ((option = getopt_long(argc, argv, "d:f:gp:uvVxh", options, NULL)) >= 0)
+   while ((option = getopt_long(argc, argv, "d:f:gp:uvVh", options, NULL)) >= 0)
       switch (option) {
       case 'b':
             all_good = false;
@@ -1474,10 +1471,6 @@ static int set_options( int argc, char **argv, char *maj_min_dev) {
       case 'V':
             printf("%s\n", "1.0");
             exit(0);
-
-      case 'x':
-            export = true;
-            break;
 
       case '?':
             return -1;
@@ -1583,13 +1576,13 @@ static int set_inq_values( struct scsi_id_device *dev_scsi, const char *path) {
 static int scsi_id( char *maj_min_dev) {
 
    struct scsi_id_device dev_scsi = {};
-   int good_dev;
-   int page_code;
+   int good_dev = 0;
+   int page_code = 0;
    int retval = 0;
 
    if (set_inq_values( &dev_scsi, maj_min_dev) < 0) {
       retval = 1;
-      goto out;
+      return retval;
    }
 
    /* get per device (vendor + model) options from the config file */
@@ -1598,64 +1591,52 @@ static int scsi_id( char *maj_min_dev) {
       
       log_error("per_dev_options: good_dev = %d", good_dev );
       retval = 1;
-      goto out;
+      return retval;
    }
 
    /* read serial number from mode pages (no values for optical drives) */
    scsi_get_serial( &dev_scsi, maj_min_dev, page_code, MAX_SERIAL_LEN);
 
-   if (export) {
-      char serial_str[MAX_SERIAL_LEN];
+   char serial_str[MAX_SERIAL_LEN];
 
-      printf("VDEV_SCSI=1\n");
-      printf("VDEV_SCSI_VENDOR=%s\n", vendor_str);
-      printf("VDEV_SCSI_VENDOR_ENC=%s\n", vendor_enc_str);
-      printf("VDEV_SCSI_MODEL=%s\n", model_str);
-      printf("VDEV_SCSI_MODEL_ENC=%s\n", model_enc_str);
-      printf("VDEV_SCSI_REVISION=%s\n", revision_str);
-      printf("VDEV_SCSI_TYPE=%s\n", type_str);
-      if (dev_scsi.serial[0] != '\0') {
-         vdev_util_replace_whitespace(dev_scsi.serial, serial_str, sizeof(serial_str));
-         vdev_util_replace_chars(serial_str, NULL);
-         printf("VDEV_SCSI_SERIAL=%s\n", serial_str);
-         vdev_util_replace_whitespace(dev_scsi.serial_short, serial_str, sizeof(serial_str));
-         vdev_util_replace_chars(serial_str, NULL);
-         printf("VDEV_SCSI_SERIAL_SHORT=%s\n", serial_str);
-      }
-      if (dev_scsi.wwn[0] != '\0') {
-         printf("VDEV_SCSI_WWN=0x%s\n", dev_scsi.wwn);
-         if (dev_scsi.wwn_vendor_extension[0] != '\0') {
-            printf("VDEV_SCSI_WWN_VENDOR_EXTENSION=0x%s\n", dev_scsi.wwn_vendor_extension);
-            printf("VDEV_SCSI_WWN_WITH_EXTENSION=0x%s%s\n", dev_scsi.wwn, dev_scsi.wwn_vendor_extension);
-         } else {
-            printf("VDEV_SCSI_WWN_WITH_EXTENSION=0x%s\n", dev_scsi.wwn);
-         }
-      }
-      if (dev_scsi.tgpt_group[0] != '\0') {
-         printf("VDEV_SCSI_TARGET_PORT=%s\n", dev_scsi.tgpt_group);
-      }
-      if (dev_scsi.unit_serial_number[0] != '\0') {
-         printf("VDEV_SCSI_SCSI_SERIAL=%s\n", dev_scsi.unit_serial_number);
-      }
-      goto out;
-   }
-
-   if (dev_scsi.serial[0] == '\0') {
-      retval = 1;
-      goto out;
-   }
-
-   if (reformat_serial) {
-      char serial_str[MAX_SERIAL_LEN];
-
+   printf("VDEV_SCSI=1\n");
+   printf("VDEV_SCSI_VENDOR=%s\n", vendor_str);
+   printf("VDEV_SCSI_VENDOR_ENC=%s\n", vendor_enc_str);
+   printf("VDEV_SCSI_MODEL=%s\n", model_str);
+   printf("VDEV_SCSI_MODEL_ENC=%s\n", model_enc_str);
+   printf("VDEV_SCSI_REVISION=%s\n", revision_str);
+   printf("VDEV_SCSI_TYPE=%s\n", type_str);
+   
+   if (dev_scsi.serial[0] != '\0') {
+      
       vdev_util_replace_whitespace(dev_scsi.serial, serial_str, sizeof(serial_str));
       vdev_util_replace_chars(serial_str, NULL);
-      printf("%s\n", serial_str);
-      goto out;
+      printf("VDEV_SCSI_SERIAL=%s\n", serial_str);
+      
+      vdev_util_replace_whitespace(dev_scsi.serial_short, serial_str, sizeof(serial_str));
+      vdev_util_replace_chars(serial_str, NULL);
+      printf("VDEV_SCSI_SERIAL_SHORT=%s\n", serial_str);
+   }
+   if (dev_scsi.wwn[0] != '\0') {
+      
+      printf("VDEV_SCSI_WWN=0x%s\n", dev_scsi.wwn);
+      
+      if (dev_scsi.wwn_vendor_extension[0] != '\0') {
+         
+         printf("VDEV_SCSI_WWN_VENDOR_EXTENSION=0x%s\n", dev_scsi.wwn_vendor_extension);
+         printf("VDEV_SCSI_WWN_WITH_EXTENSION=0x%s%s\n", dev_scsi.wwn, dev_scsi.wwn_vendor_extension);
+      }
+      else {
+         printf("VDEV_SCSI_WWN_WITH_EXTENSION=0x%s\n", dev_scsi.wwn);
+      }
+   }
+   if (dev_scsi.tgpt_group[0] != '\0') {
+      printf("VDEV_SCSI_TARGET_PORT=%s\n", dev_scsi.tgpt_group);
+   }
+   if (dev_scsi.unit_serial_number[0] != '\0') {
+      printf("VDEV_SCSI_SCSI_SERIAL=%s\n", dev_scsi.unit_serial_number);
    }
 
-   printf("%s\n", dev_scsi.serial);
-out:
    return retval;
 }
 
