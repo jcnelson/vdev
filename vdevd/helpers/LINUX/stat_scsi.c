@@ -241,8 +241,6 @@ static const struct option options[] = {
    { "device",             required_argument, NULL, 'd' },
    { "config",             required_argument, NULL, 'f' },
    { "page",               required_argument, NULL, 'p' },
-   { "blacklisted",        no_argument,       NULL, 'b' },
-   { "whitelisted",        no_argument,       NULL, 'g' },
    { "replace-whitespace", no_argument,       NULL, 'u' },
    { "sg-version",         required_argument, NULL, 's' },
    { "verbose",            no_argument,       NULL, 'v' },
@@ -251,7 +249,7 @@ static const struct option options[] = {
    {}
 };
 
-static bool all_good = false;
+static bool all_good = true;
 static bool dev_specified = false;
 static char config_file[MAX_PATH_LEN] = "/etc/scsi_id.config";
 static enum page_code default_page_code = PAGE_UNSPECIFIED;
@@ -1399,8 +1397,6 @@ static void help( char const* progname ) {
       "  -f --config=                     Location of config file\n"
       "  -p --page=0x80|0x83|pre-spc3-83  SCSI page (0x80, 0x83, pre-spc3-83)\n"
       "  -s --sg-version=3|4              Use SGv3 or SGv4\n"
-      "  -b --blacklisted                 Treat device as blacklisted\n"
-      "  -g --whitelisted                 Treat device as whitelisted\n"
       "  -u --replace-whitespace          Replace all whitespace by underscores\n"
       "  -v --verbose                     Verbose logging\n"
       , progname);
@@ -1419,9 +1415,6 @@ static int set_options( int argc, char **argv, char *maj_min_dev) {
    optind = 1;
    while ((option = getopt_long(argc, argv, "d:f:gp:uvVh", options, NULL)) >= 0)
       switch (option) {
-      case 'b':
-            all_good = false;
-            break;
 
       case 'd':
             dev_specified = true;
@@ -1430,10 +1423,6 @@ static int set_options( int argc, char **argv, char *maj_min_dev) {
 
       case 'f':
             strscpy(config_file, MAX_PATH_LEN, optarg);
-            break;
-
-      case 'g':
-            all_good = true;
             break;
 
       case 'h':
@@ -1502,19 +1491,12 @@ static int per_dev_options(struct scsi_id_device *dev_scsi, int *good_bad, int *
 
    optind = 1; /* reset this global extern */
    while (retval == 0) {
-      option = getopt_long(newargc, newargv, "bgp:", options, NULL);
+      option = getopt_long(newargc, newargv, "p:", options, NULL);
       if (option == -1)
             break;
 
       switch (option) {
-      case 'b':
-         *good_bad = 0;
-         break;
-
-      case 'g':
-         *good_bad = 1;
-         break;
-
+      
       case 'p':
          if (streq(optarg, "0x80")) {
             *page_code = PAGE_80;
@@ -1576,7 +1558,7 @@ static int set_inq_values( struct scsi_id_device *dev_scsi, const char *path) {
 static int scsi_id( char *maj_min_dev) {
 
    struct scsi_id_device dev_scsi = {};
-   int good_dev = 0;
+   int good_dev = 1;
    int page_code = 0;
    int retval = 0;
 
