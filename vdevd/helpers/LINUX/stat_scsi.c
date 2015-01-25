@@ -1616,7 +1616,7 @@ static int scsi_id( char *maj_min_dev) {
       printf("VDEV_SCSI_TARGET_PORT=%s\n", dev_scsi.tgpt_group);
    }
    if (dev_scsi.unit_serial_number[0] != '\0') {
-      printf("VDEV_SCSI_SCSI_SERIAL=%s\n", dev_scsi.unit_serial_number);
+      printf("VDEV_SCSI_UNIT_SERIAL=%s\n", dev_scsi.unit_serial_number);
    }
 
    return retval;
