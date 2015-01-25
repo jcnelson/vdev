@@ -1,7 +1,7 @@
 /*
  * common - common files for the stat_* binaries
  * 
- * Forked from systemd/src/udev/ on January 7, 2015.
+ * Contains code forked from systemd/src/udev/ on January 7, 2015.
  * (original from https://github.com/systemd/systemd/blob/master/src/udev/)
  * 
  * All modifications to the original source file are Copyright (C) 2015 Jude Nelson <judecn@gmail.com>
@@ -187,7 +187,7 @@ int vdev_utf8_encoded_to_unichar(const char *str) {
 }
 
 /* expected size used to encode one unicode char */
-static int utf8_unichar_to_encoded_len(int unichar) {
+static int vdev_utf8_unichar_to_encoded_len(int unichar) {
 
    if (unichar < 0x80) {
       return 1;
@@ -209,7 +209,7 @@ static int utf8_unichar_to_encoded_len(int unichar) {
 }
 
 /* validate one encoded unicode char and return its length */
-int utf8_encoded_valid_unichar(const char *str) {
+int vdev_utf8_encoded_valid_unichar(const char *str) {
    int len, unichar, i;
 
    len = vdev_utf8_encoded_expected_len(str);
@@ -232,7 +232,7 @@ int utf8_encoded_valid_unichar(const char *str) {
    unichar = vdev_utf8_encoded_to_unichar(str);
 
    /* check if encoded length matches encoded value */
-   if (utf8_unichar_to_encoded_len(unichar) != len) {
+   if (vdev_utf8_unichar_to_encoded_len(unichar) != len) {
       return -EINVAL;
    }
 
@@ -264,7 +264,7 @@ int vdev_util_replace_chars(char *str, const char *white) {
       }
 
       /* accept valid utf8 */
-      len = utf8_encoded_valid_unichar(&str[i]);
+      len = vdev_utf8_encoded_valid_unichar(&str[i]);
       if (len > 1) {
          i += len;
          continue;
@@ -310,7 +310,7 @@ int vdev_util_encode_string(const char *str, char *str_enc, size_t len) {
    for (i = 0, j = 0; str[i] != '\0'; i++) {
       int seqlen;
 
-      seqlen = utf8_encoded_valid_unichar(&str[i]);
+      seqlen = vdev_utf8_encoded_valid_unichar(&str[i]);
       if (seqlen > 1) {
          
          if (len-j < (size_t)seqlen) {
@@ -393,6 +393,7 @@ int vdev_property_add( char const* name, char const* value ) {
    return 0;
 }
 
+
 // print all properties as sourceable environmet variables
 int vdev_property_print( void ) {
    
@@ -405,6 +406,7 @@ int vdev_property_print( void ) {
    
    return 0;
 }
+
 
 // free all properties 
 int vdev_property_free_all( void ) {
@@ -560,7 +562,8 @@ int vdev_sysfs_uevent_get_key( char const* uevent_buf, size_t uevent_buflen, cha
    char* delim = NULL;
    int rc = 0;
    
-   char* buf_dup = (char*)calloc( uevent_buflen, 1 );
+   // NOTE: zero-terminate
+   char* buf_dup = (char*)calloc( uevent_buflen + 1, 1 );
    if( buf_dup == NULL ) {
       return -ENOMEM;
    }
@@ -585,7 +588,7 @@ int vdev_sysfs_uevent_get_key( char const* uevent_buf, size_t uevent_buflen, cha
          continue;
       }
       
-      *delim = 0;
+      *delim = '\0';
       
       // match key?
       if( strcmp( tok, key ) == 0 ) {
@@ -746,26 +749,35 @@ int vdev_sysfs_get_parent_with_subsystem_devtype( char const* sysfs_device_path,
          }
       }
       
-      // matches?
-      if( strcmp( devtype, devtype_name ) == 0 ) {
+      if( devtype_name != NULL ) {
+         // matches?
+         if( strcmp( devtype, devtype_name ) == 0 ) {
+            
+            free( devtype );
+            
+            // this is the path to the device 
+            *devpath = strdup( cur_dir );
+            *devpath_len = strlen( cur_dir );
+            
+            if( *devpath == NULL ) {
+               
+               return -ENOMEM;
+            }
+            
+            else {
+               
+               // found!
+               rc = 0;
+               break;
+            }
+         }
+      }
+      else {
          
+         // match any
+         rc = 0;
          free( devtype );
-         
-         // this is the path to the device 
-         *devpath = strdup( cur_dir );
-         *devpath_len = strlen( cur_dir );
-         
-         if( *devpath == NULL ) {
-            
-            return -ENOMEM;
-         }
-         
-         else {
-            
-            // found!
-            rc = 0;
-            break;
-         }
+         break;
       }
       
       free( devtype );
@@ -810,6 +822,7 @@ int vdev_sysfs_read_device_path( char const* sysfs_dir, char** devpath, size_t* 
    
    return 0;
 }
+
 
 // search sysfs for the device path corresponding to a given subsystem and sysname.
 // fill in devpath if found.
@@ -913,5 +926,137 @@ int vdev_sysfs_device_path_from_subsystem_sysname( char const* sysfs_mount, char
    }
    
    return -ENOENT;
+}
+
+
+// get the parent device of a given device, using sysfs.
+// not all devices have parents; those that do will have a uevent file.
+int vdev_sysfs_get_parent_device( char const* dev_path, char** ret_parent_device, size_t* ret_parent_device_len ) {
+   
+   char* parent_path = NULL;
+   size_t parent_path_len = 0;
+   struct stat sb;
+   int rc = 0;
+   
+   char* delim = NULL;
+   
+   parent_path = (char*)calloc( strlen(dev_path) + 1 + strlen("/uevent"), 1 );
+   if( parent_path == NULL ) {
+      return -ENOMEM;
+   }
+   
+   strcpy( parent_path, dev_path );
+   
+   // lop off the child 
+   delim = rindex( parent_path, '/' );
+   if( delim == NULL ) {
+      
+      // invalid 
+      free( parent_path );
+      return -EINVAL;
+   }
+   
+   *delim = '\0';
+   parent_path_len = strlen( parent_path );
+   
+   // verify that this is a device...
+   strcat( parent_path, "/uevent" );
+   
+   rc = stat( parent_path, &sb );
+   if( rc != 0 ) {
+      
+      // nope 
+      rc = -errno;
+      free( parent_path );
+      return rc;
+   }
+   
+   // lop off /uevent 
+   parent_path[ parent_path_len ] = '\0';
+   
+   *ret_parent_device = parent_path;
+   *ret_parent_device_len = parent_path_len;
+   
+   return 0;
+}
+
+// get the subsystem from a device path
+int vdev_sysfs_read_subsystem( char const* devpath, char** ret_subsystem, size_t* ret_subsystem_len ) {
+   
+   int rc = 0;
+   char linkpath[ 4097 ];
+   size_t linkpath_len = 4097;
+   char* subsystem_path = NULL;
+   char* subsystem = NULL;
+   
+   subsystem_path = (char*)calloc( strlen(devpath) + 1 + strlen("/subsystem") + 1, 1 );
+   if( subsystem_path == NULL ) {
+      return -ENOMEM;
+   }
+   
+   sprintf( subsystem_path, "%s/subsystem", devpath );
+   
+   memset( linkpath, 0, 4097 );
+   
+   rc = readlink( subsystem_path, linkpath, linkpath_len );
+   if( rc < 0 ) {
+      
+      rc = -errno;
+      log_error("readlink('%s') rc = %d\n", subsystem_path, rc );
+      free( subsystem_path );
+      return rc;
+   }
+   
+   free( subsystem_path );
+   
+   subsystem = rindex( linkpath, '/' );
+   if( subsystem == NULL ) {
+      return -EINVAL;
+   }
+   
+   *ret_subsystem = strdup( subsystem );
+   *ret_subsystem_len = strlen( subsystem );
+   
+   if( *ret_subsystem == NULL ) {
+      return -ENOMEM;
+   }
+   
+   return 0;
+}
+
+
+// get the sysname from the device path
+int vdev_sysfs_get_sysname( char const* devpath, char** ret_sysname, size_t* ret_sysname_len ) {
+   
+   char const* delim = NULL;
+   char* sysname = NULL;
+   size_t len = 0;
+   
+   delim = rindex( devpath, '/' );
+   if( delim == NULL ) {
+      
+      return -EINVAL;
+   }
+   
+   sysname = strdup( delim + 1 );
+   
+   if( sysname == NULL ) {
+      return -ENOMEM;
+   }
+   
+    /* some devices have '!' in their name, change that to '/' */
+    while( sysname[len] != '\0' ) {
+       
+       if( sysname[len] == '!' ) {
+          sysname[len] = '/';
+       }
+       
+       len++;
+    }
+    
+    *ret_sysname = sysname;
+    *ret_sysname_len = len;
+    
+   return 0;
 }
 
