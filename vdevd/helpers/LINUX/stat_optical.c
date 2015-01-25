@@ -72,7 +72,7 @@ static int stat_optical_print_caps( int capabilities ) {
 // usage statement
 static int usage( char const* prog_name ) {
    
-   fprintf(stderr, "Usage: %s OPTICAL_DEVICE_FILE_PATH\n", prog_name );
+   fprintf(stderr, "Usage: %s /path/to/optical/device\n", prog_name );
    return 0;
 }
 
