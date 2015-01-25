@@ -456,40 +456,16 @@ int main(int argc, char **argv ) {
    char serial[21];
    char revision[9];
    const char *node = NULL;
-   int export_vars = 0;
    uint16_t word;
    int is_packet_device = 0;
-   static const struct option options[] = {
-            { "export", no_argument, NULL, 'x' },
-            { "help", no_argument, NULL, 'h' },
-            {}
-   };
-
-   while (1) {
-      int option;
-
-      option = getopt_long(argc, argv, "xh", options, NULL);
-      if (option == -1)
-            break;
-
-      switch (option) {
-      case 'x':
-         export_vars = 1;
-         break;
-      case 'h':
-         printf("Usage: %s [--export] [--help] <device>\n"
-                  "  -x,--export_vars    print values as environment keys\n"
-                  "  -h,--help      print this help text\n\n", argv[0] );
-         return 0;
-      }
+   
+   // check usage 
+   if( argc != 2 ) {
+      fprintf(stderr, "Usage: %s /path/to/device/file\n", argv[0]);
+      exit(1);
    }
-
-   node = argv[optind];
-   if (node == NULL) {
-      
-            fprintf(stderr, "no node specified");
-            return 1;
-   }
+   
+   node = argv[1];
 
    fd = open(node, O_RDONLY|O_NONBLOCK|O_CLOEXEC);
    if (fd < 0) {
@@ -521,7 +497,8 @@ int main(int argc, char **argv ) {
       disk_identify_fixup_uint16(identify.byte, 128);     /* device lock function */
       disk_identify_fixup_uint16(identify.byte, 217);     /* nominal media rotation rate */
       memcpy(&id, identify.byte, sizeof id);
-   } else {
+   }
+   else {
       /* If this fails, then try HDIO_GET_IDENTITY */
       if (ioctl(fd, HDIO_GET_IDENTITY, &id) != 0) {
          int errsv = -errno;
@@ -541,165 +518,161 @@ int main(int argc, char **argv ) {
    vdev_util_replace_whitespace((char *) id.fw_rev, revision, 8);
    vdev_util_replace_chars(revision, NULL);
 
-   if (export_vars) {
-      /* Set this to convey the disk speaks the ATA protocol */
-      printf("VDEV_ATA=1\n");
 
-      if ((id.config >> 8) & 0x80) {
-         /* This is an ATAPI device */
-         switch ((id.config >> 8) & 0x1f) {
-         case 0:
-            printf("VDEV_ATA_TYPE=cd\n");
-            break;
-         case 1:
-            printf("VDEV_ATA_TYPE=tape\n");
-            break;
-         case 5:
-            printf("VDEV_ATA_TYPE=cd\n");
-            break;
-         case 7:
-            printf("VDEV_ATA_TYPE=optical\n");
-            break;
-         default:
-            printf("VDEV_ATA_TYPE=generic\n");
-            break;
-         }
-      } else {
-         printf("VDEV_ATA_TYPE=disk\n");
-      }
-      printf("VDEV_ATA_BUS=ata\n");
-      printf("VDEV_ATA_MODEL=%s\n", model);
-      printf("VDEV_ATA_MODEL_ENC=%s\n", model_enc);
-      printf("VDEV_ATA_REVISION=%s\n", revision);
-      if (serial[0] != '\0') {
-         printf("VDEV_ATA_SERIAL=%s_%s\n", model, serial);
-         printf("VDEV_ATA_SERIAL_SHORT=%s\n", serial);
-      } else {
-         printf("VDEV_ATA_SERIAL=%s\n", model);
-      }
+   /* Set this to convey the disk speaks the ATA protocol */
+   printf("VDEV_ATA=1\n");
 
-      if (id.command_set_1 & (1<<5)) {
-         printf("VDEV_ATA_WRITE_CACHE=1\n");
-         printf("VDEV_ATA_WRITE_CACHE_ENABLED=%d\n", (id.cfs_enable_1 & (1<<5)) ? 1 : 0);
-      }
-      if (id.command_set_1 & (1<<10)) {
-         printf("VDEV_ATA_FEATURE_SET_HPA=1\n");
-         printf("VDEV_ATA_FEATURE_SET_HPA_ENABLED=%d\n", (id.cfs_enable_1 & (1<<10)) ? 1 : 0);
-
-         /*
-            * TODO: use the READ NATIVE MAX ADDRESS command to get the native max address
-            * so it is easy to check whether the protected area is in use.
-            */
-      }
-      if (id.command_set_1 & (1<<3)) {
-         printf("VDEV_ATA_FEATURE_SET_PM=1\n");
-         printf("VDEV_ATA_FEATURE_SET_PM_ENABLED=%d\n", (id.cfs_enable_1 & (1<<3)) ? 1 : 0);
-      }
-      if (id.command_set_1 & (1<<1)) {
-         printf("VDEV_ATA_FEATURE_SET_SECURITY=1\n");
-         printf("VDEV_ATA_FEATURE_SET_SECURITY_ENABLED=%d\n", (id.cfs_enable_1 & (1<<1)) ? 1 : 0);
-         printf("VDEV_ATA_FEATURE_SET_SECURITY_ERASE_UNIT_MIN=%d\n", id.trseuc * 2);
-         if ((id.cfs_enable_1 & (1<<1))) /* enabled */ {
-            if (id.dlf & (1<<8)) {
-               printf("VDEV_ATA_FEATURE_SET_SECURITY_LEVEL=maximum\n");
-            }
-            else {
-               printf("VDEV_ATA_FEATURE_SET_SECURITY_LEVEL=high\n");
-            }
-         }
-         if (id.dlf & (1<<5)) {
-            printf("VDEV_ATA_FEATURE_SET_SECURITY_ENHANCED_ERASE_UNIT_MIN=%d\n", id.trsEuc * 2);
-         }
-         if (id.dlf & (1<<4)) {
-            printf("VDEV_ATA_FEATURE_SET_SECURITY_EXPIRE=1\n");
-         }
-         if (id.dlf & (1<<3)) {
-            printf("VDEV_ATA_FEATURE_SET_SECURITY_FROZEN=1\n");
-         }
-         if (id.dlf & (1<<2)) {
-            printf("VDEV_ATA_FEATURE_SET_SECURITY_LOCKED=1\n");
-         }
-      }
-      if (id.command_set_1 & (1<<0)) {
-         printf("VDEV_ATA_FEATURE_SET_SMART=1\n");
-         printf("VDEV_ATA_FEATURE_SET_SMART_ENABLED=%d\n", (id.cfs_enable_1 & (1<<0)) ? 1 : 0);
-      }
-      if (id.command_set_2 & (1<<9)) {
-         printf("VDEV_ATA_FEATURE_SET_AAM=1\n");
-         printf("VDEV_ATA_FEATURE_SET_AAM_ENABLED=%d\n", (id.cfs_enable_2 & (1<<9)) ? 1 : 0);
-         printf("VDEV_ATA_FEATURE_SET_AAM_VENDOR_RECOMMENDED_VALUE=%d\n", id.acoustic >> 8);
-         printf("VDEV_ATA_FEATURE_SET_AAM_CURRENT_VALUE=%d\n", id.acoustic & 0xff);
-      }
-      if (id.command_set_2 & (1<<5)) {
-         printf("VDEV_ATA_FEATURE_SET_PUIS=1\n");
-         printf("VDEV_ATA_FEATURE_SET_PUIS_ENABLED=%d\n", (id.cfs_enable_2 & (1<<5)) ? 1 : 0);
-      }
-      if (id.command_set_2 & (1<<3)) {
-         printf("VDEV_ATA_FEATURE_SET_APM=1\n");
-         printf("VDEV_ATA_FEATURE_SET_APM_ENABLED=%d\n", (id.cfs_enable_2 & (1<<3)) ? 1 : 0);
-         if ((id.cfs_enable_2 & (1<<3))) {
-            printf("VDEV_ATA_FEATURE_SET_APM_CURRENT_VALUE=%d\n", id.CurAPMvalues & 0xff);
-         }
-      }
-      if (id.command_set_2 & (1<<0)) {
-         printf("VDEV_ATA_DOWNLOAD_MICROCODE=1\n");
-      }
-
-      /*
-      * Word 76 indicates the capabilities of a SATA device. A PATA device shall set
-      * word 76 to 0000h or FFFFh. If word 76 is set to 0000h or FFFFh, then
-      * the device does not claim compliance with the Serial ATA specification and words
-      * 76 through 79 are not valid and shall be ignored.
-      */
-
-      word = identify.wyde[76];
-      if (word != 0x0000 && word != 0xffff) {
-            printf("VDEV_ATA_SATA=1\n");
-            /*
-               * If bit 2 of word 76 is set to one, then the device supports the Gen2
-               * signaling rate of 3.0 Gb/s (see SATA 2.6).
-               *
-               * If bit 1 of word 76 is set to one, then the device supports the Gen1
-               * signaling rate of 1.5 Gb/s (see SATA 2.6).
-               */
-            if (word & (1<<2))
-                     printf("VDEV_ATA_SATA_SIGNAL_RATE_GEN2=1\n");
-            if (word & (1<<1))
-                     printf("VDEV_ATA_SATA_SIGNAL_RATE_GEN1=1\n");
-      }
-
-      /* Word 217 indicates the nominal media rotation rate of the device */
-      word = identify.wyde[217];
-      if (word == 0x0001)
-            printf ("VDEV_ATA_ROTATION_RATE_RPM=0\n"); /* non-rotating e.g. SSD */
-      else if (word >= 0x0401 && word <= 0xfffe)
-            printf ("VDEV_ATA_ROTATION_RATE_RPM=%d\n", word);
-
-      /*
-      * Words 108-111 contain a mandatory World Wide Name (WWN) in the NAA IEEE Registered identifier
-      * format. Word 108 bits (15:12) shall contain 5h, indicating that the naming authority is IEEE.
-      * All other values are reserved.
-      */
-      word = identify.wyde[108];
-      if ((word & 0xf000) == 0x5000)
-            printf("VDEV_ATA_WWN=0x%1$" PRIu64 "x\n"
-                     "VDEV_ATA_WWN_WITH_EXTENSION=0x%1$" PRIu64 "x\n",
-                     identify.octa[108/4]);
-
-      /* from Linux's include/linux/ata.h */
-      if (identify.wyde[0] == 0x848a ||
-         identify.wyde[0] == 0x844a ||
-         (identify.wyde[83] & 0xc004) == 0x4004) {
-            printf("VDEV_ATA_CFA=1\n");
+   if ((id.config >> 8) & 0x80) {
+      /* This is an ATAPI device */
+      switch ((id.config >> 8) & 0x1f) {
+      case 0:
+         printf("VDEV_ATA_TYPE=cd\n");
+         break;
+      case 1:
+         printf("VDEV_ATA_TYPE=tape\n");
+         break;
+      case 5:
+         printf("VDEV_ATA_TYPE=cd\n");
+         break;
+      case 7:
+         printf("VDEV_ATA_TYPE=optical\n");
+         break;
+      default:
+         printf("VDEV_ATA_TYPE=generic\n");
+         break;
       }
    } else {
-      if (serial[0] != '\0') {
-         printf("%s_%s\n", model, serial);
+      printf("VDEV_ATA_TYPE=disk\n");
+   }
+   printf("VDEV_ATA_BUS=ata\n");
+   printf("VDEV_ATA_MODEL=%s\n", model);
+   printf("VDEV_ATA_MODEL_ENC=%s\n", model_enc);
+   printf("VDEV_ATA_REVISION=%s\n", revision);
+   if (serial[0] != '\0') {
+      printf("VDEV_ATA_SERIAL=%s_%s\n", model, serial);
+      printf("VDEV_ATA_SERIAL_SHORT=%s\n", serial);
+   } else {
+      printf("VDEV_ATA_SERIAL=%s\n", model);
+   }
+
+   if (id.command_set_1 & (1<<5)) {
+      printf("VDEV_ATA_WRITE_CACHE=1\n");
+      printf("VDEV_ATA_WRITE_CACHE_ENABLED=%d\n", (id.cfs_enable_1 & (1<<5)) ? 1 : 0);
+   }
+   if (id.command_set_1 & (1<<10)) {
+      printf("VDEV_ATA_FEATURE_SET_HPA=1\n");
+      printf("VDEV_ATA_FEATURE_SET_HPA_ENABLED=%d\n", (id.cfs_enable_1 & (1<<10)) ? 1 : 0);
+
+      /*
+         * TODO: use the READ NATIVE MAX ADDRESS command to get the native max address
+         * so it is easy to check whether the protected area is in use.
+         */
+   }
+   if (id.command_set_1 & (1<<3)) {
+      printf("VDEV_ATA_FEATURE_SET_PM=1\n");
+      printf("VDEV_ATA_FEATURE_SET_PM_ENABLED=%d\n", (id.cfs_enable_1 & (1<<3)) ? 1 : 0);
+   }
+   if (id.command_set_1 & (1<<1)) {
+      printf("VDEV_ATA_FEATURE_SET_SECURITY=1\n");
+      printf("VDEV_ATA_FEATURE_SET_SECURITY_ENABLED=%d\n", (id.cfs_enable_1 & (1<<1)) ? 1 : 0);
+      printf("VDEV_ATA_FEATURE_SET_SECURITY_ERASE_UNIT_MIN=%d\n", id.trseuc * 2);
+      if ((id.cfs_enable_1 & (1<<1))) /* enabled */ {
+         if (id.dlf & (1<<8)) {
+            printf("VDEV_ATA_FEATURE_SET_SECURITY_LEVEL=maximum\n");
+         }
+         else {
+            printf("VDEV_ATA_FEATURE_SET_SECURITY_LEVEL=high\n");
+         }
       }
-      else {
-         printf("%s\n", model);
+      if (id.dlf & (1<<5)) {
+         printf("VDEV_ATA_FEATURE_SET_SECURITY_ENHANCED_ERASE_UNIT_MIN=%d\n", id.trsEuc * 2);
+      }
+      if (id.dlf & (1<<4)) {
+         printf("VDEV_ATA_FEATURE_SET_SECURITY_EXPIRE=1\n");
+      }
+      if (id.dlf & (1<<3)) {
+         printf("VDEV_ATA_FEATURE_SET_SECURITY_FROZEN=1\n");
+      }
+      if (id.dlf & (1<<2)) {
+         printf("VDEV_ATA_FEATURE_SET_SECURITY_LOCKED=1\n");
+      }
+   }
+   if (id.command_set_1 & (1<<0)) {
+      printf("VDEV_ATA_FEATURE_SET_SMART=1\n");
+      printf("VDEV_ATA_FEATURE_SET_SMART_ENABLED=%d\n", (id.cfs_enable_1 & (1<<0)) ? 1 : 0);
+   }
+   if (id.command_set_2 & (1<<9)) {
+      printf("VDEV_ATA_FEATURE_SET_AAM=1\n");
+      printf("VDEV_ATA_FEATURE_SET_AAM_ENABLED=%d\n", (id.cfs_enable_2 & (1<<9)) ? 1 : 0);
+      printf("VDEV_ATA_FEATURE_SET_AAM_VENDOR_RECOMMENDED_VALUE=%d\n", id.acoustic >> 8);
+      printf("VDEV_ATA_FEATURE_SET_AAM_CURRENT_VALUE=%d\n", id.acoustic & 0xff);
+   }
+   if (id.command_set_2 & (1<<5)) {
+      printf("VDEV_ATA_FEATURE_SET_PUIS=1\n");
+      printf("VDEV_ATA_FEATURE_SET_PUIS_ENABLED=%d\n", (id.cfs_enable_2 & (1<<5)) ? 1 : 0);
+   }
+   if (id.command_set_2 & (1<<3)) {
+      printf("VDEV_ATA_FEATURE_SET_APM=1\n");
+      printf("VDEV_ATA_FEATURE_SET_APM_ENABLED=%d\n", (id.cfs_enable_2 & (1<<3)) ? 1 : 0);
+      if ((id.cfs_enable_2 & (1<<3))) {
+         printf("VDEV_ATA_FEATURE_SET_APM_CURRENT_VALUE=%d\n", id.CurAPMvalues & 0xff);
+      }
+   }
+   if (id.command_set_2 & (1<<0)) {
+      printf("VDEV_ATA_DOWNLOAD_MICROCODE=1\n");
+   }
+
+   /*
+   * Word 76 indicates the capabilities of a SATA device. A PATA device shall set
+   * word 76 to 0000h or FFFFh. If word 76 is set to 0000h or FFFFh, then
+   * the device does not claim compliance with the Serial ATA specification and words
+   * 76 through 79 are not valid and shall be ignored.
+   */
+
+   word = identify.wyde[76];
+   if (word != 0x0000 && word != 0xffff) {
+      printf("VDEV_ATA_SATA=1\n");
+      /*
+         * If bit 2 of word 76 is set to one, then the device supports the Gen2
+         * signaling rate of 3.0 Gb/s (see SATA 2.6).
+         *
+         * If bit 1 of word 76 is set to one, then the device supports the Gen1
+         * signaling rate of 1.5 Gb/s (see SATA 2.6).
+         */
+      if (word & (1<<2)) {
+         printf("VDEV_ATA_SATA_SIGNAL_RATE_GEN2=1\n");
+      }
+      if (word & (1<<1)) {
+         printf("VDEV_ATA_SATA_SIGNAL_RATE_GEN1=1\n");
       }
    }
 
+   /* Word 217 indicates the nominal media rotation rate of the device */
+   word = identify.wyde[217];
+   if (word == 0x0001) {
+      printf ("VDEV_ATA_ROTATION_RATE_RPM=0\n"); /* non-rotating e.g. SSD */
+   }
+   else if (word >= 0x0401 && word <= 0xfffe) {
+      printf ("VDEV_ATA_ROTATION_RATE_RPM=%d\n", word);
+   }
+
+   /*
+   * Words 108-111 contain a mandatory World Wide Name (WWN) in the NAA IEEE Registered identifier
+   * format. Word 108 bits (15:12) shall contain 5h, indicating that the naming authority is IEEE.
+   * All other values are reserved.
+   */
+   word = identify.wyde[108];
+   if ((word & 0xf000) == 0x5000)
+         printf("VDEV_ATA_WWN=0x%1$" PRIu64 "x\n"
+                  "VDEV_ATA_WWN_WITH_EXTENSION=0x%1$" PRIu64 "x\n",
+                  identify.octa[108/4]);
+
+   /* from Linux's include/linux/ata.h */
+   if (identify.wyde[0] == 0x848a ||
+      identify.wyde[0] == 0x844a ||
+      (identify.wyde[83] & 0xc004) == 0x4004) {
+         printf("VDEV_ATA_CFA=1\n");
+   }
+   
    return 0;
 }
