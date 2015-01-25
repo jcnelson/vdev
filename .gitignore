@@ -1,2 +1,7 @@
 *~
 *.pyc
+*.o
+*.so
+*.so.*
+*.swp
+*.kate-swp
