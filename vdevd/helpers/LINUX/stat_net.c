@@ -97,6 +97,7 @@
  */
 
 #include "common.h"
+
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <linux/pci_regs.h>
@@ -117,14 +118,14 @@ struct netnames {
    bool mac_valid;
    
    char* pcidev;                // sysfs device path
-   char pci_slot[IFNAMSIZ];
-   char pci_path[IFNAMSIZ];
-   char pci_onboard[IFNAMSIZ];
-   const char *pci_onboard_label;
+   char pci_slot[IFNAMSIZ+1];
+   char pci_path[IFNAMSIZ+1];
+   char pci_onboard[IFNAMSIZ+1];
+   char *pci_onboard_label;
 
-   char usb_ports[IFNAMSIZ];
-   char bcma_core[IFNAMSIZ];
-   char ccw_group[IFNAMSIZ];
+   char usb_ports[IFNAMSIZ+1];
+   char bcma_core[IFNAMSIZ+1];
+   char ccw_group[IFNAMSIZ+1];
 };
 
 /* retrieve on-board index number and label from firmware */
@@ -157,7 +158,7 @@ static int dev_pci_onboard( struct netnames *names) {
    
    snprintf(names->pci_onboard, sizeof(names->pci_onboard), "o%d", idx);
 
-   vdev_sysfs_read_attr( names->pci_dev, "label", &names->pci_onboard_label, &index_len );
+   vdev_sysfs_read_attr( names->pcidev, "label", &names->pci_onboard_label, &index_len );
    free( index );
    
    return 0;
@@ -167,16 +168,26 @@ static int dev_pci_onboard( struct netnames *names) {
 static bool is_pci_multifunction( char const* sysfs_path ) {
    
    FILE *f = NULL;
-   const char *filename;
+   char *filename;
    uint8_t config[64];
    
-   filename = strappenda( sysfs_path, "/config");
+   filename = (char*)calloc( strlen(sysfs_path) + 1 + strlen("/config") + 1, 1 );
+   if( filename == NULL ) {
+      return -ENOMEM;
+   }
+   
+   sprintf( filename, "%s/config", sysfs_path );
+   
    f = fopen(filename, "re");
    if (!f) {
+      
+      free( filename );
       return false;
    }
    
    if (fread(&config, sizeof(config), 1, f) != 1) {
+      
+      free( filename );
       fclose( f );
       return false;
    }
@@ -185,57 +196,85 @@ static bool is_pci_multifunction( char const* sysfs_path ) {
    
    /* bit 0-6 header type, bit 7 multi/single function device */
    if ((config[PCI_HEADER_TYPE] & 0x80) != 0) {
+      free( filename );
       return true;
    }
+   
+   free( filename );
 
    return false;
 }
 
 
-static int dev_pci_slot( struct netnames *names) {
+static int dev_pci_slot( char const* dev_path, struct netnames *names) {
    
    unsigned domain, bus, slot, func, dev_port = 0;
-   size_t l;
-   char *s;
+   
+   size_t pci_path_offset = 0;
+   char *pci_path_ptr;
    char *attr;
    size_t attr_len;
-   char const* pci_sysfs_path = NULL;
+   
+   char* pci_sysfs_path = NULL;
    size_t pci_sysfs_path_len = 0;
-   char slots[256], str[256];
+   
+   char* slots = NULL;
+   char* address_path = NULL;
+   
    DIR *dir = NULL;
    struct dirent *dent;
    int hotplug_slot = 0, err = 0;
-
-   if (sscanf(names->pcidev, "%x:%x:%x.%u", &domain, &bus, &slot, &func) != 4) {
-      return -ENOENT;
+   char* pcidev_sysname = NULL;
+   size_t pcidev_sysname_len = 0;
+   int rc = 0;
+   
+   rc = vdev_sysfs_get_sysname( names->pcidev, &pcidev_sysname, &pcidev_sysname_len );
+   if( rc != 0 ) {
+      return rc;
    }
 
+   if (sscanf( pcidev_sysname, "%x:%x:%x.%u", &domain, &bus, &slot, &func) != 4) {
+      
+      free( pcidev_sysname );
+      return -ENOENT;
+   }
+   
+   free( pcidev_sysname );
+
    /* kernel provided multi-device index */
-   rc = vdev_sysfs_read_attr(dev, "dev_port", &attr, &attr_len );
+   rc = vdev_sysfs_read_attr(dev_path, "dev_port", &attr, &attr_len );
    if ( rc == 0 ) {
       dev_port = strtol(attr, NULL, 10);
       free( attr );
    }
 
    /* compose a name based on the raw kernel's PCI bus, slot numbers */
-   s = names->pci_path;
-   l = sizeof(names->pci_path);
+   pci_path_ptr = names->pci_path;
+   memset( pci_path_ptr, 0, IFNAMSIZ );
    
    if (domain > 0) {
-      l = strpcpyf(&s, l, "P%u", domain);
+      
+      sprintf( pci_path_ptr + pci_path_offset, "P%u", domain );
+      
+      pci_path_offset = strlen(pci_path_ptr);
    }
    
-   l = strpcpyf(&s, l, "p%us%u", bus, slot);
+   sprintf( pci_path_ptr + pci_path_offset, "p%us%u", bus, slot );
+   pci_path_offset = strlen( pci_path_ptr );
    
    if (func > 0 || is_pci_multifunction(names->pcidev)) {
-      l = strpcpyf(&s, l, "f%u", func);
+      
+      sprintf( pci_path_ptr + pci_path_offset, "f%u", func );
+      pci_path_offset = strlen( pci_path_ptr );
    }
    
    if (dev_port > 0) {
-      l = strpcpyf(&s, l, "d%u", dev_port);
+      
+      sprintf( pci_path_ptr + pci_path_offset, "d%u", dev_port );
+      pci_path_offset = strlen( pci_path_ptr );
    }
    
-   if (l == 0) {
+   if (pci_path_offset == 0) {
       names->pci_path[0] = '\0';
    }
 
@@ -246,7 +285,15 @@ static int dev_pci_slot( struct netnames *names) {
       goto out;
    }
    
-   snprintf(slots, sizeof(slots), "%s/slots", pci_sysfs_path);
+   slots = (char*)calloc( strlen(pci_sysfs_path) + strlen("/slots") + 1, 1 );
+   if( slots == NULL ) {
+      err = -ENOMEM;
+      
+      free( pci_sysfs_path );
+      goto out;
+   }
+   
+   sprintf( slots, "%s/slots", pci_sysfs_path );
    
    free( pci_sysfs_path );
    
@@ -260,6 +307,7 @@ static int dev_pci_slot( struct netnames *names) {
       int i;
       char *rest;
       char *address;
+      size_t address_len = 0;
 
       if (dent->d_name[0] == '.') {
          continue;
@@ -275,16 +323,36 @@ static int dev_pci_slot( struct netnames *names) {
          continue;
       }
       
-      snprintf(str, sizeof(str), "%s/%s/address", slots, dent->d_name);
-      
-      if (read_one_line_file(str, &address) >= 0) {
-         /* match slot address with device by stripping the function */
-         if (strneq(address, names->pcidev, strlen(address))) {
-            hotplug_slot = i;
-         }
-         free(address);
+      address_path = (char*)calloc( strlen(slots) + strlen(dent->d_name) + 3 + strlen("address"), 1 );
+      if( address_path == NULL ) {
+         err = -ENOMEM;
+         goto out;
       }
-
+      
+      sprintf( address_path, "%s/%s/address", slots, dent->d_name );
+      
+      rc = vdev_read_file( address_path, &address, &address_len );
+      if( rc != 0 ) {
+         
+         free( address_path );
+         continue;
+      }
+      
+      free( address_path );
+      
+      // take the first line only 
+      if( index( address, '\n' ) != NULL ) {
+         
+         *(index(address, '\n')) = '\0';
+      }
+      
+      /* match slot address with device by stripping the function */
+      if (strneq(address, names->pcidev, strlen(address))) {
+         hotplug_slot = i;
+      }
+      
+      free(address);
+      
       if (hotplug_slot > 0) {
          break;
       }
@@ -294,24 +362,31 @@ static int dev_pci_slot( struct netnames *names) {
 
    if (hotplug_slot > 0) {
             
-      s = names->pci_slot;
-      l = sizeof(names->pci_slot);
+      pci_path_ptr = names->pci_slot;
+      pci_path_offset = strlen( names->pci_slot );
       
       if (domain > 0) {
-         l = strpcpyf(&s, l, "P%d", domain);
+         
+         sprintf( pci_path_ptr + pci_path_offset, "P%d", domain );
+         pci_path_offset = strlen( pci_path_ptr );
       }
       
-      l = strpcpyf(&s, l, "s%d", hotplug_slot);
+      sprintf( pci_path_ptr + pci_path_offset, "s%d", hotplug_slot );
+      pci_path_offset = strlen( pci_path_ptr );
       
       if (func > 0 || is_pci_multifunction(names->pcidev)) {
-         l = strpcpyf(&s, l, "f%d", func);
+         
+         sprintf( pci_path_ptr + pci_path_offset, "f%d", func );
+         pci_path_offset = strlen( pci_path_ptr );
       }
       
       if (dev_port > 0) {
-         l = strpcpyf(&s, l, "d%d", dev_port);
+         
+         sprintf( pci_path_ptr + pci_path_offset, "d%d", dev_port );
+         pci_path_offset = strlen( pci_path_ptr );
       }
       
-      if (l == 0) {
+      if (pci_path_offset == 0) {
          names->pci_path[0] = '\0';
       }
    }
@@ -319,62 +394,109 @@ out:
    return err;
 }
 
-static int names_pci( struct netnames *names) {
+static int names_pci( char const* dev_path, struct netnames *names ) {
    
-   struct udev_device *parent;
+   char* parent_device_path = NULL;
+   size_t parent_device_path_len = 0;
    
+   char* parent_device_subsystem = NULL;
+   size_t parent_device_subsystem_len = 0;
    
+   int rc = 0;
    
-   
-   
-   
-   
-   
-   
-   
-   
-   
-
-   parent = udev_device_get_parent(dev);
-   if (!parent) {
-      return -ENOENT;
-   }
-   /* check if our direct parent is a PCI device with no other bus in-between */
-   if (streq_ptr("pci", udev_device_get_subsystem(parent))) {
-      names->type = NET_PCI;
-      names->pcidev = parent;
+   // get parent device 
+   rc = vdev_sysfs_get_parent_device( dev_path, &parent_device_path, &parent_device_path_len );
+   if( rc != 0 ) {
       
+      if( rc != -ENOENT ) {
+         // some other fatal error 
+         log_error("WARN: vdev_sysfs_get_parent_device('%s') rc = %d\n", dev_path, rc );
+      }
+      
+      return rc;
    }
-   else {
-      names->pcidev = udev_device_get_parent_with_subsystem_devtype(dev, "pci", NULL);
-      if (!names->pcidev) {
-         return -ENOENT;
+   
+   // get parent subsystem 
+   rc = vdev_sysfs_read_subsystem( parent_device_path, &parent_device_subsystem, &parent_device_subsystem_len );
+   if( rc != 0 ) {
+      
+      free( parent_device_path );
+      
+      log_error("WARN: vdev_sysfs_read_subsystem('%s') rc = %d\n", parent_device_path, rc );
+      return rc;
+   }
+   
+   /* check if our direct parent is a PCI device with no other bus in-between */
+   if ( strcmp("pci", parent_device_subsystem) == 0 ) {
+      
+      names->type = NET_PCI;
+      names->pcidev = strdup( parent_device_path );
+      
+      if( names->pcidev == NULL ) {
+         free( parent_device_path );
+         free( parent_device_subsystem );
+         return -ENOMEM;
       }
    }
-   dev_pci_onboard(dev, names);
-   dev_pci_slot(dev, names);
+   else {
+      
+      size_t pcidev_len = 0;
+      rc = vdev_sysfs_get_parent_with_subsystem_devtype( dev_path, "pci", NULL, &names->pcidev, &pcidev_len );
+      
+      if( rc != 0 ) {
+         
+         if( rc != -ENOENT ) {
+            log_error("WARN: vdev_sysfs_get_parent_with_subsystem_devtype('%s', 'pci', NULL) rc = %d\n", dev_path, rc );
+         }
+         
+         return rc;
+      }
+   }
+   
+   free( parent_device_subsystem );
+   free( parent_device_path );
+   
+   dev_pci_onboard( names );
+   dev_pci_slot(dev_path, names);
    return 0;
 }
 
-static int names_usb( struct netnames *names) {
+static int names_usb( char const* dev_path, struct netnames *names) {
         
-   struct udev_device *usbdev;
-   char name[256];
    char *ports;
    char *config;
    char *interf;
-   size_t l;
    char *s;
-
-   usbdev = udev_device_get_parent_with_subsystem_devtype(dev, "usb", "usb_interface");
-   if (!usbdev) {
-      return -ENOENT;
+   char* usbdev_path = NULL;
+   char* usbdev_sysname = NULL;
+   size_t usbdev_path_len = 0;
+   size_t usbdev_sysname_len = NULL;
+   int rc = 0;
+   
+   rc = vdev_sysfs_get_parent_with_subsystem_devtype( dev_path, "usb", "usb_interface", &usbdev_path, &usbdev_path_len );
+   if( rc != 0 ) {
+      
+      if( rc != -ENOENT ) {
+         log_error("WARN: vdev_sysfs_get_parent_with_subsystem_devtype('%s', 'usb', 'usb_interface') rc = %d\n", dev_path, rc );
+      }
+      
+      return rc;
    }
-
+   
+   rc = vdev_sysfs_get_sysname( usbdev_path, &usbdev_sysname, &usbdev_sysname_len );
+   if( rc != 0 ) {
+      
+      free( usbdev_path );
+      return rc;
+   }
+   
+   free( usbdev_path );
+   
    /* get USB port number chain, configuration, interface */
-   strscpy(name, sizeof(name), udev_device_get_sysname(usbdev));
-   s = strchr(name, '-');
+   s = strchr(usbdev_sysname, '-');
    if (!s) {
+      
+      free( usbdev_sysname );
       return -EINVAL;
    }
    
@@ -382,6 +504,8 @@ static int names_usb( struct netnames *names) {
 
    s = strchr(ports, ':');
    if (!s) {
+      
+      free( usbdev_sysname );
       return -EINVAL;
    }
    
@@ -390,6 +514,8 @@ static int names_usb( struct netnames *names) {
 
    s = strchr(config, '.');
    if (!s) {
+      
+      free( usbdev_sysname );
       return -EINVAL;
    }
    
@@ -402,38 +528,67 @@ static int names_usb( struct netnames *names) {
       s[0] = 'u';
    }
    
+   // set up usb_ports
    s = names->usb_ports;
-   l = strpcpyl(&s, sizeof(names->usb_ports), "u", ports, NULL);
-
+   memset( s, 0, IFNAMSIZ+1 );
+   
+   strncat( s, "u", IFNAMSIZ );
+   strncat( s, ports, IFNAMSIZ );
+   
    /* append USB config number, suppress the common config == 1 */
-   if (!streq(config, "1")) {
-      l = strpcpyl(&s, sizeof(names->usb_ports), "c", config, NULL);
+   if( strcmp(config, "1") != 0 ) {
+      strncat( s, "c", IFNAMSIZ );
+      strncat( s, ports, IFNAMSIZ );
    }
-
+   
    /* append USB interface number, suppress the interface == 0 */
-   if (!streq(interf, "0")) {
-      l = strpcpyl(&s, sizeof(names->usb_ports), "i", interf, NULL);
+   if( strcmp(interf, "0") != 0 ) {
+      strncat( s, "i", IFNAMSIZ );
+      strncat( s, interf, IFNAMSIZ );
    }
-   if (l == 0) {
+   
+   if( strlen(s) == 0 ) {
+      
+      free( usbdev_sysname );
       return -ENAMETOOLONG;
    }
-
+   
+   free( usbdev_sysname );
    names->type = NET_USB;
    return 0;
 }
 
-static int names_bcma( struct netnames *names) {
+static int names_bcma( char const* devpath, struct netnames *names) {
 
-   struct udev_device *bcmadev;
+   char* bcmadev_path = NULL;
+   size_t bcmadev_path_len = 0;
+   char* bcmadev_sysname = NULL;
+   size_t bcmadev_sysname_len = 0;
    unsigned int core;
+   int rc = 0;
 
-   bcmadev = udev_device_get_parent_with_subsystem_devtype(dev, "bcma", NULL);
-   if (!bcmadev) {
-      return -ENOENT;
+   rc = vdev_sysfs_get_parent_with_subsystem_devtype( devpath, "bcma", NULL, &bcmadev_path, &bcmadev_path_len );
+   if( rc != 0 ) {
+      
+      if( rc != -ENOENT ) {
+         log_error("vdev_sysfs_get_parent_with_subsystem_devtype('%s', 'bcma', NULL) rc = %d\n", devpath, rc );
+      }
+      
+      return rc;
    }
-
+   
+   rc = vdev_sysfs_get_sysname( devpath, &bcmadev_sysname, &bcmadev_sysname_len );
+   if( rc != 0 ) {
+      
+      free( bcmadev_path );
+      return rc;
+   }
+   
    /* bus num:core num */
-   if (sscanf(udev_device_get_sysname(bcmadev), "bcma%*u:%u", &core) != 1) {
+   if (sscanf( bcmadev_sysname, "bcma%*u:%u", &core) != 1) {
+      
+      free( bcmadev_path );
+      free( bcmadev_sysname );
       return -EINVAL;
    }
    
@@ -443,24 +598,44 @@ static int names_bcma( struct netnames *names) {
    }
 
    names->type = NET_BCMA;
+
+   free( bcmadev_path );
+   free( bcmadev_sysname );
    return 0;
 }
 
-static int names_ccw( struct netnames *names) {
 
-   struct udev_device *cdev;
-   const char *bus_id;
-   size_t bus_id_len;
+static int names_ccw( char const* devpath, struct netnames *names) {
+
+   char *bus_id = NULL;
+   size_t bus_id_len = 0;
    int rc;
-
+   
+   char* parent_devpath = NULL;
+   size_t parent_devpath_len = 0;
+   
+   char* parent_subsystem = NULL;
+   size_t parent_subsystem_len = 0;
+   
    /* Retrieve the associated CCW device */
-   cdev = udev_device_get_parent(dev);
-   if (!cdev) {
+   rc = vdev_sysfs_get_parent_device( devpath, &parent_devpath, &parent_devpath_len );
+   if( rc != 0 ) {
       return -ENOENT;
    }
-
+   
+   // get parent subsystem 
+   rc = vdev_sysfs_read_subsystem( parent_devpath, &parent_subsystem, &parent_subsystem_len );
+   if( rc != 0 ) {
+      
+      free( parent_devpath );
+      return rc;
+   }
+   
    /* Network devices are always grouped CCW devices */
-   if (!streq_ptr("ccwgroup", udev_device_get_subsystem(cdev))) {
+   if( strcmp("ccwgroup", parent_subsystem) != 0 ) {
+      
+      free( parent_devpath );
+      free( parent_subsystem );
       return -ENOENT;
    }
 
@@ -468,17 +643,24 @@ static int names_ccw( struct netnames *names) {
    * identifies the network device on the Linux on System z channel
    * subsystem.  Note that the bus-ID contains lowercase characters.
    */
-   bus_id = udev_device_get_sysname(cdev);
-   if (!bus_id) {
+   rc = vdev_sysfs_get_sysname( parent_devpath, &bus_id, &bus_id_len );
+   if( rc != 0 ) {
+      
+      free( parent_devpath );
+      free( parent_subsystem );
       return -ENOENT;
    }
-
+   
    /* Check the length of the bus-ID.  Rely on that the kernel provides
    * a correct bus-ID; alternatively, improve this check and parse and
    * verify each bus-ID part...
    */
-   bus_id_len = strlen(bus_id);
-   if (!bus_id_len || bus_id_len < 8 || bus_id_len > 9) {
+   if (bus_id_len == 0 || bus_id_len < 8 || bus_id_len > 9) {
+      
+      free( parent_devpath );
+      free( parent_subsystem );
+      free( bus_id );
+      
       return -EINVAL;
    }
 
@@ -488,40 +670,60 @@ static int names_ccw( struct netnames *names) {
       names->type = NET_CCWGROUP;
    }
    
+   free( parent_devpath );
+   free( parent_subsystem );
+   free( bus_id );
+   
    return 0;
 }
 
-static int names_mac(, struct netnames *names) {
+static int names_mac( char const* devpath, struct netnames *names) {
 
-   const char *s;
    unsigned int i;
    unsigned int a1, a2, a3, a4, a5, a6;
-
-   /* check for NET_ADDR_PERM, skip random MAC addresses */
-   s = udev_device_get_sysattr_value(dev, "addr_assign_type");
-   if (!s) {
-      return EXIT_FAILURE;
+   int rc = 0;
+   
+   char* addr_assign_type = NULL;
+   size_t addr_assign_type_len = 0;
+   
+   char* address = NULL;
+   size_t address_len = 0;
+   
+   rc = vdev_sysfs_read_attr( devpath, "addr_assign_type", &addr_assign_type, &addr_assign_type_len );
+   if( rc != 0 ) {
+      return rc;
    }
    
-   i = strtoul(s, NULL, 0);
+   i = strtoul( addr_assign_type, NULL, 0);
    if (i != 0) {
+      
+      free( addr_assign_type );
       return 0;
    }
-
-   s = udev_device_get_sysattr_value(dev, "address");
-   if (!s) {
-      return -ENOENT;
+   
+   rc = vdev_sysfs_read_attr( devpath, "address", &address, &address_len );
+   if( rc != 0 ) {
+      
+      free( addr_assign_type );
+      return rc;
    }
    
-   if (sscanf(s, "%x:%x:%x:%x:%x:%x", &a1, &a2, &a3, &a4, &a5, &a6) != 6) {
+   rc = sscanf(address, "%x:%x:%x:%x:%x:%x", &a1, &a2, &a3, &a4, &a5, &a6);
+   if( rc != 6 ) {
+      
+      free( addr_assign_type );
+      free( address );
       return -EINVAL;
    }
 
+   free( addr_assign_type );
+   free( address );
+   
    /* skip empty MAC addresses */
-   if (a1 + a2 + a3 + a4 + a5 + a6 == 0) {
+   if( a1 == 0 && a2 == 0 && a3 == 0 && a4 == 0 && a5 == 0 && a6 == 0 ) {
       return -EINVAL;
    }
-
+   
    names->mac[0] = a1;
    names->mac[1] = a2;
    names->mac[2] = a3;
@@ -533,7 +735,7 @@ static int names_mac(, struct netnames *names) {
 }
 
 /* IEEE Organizationally Unique Identifier vendor string */
-static int ieee_oui(struct udev_device *dev, struct netnames *names, bool test) {
+static int ieee_oui( char const* devpath, struct netnames *names ) {
    char str[32];
 
    if (!names->mac_valid) {
@@ -549,28 +751,70 @@ static int ieee_oui(struct udev_device *dev, struct netnames *names, bool test) 
             names->mac[0], names->mac[1], names->mac[2],
             names->mac[3], names->mac[4], names->mac[5]);
    
-   udev_builtin_hwdb_lookup(dev, NULL, str, NULL, test);
+   // TODO: find out how to replace this
+   // udev_builtin_hwdb_lookup(dev, NULL, str, NULL, test);
    
    return 0;
 }
 
+
+void usage( char const* progname ) {
+   fprintf(stderr, "Usage: %s INTERFACE\n", progname );
+}
+
 int main( int argc, char **argv ) {
    
-   const char *s;
-   const char *p;
    unsigned int i;
-   const char *devtype;
    const char *prefix = "en";
-   struct netnames names = {};
-   int err;
-
-   /* handle only ARPHRD_ETHER and ARPHRD_SLIP devices */
-   s = udev_device_get_sysattr_value(dev, "type");
-   if (!s) {
-      return EXIT_FAILURE;
+   struct netnames names;
+   int err = 0;
+   int rc = 0;
+   char* tmp = NULL;    // for realpath success check
+   
+   char devpath_class[4097];
+   char devpath[4097];
+   char devpath_uevent[4097];
+   
+   char* devtype = NULL;
+   size_t devtype_len = 0;
+   
+   // sysfs attr buf
+   char* attr = NULL;
+   char* attr_iflink = NULL;
+   char* attr_ifindex = NULL;
+   size_t attr_len = 0;
+   
+   char* uevent_buf = NULL;
+   size_t uevent_buf_len = 0;
+   
+   memset( &names, 0, sizeof(struct netnames) );
+   
+   if( argc != 2 ) {
+      usage( argv[0] );
    }
    
-   i = strtoul(s, NULL, 0);
+   // get the device from the interface 
+   sprintf( devpath_class, "/sys/class/net/%s", argv[1] );
+   
+   tmp = realpath( devpath_class, devpath );
+   if( tmp == NULL ) {
+      rc = -errno;
+      fprintf(stderr, "Failed to locate sysfs entry for %s\n", argv[1] );
+      exit(1);
+   }
+   
+   // only care about ethernet and SLIP devices 
+   rc = vdev_sysfs_read_attr( devpath, "type", &attr, &attr_len );
+   if( rc != 0 ) {
+      
+      // not found 
+      fprintf(stderr, "Failed to find interface type for %s (sysfs path '%s'), rc = %d\n", argv[1], devpath, rc );
+      exit(1);
+   }
+   
+   i = strtoul(attr, NULL, 0);
+   
+   free( attr );
    
    switch (i) {
    case ARPHRD_ETHER:
@@ -582,107 +826,141 @@ int main( int argc, char **argv ) {
    default:
       return 0;
    }
-
-   /* skip stacked devices, like VLANs, ... */
-   s = udev_device_get_sysattr_value(dev, "ifindex");
-   if (!s) {
-      return EXIT_FAILURE;
+   
+   // sanity check (i.e. no stacked devices)
+   rc = vdev_sysfs_read_attr( devpath, "ifindex", &attr_ifindex, &attr_len );
+   if( rc != 0 ) {
+      
+      log_error("vdev_sysfs_read_attr('%s', 'ifindex') rc = %d\n", devpath, rc );
+      exit(1);
    }
    
-   p = udev_device_get_sysattr_value(dev, "iflink");
-   if (!p) {
-      return EXIT_FAILURE;
+   rc = vdev_sysfs_read_attr( devpath, "iflink", &attr_iflink, &attr_len );
+   if( rc != 0 ) {
+      
+      log_error("vdev_sysfs_read_attr('%s', 'iflink') rc = %d\n", devpath, rc );
+      
+      free( attr_ifindex );
+      exit(1);
    }
    
-   if (!streq(s, p)) {
-      return 0;
+   if( strcmp( attr_ifindex, attr_iflink ) != 0 ) {
+      exit(0);
    }
+   
+   free( attr_ifindex );
+   free( attr_iflink );
+   
+   // get device type 
+   sprintf( devpath_uevent, "%s/uevent", devpath );
 
-   devtype = udev_device_get_devtype(dev);
-   if (devtype) {
-      if (streq("wlan", devtype)) {
+   rc = vdev_read_file( devpath_uevent, &uevent_buf, &uevent_buf_len );
+   if( rc != 0 ) {
+      
+      log_error("vdev_read_file('%s') rc = %d\n", devpath_uevent, rc );
+      exit(2);
+   }
+   
+   rc = vdev_sysfs_uevent_get_key( uevent_buf, uevent_buf_len, "DEVTYPE", &devtype, &devtype_len );
+   if( rc == 0 ) {
+      
+      if( strcmp("wlan", devtype) == 0 ) {
          prefix = "wl";
       }
-      else if (streq("wwan", devtype)) {
+      else if( strcmp("wwan", devtype) == 0 ) {
          prefix = "ww";
       }
    }
-
-   err = names_mac(dev, &names);
+   
+   free( uevent_buf );
+   free( devtype );
+   
+   err = names_mac( devpath, &names);
    if (err >= 0 && names.mac_valid) {
+      
       char str[IFNAMSIZ];
 
       snprintf(str, sizeof(str), "%sx%02x%02x%02x%02x%02x%02x", prefix,
                names.mac[0], names.mac[1], names.mac[2],
                names.mac[3], names.mac[4], names.mac[5]);
       
-      udev_builtin_add_property(dev, test, "ID_NET_NAME_MAC", str);
-
-      ieee_oui(dev, &names, test);
+      vdev_property_add( "VDEV_NET_NAME_MAC", str );
+      
+      ieee_oui(devpath, &names);
    }
 
    /* get path names for Linux on System z network devices */
-   err = names_ccw(dev, &names);
+   err = names_ccw(devpath, &names);
    if (err >= 0 && names.type == NET_CCWGROUP) {
+      
       char str[IFNAMSIZ];
 
       if (snprintf(str, sizeof(str), "%s%s", prefix, names.ccw_group) < (int)sizeof(str)) {
-         udev_builtin_add_property(dev, test, "ID_NET_NAME_PATH", str);
+         
+         vdev_property_add( "VDEV_NET_NAME_PATH", str );
       }
       
       goto out;
    }
 
    /* get PCI based path names, we compose only PCI based paths */
-   err = names_pci(dev, &names);
+   err = names_pci(devpath, &names);
    if (err < 0) {
       goto out;
    }
 
    /* plain PCI device */
    if (names.type == NET_PCI) {
+      
       char str[IFNAMSIZ];
 
       if (names.pci_onboard[0]) {
          if (snprintf(str, sizeof(str), "%s%s", prefix, names.pci_onboard) < (int)sizeof(str)) {
-            udev_builtin_add_property(dev, test, "ID_NET_NAME_ONBOARD", str);
+            
+            vdev_property_add( "VDEV_NET_NAME_ONBOARD", str );
          }
       }
 
       if (names.pci_onboard_label) {
          if (snprintf(str, sizeof(str), "%s%s", prefix, names.pci_onboard_label) < (int)sizeof(str)) {
-            udev_builtin_add_property(dev, test, "ID_NET_LABEL_ONBOARD", str);
+            
+            vdev_property_add( "VDEV_NET_LABEL_ONBOARD", str );
          }
       }
 
       if (names.pci_path[0]) {
          if (snprintf(str, sizeof(str), "%s%s", prefix, names.pci_path) < (int)sizeof(str)) {
-            udev_builtin_add_property(dev, test, "ID_NET_NAME_PATH", str);
+            
+            vdev_property_add( "VDEV_NET_NAME_PATH", str );
          }
       }
 
       if (names.pci_slot[0]) {
          if (snprintf(str, sizeof(str), "%s%s", prefix, names.pci_slot) < (int)sizeof(str)) {
-            udev_builtin_add_property(dev, test, "ID_NET_NAME_SLOT", str);
+            
+            vdev_property_add( "VDEV_NET_NAME_SLOT", str );
          }
       }
       goto out;
    }
 
    /* USB device */
-   err = names_usb(dev, &names);
+   err = names_usb(devpath, &names);
    if (err >= 0 && names.type == NET_USB) {
+      
       char str[IFNAMSIZ];
 
       if (names.pci_path[0]) {
          if (snprintf(str, sizeof(str), "%s%s%s", prefix, names.pci_path, names.usb_ports) < (int)sizeof(str)) {
-            udev_builtin_add_property(dev, test, "ID_NET_NAME_PATH", str);
+            
+            vdev_property_add( "VDEV_NET_NAME_PATH", str );
          }
       }
 
       if (names.pci_slot[0]) {
          if (snprintf(str, sizeof(str), "%s%s%s", prefix, names.pci_slot, names.usb_ports) < (int)sizeof(str)) {
-            udev_builtin_add_property(dev, test, "ID_NET_NAME_SLOT", str);
+            
+            vdev_property_add( "VDEV_NET_NAME_SLOT", str );
          }
       }
       
@@ -690,23 +968,30 @@ int main( int argc, char **argv ) {
    }
 
    /* Broadcom bus */
-   err = names_bcma(dev, &names);
+   err = names_bcma(devpath, &names);
    if (err >= 0 && names.type == NET_BCMA) {
+      
       char str[IFNAMSIZ];
 
       if (names.pci_path[0]) {
          if (snprintf(str, sizeof(str), "%s%s%s", prefix, names.pci_path, names.bcma_core) < (int)sizeof(str)) {
-            udev_builtin_add_property(dev, test, "ID_NET_NAME_PATH", str);
+            
+            vdev_property_add( "VDEV_NET_NAME_PATH", str );
          }
       }
 
       if (names.pci_slot[0]) {
          if (snprintf(str, sizeof(str), "%s%s%s", prefix, names.pci_slot, names.bcma_core) < (int)sizeof(str)) {
-            udev_builtin_add_property(dev, test, "ID_NET_NAME_SLOT", str);
+            
+            vdev_property_add( "VDEV_NET_NAME_SLOT", str );
          }
       }
       goto out;
    }
 out:
+
+   vdev_property_print();
+   vdev_property_free_all();
+   
    return EXIT_SUCCESS;
 }
