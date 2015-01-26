@@ -197,7 +197,7 @@ static int vdev_linux_sysfs_read_subsystem( struct vdev_linux_context* ctx, char
    return 0;
 }
 
-
+/*
 // load sysfs device attributes.
 // They appear to userspace as files with a size equal to the PAGE_SIZE
 // insert them into the given device request as VDEV_OS_SYSFS_* device parameters.
@@ -292,7 +292,7 @@ static int vdev_linux_sysfs_read_dev_attrs( char const* fp, void* cls ) {
    
    return 0;
 }
-
+*/
 
 // print a uevent
 static int vdev_linux_debug_uevent( char const* uevent_buf, size_t uevent_buf_len ) {
@@ -528,6 +528,8 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
             
             return -EINVAL;
          }
+         
+         dev_mode = S_IFCHR;
       }
    
       if( rc == 0 ) {
@@ -1146,6 +1148,7 @@ static int vdev_linux_sysfs_walk_block_devs( struct vdev_linux_context* ctx, glo
 
 
 // build up a glob of /sys/class/*/*/dev, excluding /sys/class/block
+// TODO: use /sys/devices
 static int vdev_linux_sysfs_build_char_glob( char const* fp, void* cls ) {
    
    glob_t* char_device_paths = (glob_t*)cls;
@@ -1188,6 +1191,7 @@ static int vdev_linux_sysfs_walk_char_devs( struct vdev_linux_context* ctx, glob
    
    // character devices are in /sys/class/*/*/dev, /sys/bus/*/devices/*/dev.
    // skip /sys/class/block/*/dev
+   // TODO: use /sys/devices
    
    snprintf( sysfs_glob, PATH_MAX, "%s/bus/*/devices/*/dev", ctx->sysfs_mountpoint );
    
@@ -1214,6 +1218,7 @@ static int vdev_linux_sysfs_walk_char_devs( struct vdev_linux_context* ctx, glob
 
 
 // read all (block|character) devices from sysfs 
+// TODO: use /sys/devices
 static int vdev_linux_sysfs_walk_devs( struct vdev_linux_context* ctx ) {
    
    int rc = 0;
@@ -1279,7 +1284,8 @@ static int vdev_linux_sysfs_walk_devs( struct vdev_linux_context* ctx ) {
 
 
 // seed device-add events from sysfs
-// walk through sysfs (if mounted), and write to every device's uevent to get the kernel to send the "add" message
+// walk through sysfs and write to every device's uevent to get the kernel to send the "add" message
+// TODO: use /sys/devices
 static int vdev_linux_sysfs_trigger_events( struct vdev_linux_context* ctx ) {
    
    int rc = 0;
