@@ -43,6 +43,9 @@ Options include:\n\
    -l, --log-file LOGFILE_PATH\n\
                   Path to which to log information.\n\
                   \n\
+   -1, --once\n\
+                  Exit once all extant devices have been processed.\n\
+                  \n\
 ", progname );
   
   return 0;
@@ -81,6 +84,7 @@ int vdev_opts_parse( struct vdev_opts* opts, int argc, char** argv, int* fuse_ar
       {"config-file",     required_argument,   0, 'c'},
       {"verbose-level",   required_argument,   0, 'v'},
       {"log-file",        required_argument,   0, 'l'},
+      {"once",            no_argument,         0, '1'},
       {0, 0, 0, 0}
    };
 
@@ -89,7 +93,7 @@ int vdev_opts_parse( struct vdev_opts* opts, int argc, char** argv, int* fuse_ar
    int c = 0;
    int fuse_optind = 0;
    
-   char const* optstr = "c:v:l:o:f";
+   char const* optstr = "c:v:l:o:f1";
    
    vdev_opts_default( opts );
    
@@ -139,6 +143,12 @@ int vdev_opts_parse( struct vdev_opts* opts, int argc, char** argv, int* fuse_ar
             else {
                opts->debug_level = debug_level;  
             }
+            break;
+         }
+         
+         case '1': {
+            
+            opts->once = true;
             break;
          }
          

@@ -42,6 +42,9 @@ struct vdev_opts {
    
    // mountpoint
    char* mountpoint;
+   
+   // one-time run 
+   bool once;
 };
 
 
