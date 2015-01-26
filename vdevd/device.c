@@ -80,7 +80,6 @@ int vdev_device_request_add_param( struct vdev_device_request* req, char const* 
    return vdev_params_add( &req->params, key, value );
 }
 
-
 // create a KEY=VALUE string
 static int vdev_device_request_make_env_str( char const* key, char const* value, char** ret ) {
    
@@ -527,6 +526,8 @@ static int vdev_device_add( struct vdev_wreq* wreq, void* cls ) {
          if( rc != 0 ) {
             
             rc = -errno;
+            
+            // this can happen when the host OS puts a device in multiple places
             vdev_error("mknod('%s', dev=(%u, %u)) rc = %d\n", fp, major(req->dev), minor(req->dev), rc );
          }
          else {
@@ -663,6 +664,8 @@ int vdev_device_request_enqueue( struct vdev_wq* wq, struct vdev_device_request*
    
    int rc = 0;
    struct vdev_wreq wreq;
+   
+   memset( &wreq, 0, sizeof(struct vdev_wreq) );
    
    // sanity check 
    rc = vdev_device_request_sanity_check( req );
