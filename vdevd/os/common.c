@@ -60,8 +60,26 @@ int vdev_os_main( struct vdev_os_context* vos ) {
          vdev_device_request_free( vreq );
          free( vreq );
          
-         vdev_error("vdev_os_next_device rc = %d\n", rc );
-         continue;
+         if( rc < 0 ) {
+            vdev_error("vdev_os_next_device rc = %d\n", rc );
+         
+            if( rc == -EAGAIN ) {
+            
+               // OS backend says try again
+               continue;
+            }
+            else {
+            
+               // fatal error
+               break;
+            }
+         }
+         else {
+            
+            // exit on success 
+            rc = 0;
+            break;
+         }
       }
       
       vdev_debug("Next device: type=%d path=%s major=%u minor=%u mode=%o\n", vreq->type, vreq->path, major(vreq->dev), minor(vreq->dev), vreq->mode );
@@ -80,7 +98,7 @@ int vdev_os_main( struct vdev_os_context* vos ) {
       }
    }
    
-   return 0;
+   return rc;
 }
 
 // set up a vdev os context
