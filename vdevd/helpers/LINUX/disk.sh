@@ -2,11 +2,14 @@
 
 # link a disk device into /dev/disk/by-id, using its ATA ID
 
-DISK_ID=$($VDEV_HELPERS/stat_ata $VDEV_MOUNTPOINT/$VDEV_PATH)
+eval $($VDEV_HELPERS/stat_ata $VDEV_MOUNTPOINT/$VDEV_PATH)
 STAT_ATA_RET=$?
 
 # verify ata_id succeeded; otherwise we're done (can't label by id)
 test 0 -ne $STAT_ATA_RET && exit 0
+
+# disk id is the serial number
+DISK_ID=$VDEV_ATA_SERIAL
 
 # verify that we got a disk ID; otherwise we're done (no label to set)
 test -z "$DISK_ID" && exit 0
@@ -17,7 +20,7 @@ DISK_NAME="ata-$DISK_ID"
 # see if this is a partition...
 if [ $VDEV_OS_DEVTYPE == "partition" ]; then 
 
-   PART=$(/bin/cat /sys/dev/block/$VDEV_MAJOR\:$VDEV_MINOR/partition)
+   PART=$(/bin/cat $VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH/partition)
 
    test -z $PART && exit 0
 
