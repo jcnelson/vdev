@@ -63,6 +63,7 @@ struct vdev_linux_context {
    struct vdev_os_context* os_ctx;
    
    // initial device requests 
+   pthread_mutex_t initial_requests_lock;
    struct vdev_device_request* initial_requests;
    struct vdev_device_request* initial_requests_tail;
 };

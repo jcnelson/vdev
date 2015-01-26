@@ -23,6 +23,13 @@
 
 #include "linux.h"
 #include "workqueue.h"
+#include "libvdev/sglib.h"
+
+typedef char* cstr;
+
+// string vectors
+SGLIB_DEFINE_VECTOR_PROTOTYPES( cstr );
+SGLIB_DEFINE_VECTOR_FUNCTIONS( cstr );
 
 // parse a uevent action 
 static vdev_device_request_t vdev_linux_parse_device_request_type( char const* type ) {
@@ -136,7 +143,10 @@ static int vdev_linux_sysfs_read_dev_nums( struct vdev_linux_context* ctx, char 
    if( fd < 0 ) {
       
       rc = -errno;
-      vdev_error("open('%s') rc = %d\n", full_devpath, rc );
+      
+      if( rc != -ENOENT ) {
+         vdev_error("open('%s') rc = %d\n", full_devpath, rc );
+      }
       
       free( full_devpath );
       return rc;
@@ -357,6 +367,7 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
       }
       
       offset += rc + 1;         // count the \0 at the end
+      rc = 0;
       
       // is this the action to take?
       if( strcmp(key, "ACTION") == 0 ) {
@@ -476,6 +487,11 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
             have_major = true;
             have_minor = true;
          }
+         else {
+            
+            // it's okay to not have dev numbers
+            rc = 0;
+         }
       }
       
       // subsystem?
@@ -488,6 +504,11 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
             
             // yup!
             vdev_device_request_add_param( vreq, "SUBSYSTEM", subsystem );
+         }
+         else {
+            // this is weird...
+            vdev_error("WARN: no subsystem found for '%s'\n", devpath );
+            rc = 0;
          }
       }
       
@@ -543,6 +564,9 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
       free( subsystem );
    }
    
+   // tell helpers where /sys is mounted 
+   vdev_device_request_add_param( vreq, "SYSFS_MOUNTPOINT", ctx->sysfs_mountpoint );
+   
    return rc;
 }
 
@@ -562,6 +586,8 @@ int vdev_os_next_device( struct vdev_device_request* vreq, void* cls ) {
    struct iovec iov;
    struct sockaddr_nl cnls;
    
+   pthread_mutex_lock( &ctx->initial_requests_lock );
+   
    // do we have initial requests?
    if( ctx->initial_requests != NULL ) {
       
@@ -574,12 +600,18 @@ int vdev_os_next_device( struct vdev_device_request* vreq, void* cls ) {
       memcpy( vreq, req, sizeof(struct vdev_device_request) );
       free( req );
       
+      pthread_mutex_unlock( &ctx->initial_requests_lock );
+   
       return 0;
    }
    else if( ctx->os_ctx->state->once ) {
       
       // out of requests; die 
+      pthread_mutex_unlock( &ctx->initial_requests_lock );
       return 1;
+   }
+   else {
+      pthread_mutex_unlock( &ctx->initial_requests_lock );
    }
    
    memset(&hdr, 0, sizeof(struct msghdr));
@@ -666,6 +698,7 @@ int vdev_os_next_device( struct vdev_device_request* vreq, void* cls ) {
    }
    
    // parse the event buffer
+   vdev_debug("%p from netlink\n", vreq );
    rc = vdev_linux_parse_request( ctx, vreq, buf, len );
    
    if( rc != 0 ) {
@@ -869,6 +902,7 @@ static int vdev_linux_uevent_append( char** ret_uevent_buf, size_t* ret_uevent_b
    return 0;
 }
 
+/*
 // look up the devpath from a device's sysfs directory (should be in the 'device' symlink)
 // on success, set *ret_devpath to a malloc'ed string containing the *full path* to the directory with the device attributes (i.e. including the sysfs mountpoint)
 // return 0 on success
@@ -929,46 +963,27 @@ static int vdev_linux_sysfs_read_device_path( struct vdev_linux_context* ctx, ch
    free( tmp );
    return 0;
 }
+*/
 
 
-// register a block/character device from sysfs
-static int vdev_linux_sysfs_register_device( struct vdev_linux_context* ctx, char const* fp, mode_t mode ) {
+// register a device from sysfs, given the path to its uevent file.
+// that is, read the uevent file, generate a device request, and add it to the initial_requests list in the ctx.
+// NOTE: it is assumed that fp_uevent--the full path to the uevent file--lives in /sys/devices
+// return 0 on success
+// return negative on error.
+static int vdev_linux_sysfs_register_device( struct vdev_linux_context* ctx, char const* fp_uevent ) {
    
    int rc = 0;
    struct stat sb;
-   char* fp_parent = NULL;
-   char* fp_uevent = NULL;
    char* uevent_buf = NULL;
    size_t uevent_buf_len = 0;
-   char* devpath = NULL;
    char* full_devpath = NULL;
-   char* name = NULL;
+   char* devpath = NULL;
+   char* devname = NULL;
    
-   // skip non-regular files
-   rc = stat( fp, &sb );
-   if( rc != 0 ) {
-      
-      rc = -errno;
-      vdev_error("stat('%s') rc = %d\n", fp, rc );
-      return rc;
-   }
-   
-   if( !S_ISREG( sb.st_mode ) ) {
-      
-      // only care about regular files
-      return 0;
-   }
-   
-   // get parent path 
-   fp_parent = vdev_dirname( fp, NULL );
-   if( fp_parent == NULL ) {
-      return -ENOMEM;
-   }
-   
-   // get uevent path 
-   fp_uevent = vdev_fullpath( fp_parent, "uevent", NULL );
-   if( fp_uevent == NULL ) {
-      free( fp_parent );
+   // extract the devpath from the uevent path 
+   full_devpath = vdev_dirname( fp_uevent, NULL );
+   if( full_devpath == NULL ) {
       return -ENOMEM;
    }
    
@@ -978,57 +993,22 @@ static int vdev_linux_sysfs_register_device( struct vdev_linux_context* ctx, cha
       
       vdev_error("vdev_linux_sysfs_read_uevent('%s') rc = %d\n", fp_uevent, rc );
       
-      free( fp_parent );
-      free( fp_uevent );
-      
-      return rc;
-   }
-   
-   // get device path from parent path
-   rc = vdev_linux_sysfs_read_device_path( ctx, fp_parent, &full_devpath );
-   if( rc != 0 ) {
-      
-      if( rc == -ENOENT ) {
-         
-         // in this specific case, it means we're actually *in* the device path.
-         full_devpath = strdup( fp_parent );
-         if( full_devpath == NULL ) {
-            
-            free( fp_parent );
-            free( fp_uevent );
-            
-            return -ENOMEM;
-         }
-      }
-      else {
-         
-         vdev_error("vdev_linux_sysfs_read_device_path('%s') rc = %d\n", fp_parent, rc );
-         
-         free( fp_parent );
-         free( fp_uevent );
-         
-         return rc;
-      }
-   }
-   
-   devpath = full_devpath + strlen( ctx->sysfs_mountpoint );
-   
-   vdev_debug("sysfs DEVPATH of '%s' is '%s', but search '%s'\n", fp, devpath, fp_parent );
-   
-   // NOTE: preserve DEVPATH, but search the parent directory (since apparently the subsystem in the actual device path can be different, 
-   // such as for video cards ('pci' vs 'drm').  Set it to the actual devpath once we know the subsystem.
-   rc = vdev_linux_uevent_append( &uevent_buf, &uevent_buf_len, "DEVPATH", fp_parent + strlen(ctx->sysfs_mountpoint) );
-   if( rc != 0 ) {
-      
-      vdev_error("vdev_linux_uevent_append('%s=%s') rc = %d\n", "DEVPATH", fp_parent, rc );
-      
-      free( fp_parent );
-      free( uevent_buf );
       free( full_devpath );
-      free( fp_uevent );
-      
       return rc;
    }
+   
+   if( uevent_buf_len == 0 ) {
+      
+      // no messages to be had
+      vdev_debug("Empty uevent file at '%s'\n", fp_uevent );
+      
+      free( full_devpath );
+      free( uevent_buf );
+      return 0;
+   }
+   
+   // truncate to /devices
+   devpath = full_devpath + strlen( ctx->sysfs_mountpoint );
    
    // we're adding this, so make ACTION=add
    rc = vdev_linux_uevent_append( &uevent_buf, &uevent_buf_len, "ACTION", "add" );
@@ -1036,46 +1016,58 @@ static int vdev_linux_sysfs_register_device( struct vdev_linux_context* ctx, cha
       
       vdev_error("vdev_linux_uevent_append('%s=%s') rc = %d\n", "ACTION", "add", rc );
       
-      free( fp_parent );
       free( uevent_buf );
-      free( fp_uevent );
       free( full_devpath );
       
       return rc;
    }
    
-   // get the name--it's the basename of the dev parent 
-   name = vdev_basename( fp_parent, NULL );
-   if( name == NULL ) {
+   // get the devname--it's the basename of the dev parent 
+   devname = vdev_basename( full_devpath, NULL );
+   if( devname == NULL ) {
       
-      free( fp_parent );
       free( uevent_buf );
-      free( fp_uevent );
       free( full_devpath );
       
       return -ENOMEM;
+   }
+   
+   // include the device path
+   rc = vdev_linux_uevent_append( &uevent_buf, &uevent_buf_len, "DEVPATH", devpath );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_linux_uevent_append('%s=%s') rc = %d\n", "DEVPATH", devpath, rc );
+      
+      free( uevent_buf );
+      free( full_devpath );
+      free( devname );
+      return rc;
+   }
+   
+   // include the device name
+   rc = vdev_linux_uevent_append( &uevent_buf, &uevent_buf_len, "DEVNAME", devname );
+   if( rc != 0 ) {
+     
+      vdev_error("vdev_linux_uevent_append('%s=%s') rc = %d\n", "DEVNAME", devname, rc );
+      
+      free( uevent_buf );
+      free( full_devpath );
+      free( devname );
+      return rc;
    }
    
    // make the device request
    struct vdev_device_request* vreq = VDEV_CALLOC( struct vdev_device_request, 1 );
    if( vreq == NULL ) {
       
-      free( fp_parent );
-      free( fp_uevent );
       free( full_devpath );
-      
-      if( uevent_buf != NULL ) {
-         free( uevent_buf );
-      }
+      free( uevent_buf );
       
       return -ENOMEM;
    }
    
    // build up the request
-   vdev_device_request_init( vreq, ctx->os_ctx->state, VDEV_DEVICE_INVALID, name );
-   vdev_device_request_set_mode( vreq, mode );
-   
-   free( name );
+   vdev_device_request_init( vreq, ctx->os_ctx->state, VDEV_DEVICE_INVALID, devname );
    
    // parse from our uevent
    rc = vdev_linux_parse_request( ctx, vreq, uevent_buf, uevent_buf_len );
@@ -1087,23 +1079,22 @@ static int vdev_linux_sysfs_register_device( struct vdev_linux_context* ctx, cha
       
       vdev_error("vdev_linux_parse_request('%s') rc = %d\n", fp_uevent, rc );
       
-      free( fp_parent );
-      free( fp_uevent );
       free( full_devpath );
+      free( devname );
    
       return rc;
    }
    
-   // set the *actual* device path (starting with /devices)
-   vdev_device_request_add_param( vreq, "DEVPATH", devpath );
-   
    free( full_devpath );
+   free( devname );
+   
+   pthread_mutex_lock( &ctx->initial_requests_lock );
    
    // append 
    if( ctx->initial_requests == NULL ) {
       
       ctx->initial_requests = vreq;
-      ctx->initial_requests_tail = ctx->initial_requests;
+      ctx->initial_requests_tail = vreq;
    }
    else {
       
@@ -1111,178 +1102,235 @@ static int vdev_linux_sysfs_register_device( struct vdev_linux_context* ctx, cha
       ctx->initial_requests_tail = vreq;
    }
    
-   free( fp_parent );
-   free( fp_uevent );
+   vreq->next = NULL;
+   
+   pthread_mutex_unlock( &ctx->initial_requests_lock );
    
    return rc;
 }
 
 
-// get all block device paths from sysfs 
-static int vdev_linux_sysfs_walk_block_devs( struct vdev_linux_context* ctx, glob_t* block_device_paths ) {
+// scan structure for finding new device directories, and signalling whether or not 
+// the given directory has a uevent.
+struct vdev_linux_sysfs_scan_context {
    
-   int rc = 0;
-   char sysfs_glob[ PATH_MAX+1 ];
-   
-   memset( sysfs_glob, 0, PATH_MAX+1 );
-   
-   // walk sysfs for block devices (in /sys/block/*/dev, /sys/block/*/*/dev)
-   snprintf( sysfs_glob, PATH_MAX, "%s/block/*/dev", ctx->sysfs_mountpoint );
-   
-   rc = glob( sysfs_glob, 0, NULL, block_device_paths );
-   
-   if( rc != 0 ) {
-      
-      vdev_error("glob('%s') rc = %d\n", sysfs_glob, rc );
-      return rc;
-   }
-   
-   // append /sys/block/*/*/dev 
-   snprintf( sysfs_glob, PATH_MAX, "%s/block/*/*/dev", ctx->sysfs_mountpoint );
-   
-   rc = glob( sysfs_glob, GLOB_APPEND, NULL, block_device_paths );
-   
-   if( rc != 0 ) {
-      
-      vdev_error("glob('%s') rc = %d\n", sysfs_glob, rc );
-      return rc;
-   }
-   
-   return 0;
-}
+   char* uevent_path;
+   struct sglib_cstr_vector* device_frontier;
+};
 
-
-// build up a glob of /sys/class/*/*/dev, excluding /sys/class/block
-// TODO: use /sys/devices
-static int vdev_linux_sysfs_build_char_glob( char const* fp, void* cls ) {
+// populate a /sys/devices directory with its child directories
+static int vdev_linux_sysfs_scan_device_directory( char const* fp, void* cls ) {
    
-   glob_t* char_device_paths = (glob_t*)cls;
+   struct vdev_linux_sysfs_scan_context* scan_ctx = (struct vdev_linux_sysfs_scan_context*)cls;
    
-   char sysfs_glob[ PATH_MAX+1 ];
-   char name[NAME_MAX+1];
+   struct sglib_cstr_vector* device_frontier = scan_ctx->device_frontier;
+   
+   struct stat sb;
    int rc = 0;
+   char* fp_base = NULL;
+   char* fp_dup = NULL;
    
-   vdev_basename( fp, name );
+   fp_base = rindex( fp, '/' );
    
-   // skip . and ..
-   if( strcmp(name, ".") == 0 || strcmp(name, "..") == 0 ) {
+   if( fp_base == NULL ) {
       return 0;
    }
    
-   if( strcmp(name, "block" ) != 0 ) {
+   // skip . and .. 
+   if( strcmp( fp_base, "/." ) == 0 || strcmp( fp_base, "/.." ) == 0 ) {
+      return 0;
+   }
+   
+   // add directories
+   rc = lstat( fp, &sb );
+   if( rc != 0 ) {
       
-      // scan this directory 
-      snprintf(sysfs_glob, PATH_MAX, "%s/*/dev", fp );
+      rc = -errno;
+      vdev_error("lstat('%s') rc = %d\n", fp, rc );
+      return rc;
+   }
+   
+   if( !S_ISDIR( sb.st_mode ) && strcmp( fp_base, "/uevent" ) != 0 ) {
       
-      rc = glob( sysfs_glob, GLOB_APPEND, NULL, char_device_paths );
-      if( rc != 0 && rc != GLOB_NOMATCH ) {
-         
-         vdev_error("glob('%s') rc = %d\n", sysfs_glob, rc );
+      // not a directory, and not a uevent
+      return 0;
+   }
+   
+   fp_dup = vdev_strdup_or_null( fp );
+   if( fp_dup == NULL ) {
+      
+      return -ENOMEM;
+   }
+   
+   if( S_ISDIR( sb.st_mode ) ) {
+   
+      vdev_debug("Search '%s'\n", fp_dup );
+      
+      rc = sglib_cstr_vector_push_back( device_frontier, fp_dup );
+      if( rc != 0 ) {
+      
+         free( fp_dup );
          return rc;
       }
    }
+   else {
+      
+      // this is a uevent; this directory is a device 
+      vdev_debug("Uevent '%s'\n", fp_dup );
+      scan_ctx->uevent_path = fp_dup;
+   }
    
    return 0;
 }
 
 
-// get all char device paths from sysfs 
-static int vdev_linux_sysfs_walk_char_devs( struct vdev_linux_context* ctx, glob_t* char_device_paths ) {
+// read all devices from sysfs, and put their uevent paths into the given uevent_paths
+// return 0 on success
+// return negative on error
+static int vdev_linux_sysfs_find_devices( struct vdev_linux_context* ctx, struct sglib_cstr_vector* uevent_paths ) {
    
    int rc = 0;
-   char sysfs_glob[ PATH_MAX+1 ];
    
-   memset( sysfs_glob, 0, PATH_MAX+1 );
+   // find all directories that have a 'uevent' file in them 
+   struct sglib_cstr_vector device_frontier;
+   sglib_cstr_vector_init( &device_frontier );
    
-   // character devices are in /sys/class/*/*/dev, /sys/bus/*/devices/*/dev.
-   // skip /sys/class/block/*/dev
-   // TODO: use /sys/devices
+   struct vdev_linux_sysfs_scan_context scan_context;
+   memset( &scan_context, 0, sizeof(struct vdev_linux_sysfs_scan_context) );
    
-   snprintf( sysfs_glob, PATH_MAX, "%s/bus/*/devices/*/dev", ctx->sysfs_mountpoint );
+   scan_context.device_frontier = &device_frontier;
    
-   rc = glob( sysfs_glob, 0, NULL, char_device_paths );
+   char* device_root = NULL;
    
+   // scan /sys/devices 
+   device_root = vdev_fullpath( ctx->sysfs_mountpoint, "/devices", NULL );
+   if( device_root == NULL ) {
+      
+      return -ENOMEM;
+   }
+   
+   rc = vdev_load_all( device_root, vdev_linux_sysfs_scan_device_directory, &scan_context );
    if( rc != 0 ) {
       
-      vdev_error("glob('%s') rc = %d\n", sysfs_glob, rc );
+      vdev_error("vdev_load_all('%s') rc = %d\n", device_root, rc );
+      
+      free( device_root );
+      
+      sglib_cstr_vector_free( &device_frontier );
+      
       return rc;
    }
    
-   snprintf( sysfs_glob, PATH_MAX, "%s/class/", ctx->sysfs_mountpoint );
+   free( device_root );
    
-   rc = vdev_load_all( sysfs_glob, vdev_linux_sysfs_build_char_glob, char_device_paths );
-   if( rc != 0 ) {
+   while( 1 ) {
       
-      vdev_error("vdev_load_all('%s') rc = %d\n", sysfs_glob, rc );
-      return rc;
+      unsigned long len = sglib_cstr_vector_size( &device_frontier );
+      
+      if( len == 0 ) {
+         break;
+      }
+      
+      device_root = sglib_cstr_vector_at( &device_frontier, len - 1 );
+      sglib_cstr_vector_set( &device_frontier, NULL, len - 1 );
+      
+      sglib_cstr_vector_pop_back( &device_frontier );
+      
+      // scan for more devices 
+      rc = vdev_load_all( device_root, vdev_linux_sysfs_scan_device_directory, &scan_context );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_load_all('%s') rc = %d\n", device_root, rc );
+         free( device_root );
+         break;
+      }
+      
+      // is one of them a uevent?
+      if( scan_context.uevent_path != NULL ) {
+         
+         // yup--remember it
+         char* uevent_path = vdev_strdup_or_null( scan_context.uevent_path );
+         
+         if( uevent_path == NULL ) {
+            
+            free( device_root );
+            rc = -ENOMEM;
+            break;
+         }
+         
+         sglib_cstr_vector_push_back( uevent_paths, uevent_path );
+         
+         free( scan_context.uevent_path );
+         scan_context.uevent_path = NULL;
+      }
+      
+      free( device_root );
    }
    
+   sglib_cstr_vector_free( &device_frontier );
    
-   return 0;
+   return rc;
 }
 
 
-// read all (block|character) devices from sysfs 
-// TODO: use /sys/devices
-static int vdev_linux_sysfs_walk_devs( struct vdev_linux_context* ctx ) {
+static int vdev_cstr_vector_free_all( struct sglib_cstr_vector* vec ) {
+   
+   // free all strings
+   for( unsigned long i = 0; i < sglib_cstr_vector_size( vec ); i++ ) {
+      
+      if( sglib_cstr_vector_at( vec, i ) != NULL ) {
+         
+         free( sglib_cstr_vector_at( vec, i ) );
+         sglib_cstr_vector_set( vec, NULL, i );
+      }
+   }
+   
+   return 0;
+}
+ 
+// register all devices, given a vector to their uevent files
+// return 0 on success
+// return negative on error
+static int vdev_linux_sysfs_register_devices( struct vdev_linux_context* ctx ) {
    
    int rc = 0;
-   glob_t char_device_paths;
-   glob_t block_device_paths;
+   struct sglib_cstr_vector uevent_paths;
    
-   // get block devices 
-   rc = vdev_linux_sysfs_walk_block_devs( ctx, &block_device_paths );
+   sglib_cstr_vector_init( &uevent_paths );
    
+   // scan devices 
+   rc = vdev_linux_sysfs_find_devices( ctx, &uevent_paths );
    if( rc != 0 ) {
       
-      vdev_error( "vdev_linux_sysfs_walk_block_devs rc = %d\n", rc );
+      vdev_error("vdev_linux_sysfs_find_devices() rc = %d\n", rc );
+      
+      vdev_cstr_vector_free_all( &uevent_paths );
+      sglib_cstr_vector_free( &uevent_paths );
       return rc;
    }
    
-   // get character devices
-   rc = vdev_linux_sysfs_walk_char_devs( ctx, &char_device_paths );
-   
-   if( rc != 0 ) {
+   // process all devices
+   for( unsigned long i = 0; i < sglib_cstr_vector_size( &uevent_paths ); i++ ) {
       
-      vdev_error( "vdev_linux_sysfs_walk_char_devs rc = %d\n", rc );
-      return rc;
-   }
-   
-   // populate block devices 
-   for( unsigned int i = 0; block_device_paths.gl_pathv[i] != NULL; i++ ) {
+      char* uevent_path = sglib_cstr_vector_at( &uevent_paths, i );
       
-      vdev_debug("Discovered block device '%s'\n", block_device_paths.gl_pathv[i] );
+      // skip filtered entries
+      if( uevent_path == NULL ) {
+         continue;
+      }
       
-      rc = vdev_linux_sysfs_register_device( ctx, block_device_paths.gl_pathv[i], S_IFBLK );
+      vdev_debug("Register device '%s'\n", uevent_path );
+      rc = vdev_linux_sysfs_register_device( ctx, uevent_path );
       if( rc != 0 ) {
          
-         vdev_error("vdev_linux_sysfs_register_device('%s', BLK) rc = %d\n", block_device_paths.gl_pathv[i], rc );
-         break;
+         vdev_error("vdev_linux_sysfs_register_device('%s') rc = %d\n", uevent_path, rc );
+         continue;
       }
    }
    
-   if( rc != 0 ) {
-      
-      globfree( &char_device_paths );
-      globfree( &block_device_paths );
-      return rc;
-   }
-   
-   // populate char devices 
-   for( unsigned int i = 0; char_device_paths.gl_pathv[i] != NULL; i++ ) {
-      
-      vdev_debug("Discovered char device '%s'\n", char_device_paths.gl_pathv[i] );
-      
-      rc = vdev_linux_sysfs_register_device( ctx, char_device_paths.gl_pathv[i], S_IFCHR );
-      if( rc != 0 ) {
-         
-         vdev_error("vdev_linux_sysfs_register_device('%s', CHR) rc = %d\n", char_device_paths.gl_pathv[i], rc );
-         break;
-      }
-   }
-   
-   globfree( &char_device_paths );
-   globfree( &block_device_paths );
+   // free all paths
+   vdev_cstr_vector_free_all( &uevent_paths );
+   sglib_cstr_vector_free( &uevent_paths );
    
    return rc;
 }
@@ -1414,8 +1462,10 @@ static int vdev_linux_context_init( struct vdev_os_context* os_ctx, struct vdev_
       return rc;
    }
    
-   // seed block/character devices from sysfs 
-   rc = vdev_linux_sysfs_walk_devs( ctx );
+   pthread_mutex_init( &ctx->initial_requests_lock, NULL );
+   
+   // seed devices from sysfs 
+   rc = vdev_linux_sysfs_register_devices( ctx );
    if( rc != 0 ) {
       
       vdev_error("vdev_linux_sysfs_walk_devs rc = %d\n", rc );
