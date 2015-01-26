@@ -97,18 +97,9 @@ static void* vdev_wq_main( void* cls ) {
       pthread_mutex_lock( &wq->work_lock );
 
       work_itr = wq->work;
-
-      if( wq->work == wq->work_1 ) {
-         wq->work_1 = NULL;
-         wq->work = wq->work_2;
-      }
-      else {
-         wq->work_2 = NULL;
-         wq->work = wq->work_1;
-      }
-      
+      wq->work = NULL;
       wq->tail = NULL;
-
+      
       pthread_mutex_unlock( &wq->work_lock );
       
       if( work_itr == NULL ) {
@@ -152,7 +143,7 @@ int vdev_wq_init( struct vdev_wq* wq ) {
    pthread_mutex_init( &wq->work_lock, NULL );
    sem_init( &wq->work_sem, 0, 0 );
    sem_init( &wq->end_sem, 0, 0 );
-
+   
    return rc;
 }
 
@@ -246,8 +237,7 @@ int vdev_wq_free( struct vdev_wq* wq ) {
    }
 
    // free all
-   vdev_wq_queue_free( wq->work_1 );
-   vdev_wq_queue_free( wq->work_2 );
+   vdev_wq_queue_free( wq->work );
    
    pthread_mutex_destroy( &wq->work_lock );
    sem_destroy( &wq->work_sem );
@@ -298,14 +288,13 @@ int vdev_wq_add( struct vdev_wq* wq, struct vdev_wreq* wreq ) {
    next->next = NULL;
    
    pthread_mutex_lock( &wq->work_lock );
-
+   
    if( wq->work == NULL ) {
-      
+      // head
       wq->work = next;
       wq->tail = next;
    }
    else {
-      
       // append 
       wq->tail->next = next;
       wq->tail = next;

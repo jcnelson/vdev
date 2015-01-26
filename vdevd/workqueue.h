@@ -51,12 +51,9 @@ struct vdev_wq {
    // is the thread running?
    volatile bool running;
 
-   // things to do (double-bufferred)
+   // things to do
    struct vdev_wreq* work;
    struct vdev_wreq* tail;
-
-   struct vdev_wreq* work_1;
-   struct vdev_wreq* work_2;
 
    // lock governing access to work
    pthread_mutex_t work_lock;
