@@ -571,6 +571,11 @@ int vdev_action_match( struct vdev_device_request* vreq, struct vdev_action* act
    // type match?
    if( act->has_type ) {
       
+      if( !S_ISBLK( vreq->mode ) && !S_ISCHR( vreq->mode ) ) {
+         // device has no type 
+         return 0;
+      }
+      
       if( S_ISBLK( vreq->mode ) && strcasecmp( act->type, "block" ) != 0 ) {
          
          // not a block device
