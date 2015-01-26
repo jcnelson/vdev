@@ -576,6 +576,11 @@ int vdev_os_next_device( struct vdev_device_request* vreq, void* cls ) {
       
       return 0;
    }
+   else if( ctx->os_ctx->state->once ) {
+      
+      // out of requests; die 
+      return 1;
+   }
    
    memset(&hdr, 0, sizeof(struct msghdr));
    
@@ -592,7 +597,7 @@ int vdev_os_next_device( struct vdev_device_request* vreq, void* cls ) {
          return -EAGAIN;
       }
       
-      vdev_error("poll(%d) rc = %d\n", ctx->pfd.fd, rc );
+      vdev_error("FATAL: poll(%d) rc = %d\n", ctx->pfd.fd, rc );
       
       return rc;
    }
@@ -616,7 +621,7 @@ int vdev_os_next_device( struct vdev_device_request* vreq, void* cls ) {
    if( len < 0 ) {
       
       rc = -errno;
-      vdev_error("recvmsg(%d) rc = %d\n", ctx->pfd.fd, rc );
+      vdev_error("FATAL: recvmsg(%d) rc = %d\n", ctx->pfd.fd, rc );
       
       return rc;
    }
@@ -667,7 +672,7 @@ int vdev_os_next_device( struct vdev_device_request* vreq, void* cls ) {
       
       vdev_error("vdev_linux_parse_request rc = %d\n", rc );
       
-      return rc;
+      return -EAGAIN;
    }
    
    return 0;
