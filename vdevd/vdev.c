@@ -128,6 +128,7 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
    
    vdev->mountpoint = vdev_strdup_or_null( opts.mountpoint );
    vdev->debug_level = opts.debug_level;
+   vdev->once = opts.once;
    
    if( vdev->mountpoint == NULL ) {
       
@@ -186,18 +187,17 @@ int vdev_main( struct vdev_state* vdev ) {
 int vdev_stop( struct vdev_state* vdev ) {
    
    int rc = 0;
-   int umount_rc = 0;
-   char umount_cmd[PATH_MAX + 100];
-   memset( umount_cmd, 0, PATH_MAX + 100 );
+   bool wait_for_empty = false;
    
    if( !vdev->running ) {
       return -EINVAL;
    }
    
    vdev->running = false;
+   wait_for_empty = vdev->once;         // wait for the queue to drain if running once
    
    // stop processing requests 
-   rc = vdev_wq_stop( &vdev->device_wq );
+   rc = vdev_wq_stop( &vdev->device_wq, wait_for_empty );
    if( rc != 0 ) {
       
       vdev_error("vdev_wq_stop rc = %d\n", rc );

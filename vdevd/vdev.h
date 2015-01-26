@@ -59,6 +59,9 @@ struct vdev_state {
    
    // are we taking events from the OS? (back-end)
    bool running;
+   
+   // run once?
+   bool once;
 };
 
 
