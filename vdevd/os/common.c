@@ -82,7 +82,7 @@ int vdev_os_main( struct vdev_os_context* vos ) {
          }
       }
       
-      vdev_debug("Next device: type=%d path=%s major=%u minor=%u mode=%o\n", vreq->type, vreq->path, major(vreq->dev), minor(vreq->dev), vreq->mode );
+      vdev_debug("Next device: %p, type=%d path=%s major=%u minor=%u mode=%o\n", vreq, vreq->type, vreq->path, major(vreq->dev), minor(vreq->dev), vreq->mode );
       
       // post the event to the device work queue
       rc = vdev_device_request_enqueue( &vos->state->device_wq, vreq );
