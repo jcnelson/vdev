@@ -1934,7 +1934,7 @@ void sglib___##type##_consistency_check(type *t) {\
    extern void sglib_##type##_vector_init( struct sglib_##type##_vector* v ); \
    extern void sglib_##type##_vector_free( struct sglib_##type##_vector* v ); \
    extern int sglib_##type##_vector_push_back( struct sglib_##type##_vector* v, type t ); \
-   extern type sglib_##type##_vector_pop_back( struct sglib_##type##_vector* v, type t ); \
+   extern type sglib_##type##_vector_pop_back( struct sglib_##type##_vector* v ); \
    extern int sglib_##type##_vector_set( struct sglib_##type##_vector* v, type t, unsigned long i ); \
    extern void sglib_##type##_vector_clear( struct sglib_##type##_vector* v ); \
    extern type sglib_##type##_vector_at( struct sglib_##type##_vector* v, unsigned long i ); \
@@ -1984,8 +1984,14 @@ void sglib___##type##_consistency_check(type *t) {\
       return 0; \
    } \
    \
-   type sglib_##type##_vector_pop_back( struct sglib_##type##_vector* v, type t ) { \
-      return v->buf[ v->len-- ]; \
+   type sglib_##type##_vector_pop_back( struct sglib_##type##_vector* v ) { \
+      if( v->len <= 0 ) { \
+         fprintf( stderr, "FATAL: pop_back on zero-length vector %p\n", v ); \
+         abort(); \
+      } \
+      type ret = v->buf[ v->len - 1 ]; \
+      v->len--;\
+      return ret; \
    } \
    \
    int sglib_##type##_vector_set( struct sglib_##type##_vector* v, type t, unsigned long i ) { \
