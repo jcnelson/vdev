@@ -49,7 +49,7 @@ struct vdev_wq {
    pthread_t thread;
 
    // is the thread running?
-   bool running;
+   volatile bool running;
 
    // things to do (double-bufferred)
    struct vdev_wreq* work;
@@ -63,13 +63,20 @@ struct vdev_wq {
 
    // semaphore to signal the availability of work
    sem_t work_sem;
+   
+   // semaphore to signal the end of work 
+   sem_t end_sem;
+   
+   // number of threads waiting for the queue to be empty
+   volatile int waiter_count;
+   pthread_mutex_t waiter_lock;
 };
 
 C_LINKAGE_BEGIN
 
 int vdev_wq_init( struct vdev_wq* wq );
 int vdev_wq_start( struct vdev_wq* wq );
-int vdev_wq_stop( struct vdev_wq* wq );
+int vdev_wq_stop( struct vdev_wq* wq, bool wait );
 int vdev_wq_free( struct vdev_wq* wq );
 
 int vdev_wreq_init( struct vdev_wreq* wreq, vdev_wq_func_t work, void* work_data );

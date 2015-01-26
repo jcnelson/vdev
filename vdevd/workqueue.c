@@ -22,6 +22,39 @@
 #include "libvdev/util.h"
 #include "workqueue.h"
 
+
+// wait for the queue to be empty 
+static int vdev_wq_wait_for_empty( struct vdev_wq* wq ) {
+   
+   pthread_mutex_lock( &wq->waiter_lock );
+   
+   wq->waiter_count++;
+   
+   pthread_mutex_unlock( &wq->waiter_lock );
+   
+   sem_wait( &wq->end_sem );
+   
+   return 0;
+}
+
+// wake up all threads waiting for the queue to be empty 
+static int vdev_wq_wakeup_waiters_on_empty( struct vdev_wq* wq ) {
+   
+   pthread_mutex_lock( &wq->waiter_lock );
+   
+   int waiter_count = wq->waiter_count;
+   wq->waiter_count = 0;
+   
+   pthread_mutex_unlock( &wq->waiter_lock );
+   
+   for( int i = 0; i < waiter_count; i++ ) {
+      
+      sem_post( &wq->end_sem );
+   }
+   
+   return 0;
+}
+
 // work queue main method
 static void* vdev_wq_main( void* cls ) {
 
@@ -34,9 +67,27 @@ static void* vdev_wq_main( void* cls ) {
 
    while( wq->running ) {
 
-      // wait for work
-      sem_wait( &wq->work_sem );
-
+      // is there work?
+      rc = sem_trywait( &wq->work_sem );
+      if( rc != 0 ) {
+         
+         rc = -errno;
+         if( rc == -EAGAIN ) {
+            
+            // no work; wake up anyone waiting for us to be empty
+            vdev_wq_wakeup_waiters_on_empty( wq );
+            
+            // wait for work
+            sem_wait( &wq->work_sem );
+         }
+         else {
+            
+            // some other fatal error 
+            vdev_error("FATAL: sem_trywait rc = %d\n", rc );
+            break;
+         }
+      }
+      
       // cancelled?
       if( !wq->running ) {
          break;
@@ -100,6 +151,7 @@ int vdev_wq_init( struct vdev_wq* wq ) {
    
    pthread_mutex_init( &wq->work_lock, NULL );
    sem_init( &wq->work_sem, 0, 0 );
+   sem_init( &wq->end_sem, 0, 0 );
 
    return rc;
 }
@@ -141,10 +193,16 @@ int vdev_wq_start( struct vdev_wq* wq ) {
 // return 0 on success
 // return negative on error:
 // * -EINVAL if not running
-int vdev_wq_stop( struct vdev_wq* wq ) {
+int vdev_wq_stop( struct vdev_wq* wq, bool wait ) {
 
    if( !wq->running ) {
       return -EINVAL;
+   }
+   
+   if( wait ) {
+      
+      // wait for the queue to be empty 
+      vdev_wq_wait_for_empty( wq );
    }
 
    wq->running = false;
