@@ -28,7 +28,7 @@
 
 #define VDEV_NAME_MAX 256
 
-#define VDEV_OS_XATTR_NAMESPACE    "vdev.VDEV_OS_"
+#define VDEV_API_ATTRS_PREFIX "API/attrs/"
 
 // device request type 
 typedef enum {

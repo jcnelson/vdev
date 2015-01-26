@@ -325,49 +325,132 @@ int vdev_device_request_set_mode( struct vdev_device_request* req, mode_t mode )
    return 0;
 }
 
-// record extra metadata (i.e. vdev and OS parameters) onto a device node, in the form of xattrs.
+// record extra metadata (i.e. vdev and OS parameters) for a device node
+// store it as $VDEV_MOUNTPOINT/%VDEV_API_ATTRS_PREFIX/$VDEV_PATH/$PARAM_KEY (set to the contents of $PARAM_VALUE)
 // return 0 on success
 // return negative on error
-static int vdev_device_add_metadata( struct vdev_device_request* req, char const* fp ) {
+static int vdev_device_add_metadata( struct vdev_device_request* req ) {
 
    int rc = 0;
    struct sglib_vdev_params_iterator itr;
    struct vdev_param_t* dp;
+   
+   char* base_dir = NULL;
+   char api_dir[4096];
+   
+   // NOTE: req->path is guaranteed to be <= 256 characters
+   sprintf( api_dir, VDEV_API_ATTRS_PREFIX "/%s", req->renamed_path );
+   
+   base_dir = vdev_fullpath( req->state->mountpoint, api_dir, NULL );
+   if( base_dir == NULL ) {
+      
+      return -ENOMEM;
+   }
+   
+   rc = vdev_mkdirs( base_dir, 0, 0755 );
+   
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_mkdirs('%s') rc = %d\n", api_dir, rc );
+      
+      free( base_dir );
+      return rc;
+   }
    
    // save all OS-specific attributes to this, via setxattr 
    for( dp = sglib_vdev_params_it_init_inorder( &itr, req->params ); dp != NULL; dp = sglib_vdev_params_it_next( &itr ) ) {
       
       char const* param_name = dp->key;
       char const* param_value = dp->value;
+      char* param_value_with_newline = NULL;
+      char* key_value_path = NULL;
       
-      char* vdev_param_name = VDEV_CALLOC( char, strlen(VDEV_OS_XATTR_NAMESPACE) + 1 + strlen(param_name) + 1 );
+      key_value_path = vdev_fullpath( base_dir, param_name, NULL );
       
-      if( vdev_param_name == NULL ) {
+      if( key_value_path == NULL ) {
          
          rc = -ENOMEM;
          break;
       }
       
-      sprintf(vdev_param_name, "%s%s", VDEV_OS_XATTR_NAMESPACE, param_name );
-      
-      rc = setxattr( fp, vdev_param_name, param_value, strlen(param_value) + 1, 0 );
-      
-      if( rc != 0 ) {
+      param_value_with_newline = VDEV_CALLOC( char, strlen(param_value) + 2 );
+      if( param_value_with_newline == NULL ) {
          
-         rc = -errno;
-         vdev_error("setxattr('%s' = '%s') rc = %d\n", vdev_param_name, param_value, rc );
-         
-         free( vdev_param_name );
-         
+         rc = -ENOMEM;
+         free( key_value_path );
          break;
       }
       
-      free( vdev_param_name );
+      strcpy( param_value_with_newline, param_value );
+      strcat( param_value_with_newline, "\n");
+      
+      rc = vdev_write_file( key_value_path, param_value_with_newline, strlen(param_value_with_newline), O_CREAT | O_WRONLY | O_TRUNC, 0644 );
+      
+      free( param_value_with_newline );
+      
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_write_file('%s', '%s') rc = %d\n", key_value_path, param_value, rc );
+         
+         free( key_value_path );
+         break;
+      }
+      
+      free( key_value_path );
+   }
+   
+   free( base_dir );
+   
+   return rc;
+}
+
+
+// remove helper for vdev_device_remove_metadata
+static int vdev_device_remove_metadata_file( char const* fp, void* cls ) {
+   
+   int rc = 0;
+   
+   rc = unlink( fp );
+   if( rc != 0 ) {
+      
+      rc = -errno;
+      vdev_error("WARN: vdev_device_remove_metadata_file('%s') rc = %d\n", fp, rc );
+      return rc;
    }
    
    return rc;
 }
 
+// remove extra metadata (i.e. vdev and OS parameters) for a deivce node 
+// return 0 on success
+// return negative on error 
+static int vdev_device_remove_metadata( struct vdev_device_request* req ) {
+   
+   int rc = 0;
+   
+   char* base_dir = NULL;
+   char api_dir[4096];
+   
+   // NOTE: req->path is guaranteed to be <= 256 characters
+   sprintf( api_dir, VDEV_API_ATTRS_PREFIX "/%s", req->path );
+   
+   base_dir = vdev_fullpath( req->state->mountpoint, api_dir, NULL );
+   if( base_dir == NULL ) {
+      
+      return -ENOMEM;
+   }
+   
+   // remove everything in this directory 
+   rc = vdev_load_all( base_dir, vdev_device_remove_metadata_file, NULL );
+   
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_load_all('%s') rc = %d\n", base_dir, rc );
+   }
+   
+   free( base_dir );
+   return rc;
+}
 
 // handler to add a device
 static int vdev_device_add( struct vdev_wreq* wreq, void* cls ) {
@@ -449,7 +532,7 @@ static int vdev_device_add( struct vdev_wreq* wreq, void* cls ) {
          else {
             
             // save metadata 
-            rc = vdev_device_add_metadata( req, fp );
+            rc = vdev_device_add_metadata( req );
             
             if( rc != 0 ) {
                
@@ -488,10 +571,8 @@ static int vdev_device_remove( struct vdev_wreq* wreq, void* cls ) {
    int rc = 0;
    struct vdev_device_request* req = (struct vdev_device_request*)cls;
    
-   char* renamed_path = NULL;
-      
    // do the rename, possibly generating it
-   rc = vdev_action_create_path( req, req->state->acts, req->state->num_acts, &renamed_path );
+   rc = vdev_action_create_path( req, req->state->acts, req->state->num_acts, &req->renamed_path );
    if( rc != 0 ) {
       
       vdev_error("vdev_action_create_path('%s') rc = %d\n", req->path, rc);
@@ -503,13 +584,13 @@ static int vdev_device_remove( struct vdev_wreq* wreq, void* cls ) {
       return rc;
    }
    
-   if( renamed_path == NULL ) {
-      renamed_path = vdev_strdup_or_null( req->path );
+   if( req->renamed_path == NULL ) {
+      req->renamed_path = vdev_strdup_or_null( req->path );
    }
    
-   vdev_debug("REMOVE device %p type '%s' at '%s' (%d:%d) (original path='%s')\n", req, (S_ISBLK(req->mode) ? "block" : S_ISCHR(req->mode) ? "char" : "unknown"), renamed_path, major(req->dev), minor(req->dev), req->path );
+   vdev_debug("REMOVE device %p type '%s' at '%s' (%d:%d) (original path='%s')\n", req, (S_ISBLK(req->mode) ? "block" : S_ISCHR(req->mode) ? "char" : "unknown"), req->renamed_path, major(req->dev), minor(req->dev), req->path );
       
-   if( renamed_path != NULL ) {
+   if( req->renamed_path != NULL ) {
       
       char* fp = vdev_fullpath( req->state->mountpoint, req->path, NULL );
    
@@ -532,6 +613,15 @@ static int vdev_device_remove( struct vdev_wreq* wreq, void* cls ) {
             
             rc = 0;
          }
+      }
+      
+      // remove metadata 
+      rc = vdev_device_remove_metadata( req );
+      
+      if( rc != 0 ) {
+         
+         vdev_error("WARN: unable to remove all metadata for '%s'\n", fp );
+         rc = 0;
       }
       
       // try to clean up directories 
@@ -558,10 +648,6 @@ static int vdev_device_remove( struct vdev_wreq* wreq, void* cls ) {
          
          vdev_error("vdev_action_run_all(REMOVE %p) rc = %d\n", req, rc );
       }
-   }
-   
-   if( renamed_path != NULL ) {
-      free( renamed_path );
    }
    
    // done with this request 
