@@ -440,6 +440,60 @@ int vdev_read_file( char const* path, char* buf, size_t len ) {
    return 0;
 }
 
+// write a whole file, masking EINTR 
+int vdev_write_file( char const* path, char const* buf, size_t len, int flags, mode_t mode ) {
+   
+   int fd = 0;
+   int rc = 0;
+   
+   if( path == NULL || buf == NULL ) {
+      return -EINVAL;
+   }
+   
+   fd = open( path, flags, mode );
+   if( fd < 0 ) {
+      
+      rc = -errno;
+      vdev_error("open('%s') rc = %d\n", path, rc );
+      return rc;
+   }
+   
+   rc = vdev_write_uninterrupted( fd, buf, len );
+   if( rc < 0 ) {
+      
+      rc = -errno;
+      vdev_error("vdev_write_uninterrupted('%s') rc = %d\n", path, rc );
+      
+      close( fd );
+      return rc;
+   }
+   
+   while( true ) {
+      
+      rc = fsync( fd );
+      if( rc != 0 ) {
+      
+         rc = -errno;
+         
+         if( rc == -EINTR ) {
+            continue;
+         }
+         
+         vdev_error("fsync('%s') rc = %d\n", path, rc );
+      
+         close( fd );
+         return rc;
+      }
+      
+      break;
+   }
+   
+   // NOTE: not much we can do if close() fails...
+   close( fd );
+      
+   return rc;
+}
+
 
 // free a list of dirents 
 static void vdev_dirents_free( struct dirent** dirents, int num_entries ) {

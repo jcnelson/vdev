@@ -125,6 +125,7 @@ uint64_t vdev_parse_uint64( char const* uint64_str, bool* success );
 ssize_t vdev_read_uninterrupted( int fd, char* buf, size_t len );
 ssize_t vdev_write_uninterrupted( int fd, char const* buf, size_t len );
 int vdev_read_file( char const* path, char* buf, size_t len );
+int vdev_write_file( char const* path, char const* buf, size_t len, int flags, mode_t mode );
 
 // directory I/O
 int vdev_load_all( char const* dir_path, vdev_dirent_loader_t loader, void* cls );
