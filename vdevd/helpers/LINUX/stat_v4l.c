@@ -1,5 +1,5 @@
 /*
- * stat_v4l - reads scsi properties
+ * stat_v4l - reads video4linux device properties
  * 
  * Forked from systemd/src/udev/v4l_id/v4l_id.c on January 24, 2015
  * (original from http://cgit.freedesktop.org/systemd/systemd/tree/src/udev/v4l_id/v4l_id.c)
