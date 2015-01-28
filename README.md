@@ -76,4 +76,10 @@ FAQ
 * **Which Linux distributions are you targeting?**  vdev is distro-agnostic, but I'm developing and testing primarily for [Debian](http://www.debian.org) and [Devuan](http://devuan.org).
 * **Which BSDs/other UNIXes are you planning to support?**  OpenBSD and FreeBSD for now.  Well-written, suitably-licensed pull requests that port vdev to these or other UNIX-like OSs will be gratefully accepted.
 * **Will vdev have a DBus API, or a C library?**  These are not necessary.  Vdev will expose its API through the filesystem directly.  However, it will also ship with a libudev compatibility library.
-* **Does this project have anything to do with systemd and udev merging?**  It's not strictly related, but the pending merger definitely motivated me to start this project sooner rather than later.  I hope vdev's existence will help alleviate the tension between the pro- and anti-systemd crowds.  Linux users who don't want to use systemd won't have to foresake dynamic device management, and Linux developers who need fine-grained device access controls like those offerred by systemd don't have to couple their applications to a specific plumbing layer if they don't want to.  Everyone wins.
+* **Does this project have anything to do with systemd and udev merging?**  It's not strictly related, but the pending merger definitely motivated me to start this project sooner rather than later.  I hope vdev's existence will help alleviate the tension between the pro- and anti-systemd crowds:
+  * Linux users who don't want to use systemd can run vdev in place of udev.
+  * Non-systemd and non-udev users who rely on software that depends on libudev can use libudev-compat.
+  * Linux developers who need fine-grained device access controls but don't want to couple their software to systemd will have vdevfs as a portable, easy-to-use alternative.
+  * Users do not need to choose between systemd and vdevfs, since they can coexist.
+  * Systemd developers can go ahead and tightly-couple udev to systemd-PID-1.
+  * **Result:** Everyone wins.
