@@ -1,8 +1,8 @@
 /*
- * stat_v4l - reads scsi properties
+ * stat_net - reads network device properties, given an interface
  * 
- * Forked from systemd/src/udev/v4l_id/v4l_id.c on January 24, 2015
- * (original from http://cgit.freedesktop.org/systemd/systemd/tree/src/udev/v4l_id/v4l_id.c)
+ * Forked from systemd/src/udev/net_id/net_id.c on January 24, 2015
+ * (original from http://cgit.freedesktop.org/systemd/systemd/tree/src/udev/net_id/net_id.c)
  * 
  * All modifications to the original source file are Copyright (C) 2015 Jude Nelson <judecn@gmail.com>
  *
