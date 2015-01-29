@@ -692,7 +692,7 @@ int vdev_sysfs_get_parent_with_subsystem_devtype( char const* sysfs_device_path,
    char cur_dir[4097];
    char subsystem_path[4097];
    char subsystem_link[4097];
-   char subsystem_uevent_path[4097];
+   char uevent_path[4097];
    
    memset( subsystem_path, 0, 4097 );
    memset( subsystem_link, 0, 4097 );
@@ -724,6 +724,8 @@ int vdev_sysfs_get_parent_with_subsystem_devtype( char const* sysfs_device_path,
       // subsystem?
       sprintf( subsystem_path, "%s/subsystem", cur_dir );
       
+      memset( subsystem_link, 0, 4096 );
+      
       rc = readlink( subsystem_path, subsystem_link, 4096 );
       if( rc < 0 ) {
          
@@ -734,7 +736,8 @@ int vdev_sysfs_get_parent_with_subsystem_devtype( char const* sysfs_device_path,
       
       // get subsystem name...
       tmp = rindex( subsystem_link, '/' );
-      if( strcmp( tmp + 1, subsystem_name ) != 0 ) {
+      
+      if( tmp != NULL && strcmp( tmp + 1, subsystem_name ) != 0 ) {
          
          // next parent 
          continue;
@@ -747,13 +750,13 @@ int vdev_sysfs_get_parent_with_subsystem_devtype( char const* sysfs_device_path,
       *tmp = 0;
       
       // make uevent path 
-      sprintf( subsystem_uevent_path, "%s/uevent", cur_dir );
+      sprintf( uevent_path, "%s/uevent", cur_dir );
       
       // get uevent 
-      rc = vdev_read_file( subsystem_uevent_path, &uevent_buf, &uevent_len );
+      rc = vdev_read_file( uevent_path, &uevent_buf, &uevent_len );
       if( rc != 0 ) {
          
-         fprintf(stderr, "WARN: vdev_read_file('%s') rc = %d\n", subsystem_uevent_path, rc );
+         fprintf(stderr, "WARN: vdev_read_file('%s') rc = %d\n", uevent_path, rc );
          return rc;
       }
       
