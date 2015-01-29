@@ -45,8 +45,6 @@
 #define VDEV_LINUX_NETLINK_UDEV_HEADER "libudev"
 #define VDEV_LINUX_NETLINK_UDEV_HEADER_LEN 8
 
-#define VDEV_OS_SYSFS_PREFIX    "SYSFS_"
-
 // connection to the linux kernel for hotplug
 struct vdev_linux_context {
    
