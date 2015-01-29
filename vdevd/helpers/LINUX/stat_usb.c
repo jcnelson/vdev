@@ -342,6 +342,8 @@ int main( int argc, char **argv) {
    char* devtype_str = NULL;
    size_t devtype_strlen = 0;
    
+   struct stat sb;
+   
    memset( sysfs_base, 0, 8193 );
    memset( path_tmp, 0, 8193 );
    
@@ -371,8 +373,38 @@ int main( int argc, char **argv) {
    
    strcpy( sysfs_base, argv[1] );
    
+   // if this directory has a 'device' link, follow it first
+   sprintf( path_tmp, "%s/device", sysfs_base );
+   rc = lstat( path_tmp, &sb );
+   
+   if( rc == 0 ) {
+      
+      if( S_ISLNK( sb.st_mode ) ) {
+         
+         // read the link 
+         memset( sysfs_base, 0, 8193 );
+         rc = readlink( path_tmp, sysfs_base, 8192 );
+         
+         if( rc > 0 ) {
+            
+            sprintf( path_tmp, "%s/%s", argv[1], sysfs_base );
+            
+            // resolve to the actual device
+            char* tmp = realpath( path_tmp, sysfs_base );
+            
+            if( tmp == NULL ) {
+               // won't follow 
+               rc = -errno;
+               
+               memset( sysfs_base, 0, 8193 );
+               strcpy( sysfs_base, argv[1] );
+            }
+         }
+      }
+   }
+   
    // find out what kind of device we are...
-   rc = get_device_type( sysfs_base, &devtype_str, &devtype_strlen );
+   get_device_type( sysfs_base, &devtype_str, &devtype_strlen );
    
    if( devtype_str != NULL && strcmp(devtype_str, "usb_device") == 0 ) {
       
@@ -422,7 +454,9 @@ int main( int argc, char **argv) {
       rc = vdev_sysfs_read_attr( sysfs_base, "bInterfaceClass", &if_class_str, &if_class_strlen );
       if( rc != 0 ) {
          
-         free( devtype_str );
+         if( devtype_str != NULL ) {
+            free( devtype_str );
+         }
          
          fprintf(stderr, "FATAL: vdev_sysfs_read_attr('%s/%s') rc = %d\n", sysfs_base, "bInterfaceClass", rc );
          exit(1);
@@ -430,6 +464,8 @@ int main( int argc, char **argv) {
       
       // parse fields 
       if_class_num = strtoul( if_class_str, NULL, 16 );
+      
+      free( if_class_str );
       
       if( if_class_num == 8 ) {
          // indicates mass storage device.
@@ -454,7 +490,9 @@ int main( int argc, char **argv) {
       if( rc != 0 ) {
          
          // couldn't find
-         free( devtype_str );
+         if( devtype_str != NULL ) {
+            free( devtype_str );
+         }
          
          fprintf( stderr, "FATAL: vdev_sysfs_get_parent_with_subsystem_devtype('%s', 'usb', 'usb_device') rc = %d\n", sysfs_base, rc );
          
@@ -839,6 +877,10 @@ fallback:
    
    vdev_property_print();
    vdev_property_free_all();
+   
+   if( devtype_str != NULL ) {
+      free( devtype_str );
+   }
    
    return 0;
 }
