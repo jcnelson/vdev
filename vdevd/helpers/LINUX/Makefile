@@ -6,7 +6,7 @@ CXSRCS:= $(wildcard *.cpp) $(wildcard os/*.cpp)
 OBJ   := $(patsubst %.c,%.o,$(C_SRCS)) $(patsubst %.cpp,%.o,$(CXSRCS))
 DEFS  := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS -fstack-protector -fstack-protector-all
 
-HELPERS := stat_optical stat_ata stat_input stat_scsi stat_v4l stat_net
+HELPERS := stat_optical stat_ata stat_input stat_scsi stat_v4l stat_net stat_usb
 HELPER_SCRIPTS := $(wildcard *.sh)
 
 PREFIX ?= /
