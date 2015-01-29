@@ -18,7 +18,7 @@ test -z "$DISK_ID" && exit 0
 DISK_NAME="ata-$DISK_ID"
 
 # see if this is a partition...
-if [ $VDEV_OS_DEVTYPE == "partition" ]; then 
+if [ "$VDEV_OS_DEVTYPE" = "partition" ]; then 
 
    PART=$(/bin/cat $VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH/partition)
 
@@ -28,17 +28,38 @@ if [ $VDEV_OS_DEVTYPE == "partition" ]; then
    DISK_NAME=$DISK_NAME-part${PART}
 fi
 
-# install by-id
-/bin/mkdir -p $VDEV_MOUNTPOINT/disk/by-id
-/bin/ln -s ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$DISK_NAME
-
 # get UUID
-UUID=$(/sbin/blkid | /bin/grep $VDEV_PATH | /bin/sed 's/[^ ]* UUID="\([^ ]*\)" .*/\1/g')
+UUID=$(/sbin/blkid | /bin/grep "$VDEV_PATH:" | /bin/sed 's/[^ ]* UUID="\([^ ]*\)" .*/\1/g')
 
-test -z "$UUID" && exit 0
+# (un)install by-uuid
+case "$VDEV_ACTION" in
 
-# install by-uuid
-/bin/mkdir -p $VDEV_MOUNTPOINT/disk/by-uuid
-/bin/ln -s ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-uuid/$UUID
+   add)
+   
+      if [ -n "$UUID" ]; then 
+         /bin/mkdir -p $VDEV_MOUNTPOINT/disk/by-uuid
+         /bin/ln -s ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$DISK_NAME
+      fi
+
+      /bin/mkdir -p $VDEV_MOUNTPOINT/disk/by-id
+      /bin/ln -s ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-uuid/$UUID
+      ;;
+
+   remove)
+
+      /bin/rm -f $VDEV_MOUNTPOINT/disk/by-uuid/$UUID
+      /bin/rm -f $VDEV_MOUNTPOINT/disk/by-id/$DISK_NAME
+      ;;
+
+   test)
+
+      if [ -n "$UUID" ]; then 
+         echo "ln -s ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-uuid/$UUID"
+      fi
+
+      echo "ln -s ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$DISK_NAME"
+      ;;
+
+esac
 
 exit 0
