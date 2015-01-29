@@ -348,6 +348,33 @@ err:
    return -EINVAL;
 }
 
+// remove trailing whitespace
+int vdev_util_rstrip( char* str ) {
+   
+   size_t i = strlen(str);
+   
+   if( i == 0 ) {
+      return 0;
+   }
+   
+   i--;
+   
+   while( i >= 0 ) {
+      
+      if( isspace(str[i]) ) {
+         str[i] = 0;
+         i--;
+         continue;
+      }
+      else {
+         // not space 
+         break;
+      }
+   }
+   
+   return 0;
+}
+
 // global list of properties discovered
 static struct vdev_property* vdev_property_head = NULL;
 static struct vdev_property* vdev_property_tail = NULL;
@@ -484,8 +511,6 @@ int vdev_sysfs_read_attr( char const* sysfs_device_path, char const* attr_name, 
    // regular file? return the contents 
    if( S_ISREG( sb.st_mode ) ) {
       
-      size_t num_read = 0;
-
       fd = open( attr_path, O_RDONLY );
       if( fd < 0 ) {
          
@@ -513,7 +538,7 @@ int vdev_sysfs_read_attr( char const* sysfs_device_path, char const* attr_name, 
       close( fd );
       
       *value = ret_value;
-      *value_len = num_read;
+      *value_len = sb.st_size;
       
       return 0;
    }
@@ -709,7 +734,7 @@ int vdev_sysfs_get_parent_with_subsystem_devtype( char const* sysfs_device_path,
       
       // get subsystem name...
       tmp = rindex( subsystem_link, '/' );
-      if( strcmp( tmp, subsystem_name ) != 0 ) {
+      if( strcmp( tmp + 1, subsystem_name ) != 0 ) {
          
          // next parent 
          continue;
@@ -722,7 +747,7 @@ int vdev_sysfs_get_parent_with_subsystem_devtype( char const* sysfs_device_path,
       *tmp = 0;
       
       // make uevent path 
-      sprintf( subsystem_uevent_path, "%s/uevent", subsystem_link );
+      sprintf( subsystem_uevent_path, "%s/uevent", cur_dir );
       
       // get uevent 
       rc = vdev_read_file( subsystem_uevent_path, &uevent_buf, &uevent_len );

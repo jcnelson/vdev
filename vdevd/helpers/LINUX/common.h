@@ -93,6 +93,7 @@ int vdev_utf8_encoded_to_unichar(const char *str);
 int vdev_utf8_encoded_valid_unichar(const char *str);
 int vdev_util_replace_chars(char *str, const char *white);
 int vdev_util_encode_string(const char *str, char *str_enc, size_t len);
+int vdev_util_rstrip( char* str );
 
 // device properties
 int vdev_property_add( char const* name, char const* value );
@@ -110,6 +111,6 @@ int vdev_sysfs_read_subsystem( char const* devpath, char** ret_subsystem, size_t
 int vdev_sysfs_get_sysname( char const* devpath, char** sysname, size_t* sysname_len );
 
 // file operations 
-int vdev_read_file( char const* sysfs_uevent_path, char** file_buf, size_t* file_buf_len );
+int vdev_read_file( char const* path, char** file_buf, size_t* file_buf_len );
 
 #endif
