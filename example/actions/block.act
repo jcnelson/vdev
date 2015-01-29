@@ -1,4 +1,4 @@
 [vdev-action]
-event=add
+event=any
 type=block
 command=exec $VDEV_HELPERS/block.sh

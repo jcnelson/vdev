@@ -1,5 +1,5 @@
 [vdev-action]
-event=add
+event=any
 OS_DEVTYPE=disk
 OS_SUBSYSTEM=block
 command=test -n "$(echo $VDEV_OS_DEVNAME | grep dm-[0-9]*)" && exec $VDEV_HELPERS/dm-disk.sh

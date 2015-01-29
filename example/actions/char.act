@@ -1,4 +1,4 @@
 [vdev-action]
-event=add
+event=any
 type=char
 command=exec $VDEV_HELPERS/char.sh

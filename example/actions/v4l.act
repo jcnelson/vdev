@@ -1,4 +1,4 @@
 [vdev-action]
-event=add
+event=any
 OS_SUBSYSTEM=video4linux
-rename_command=$VDEV_HELPERS/v4l-name.sh
+command=$VDEV_HELPERS/v4l.sh
