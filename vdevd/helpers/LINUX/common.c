@@ -686,7 +686,11 @@ int vdev_read_file( char const* path, char** file_buf, size_t* file_buf_len ) {
 }
 
 
-// walk up a sysfs device path to find the usb device that is the parent of a usb interface 
+// walk up a sysfs device path to find the ancestor device with the given subsystem and devtype
+// if devtype_name is NULL, match any devtype (only match the subsystem)
+// return 0 on success
+// return -ENOMEM on OOM 
+// return -ENOENT if a subsystem or uevent was not found, when one was expected
 int vdev_sysfs_get_parent_with_subsystem_devtype( char const* sysfs_device_path, char const* subsystem_name, char const* devtype_name, char** devpath, size_t* devpath_len ) {
    
    char cur_dir[4097];
@@ -699,30 +703,25 @@ int vdev_sysfs_get_parent_with_subsystem_devtype( char const* sysfs_device_path,
    
    char* tmp = NULL;
    int rc = 0;
-   char* dir_delim = NULL;
    char* uevent_buf = NULL;
    size_t uevent_len = 0;
    char* devtype = NULL;
    size_t devtype_len = 0;
+   char* parent_device = NULL;
+   size_t parent_device_len = 0;
    
    strcpy( cur_dir, sysfs_device_path );
    
    while( 1 ) {
       
-      // get parent directory
-      dir_delim = rindex( cur_dir, '/' );
-      
-      if( dir_delim == NULL ) {
-         // not found 
-         rc = -ENOENT;
+      // get parent device 
+      rc = vdev_sysfs_get_parent_device( cur_dir, &parent_device, &parent_device_len );
+      if( rc != 0 ) {
          break;
       }
       
-      // truncate to parent directory
-      *dir_delim = '\0';
-      
       // subsystem?
-      sprintf( subsystem_path, "%s/subsystem", cur_dir );
+      sprintf( subsystem_path, "%s/subsystem", parent_device );
       
       memset( subsystem_link, 0, 4096 );
       
@@ -730,7 +729,12 @@ int vdev_sysfs_get_parent_with_subsystem_devtype( char const* sysfs_device_path,
       if( rc < 0 ) {
          
          rc = -errno;
-         fprintf(stderr, "WARN: readlink('%s') errno = %d\n", subsystem_path, rc );
+         if( rc != -ENOENT ) {
+            fprintf(stderr, "WARN: readlink('%s') errno = %d\n", subsystem_path, rc );
+         }
+         
+         free( parent_device );
+         parent_device = NULL;
          return rc;
       }
       
@@ -739,76 +743,96 @@ int vdev_sysfs_get_parent_with_subsystem_devtype( char const* sysfs_device_path,
       
       if( tmp != NULL && strcmp( tmp + 1, subsystem_name ) != 0 ) {
          
-         // next parent 
+         // subsystem does not match
+         // crawl up to the parent
+         strcpy( cur_dir, parent_device );
+         
+         free( parent_device );
+         parent_device = NULL;
          continue;
       }
       
       // subsystem matches...
-      // get uevent 
-      
-      // chop off subsystem name to get parent directory
       *tmp = 0;
       
-      // make uevent path 
-      sprintf( uevent_path, "%s/uevent", cur_dir );
-      
-      // get uevent 
-      rc = vdev_read_file( uevent_path, &uevent_buf, &uevent_len );
-      if( rc != 0 ) {
+      if( devtype_name != NULL ) {
          
-         fprintf(stderr, "WARN: vdev_read_file('%s') rc = %d\n", uevent_path, rc );
-         return rc;
-      }
-      
-      // get devtype 
-      rc = vdev_sysfs_uevent_get_key( uevent_buf, uevent_len, "DEVTYPE", &devtype, &devtype_len );
-      free( uevent_buf );
-      
-      if( rc != 0 ) {
+         // get uevent
+         // get DEVTYPE from uevent 
+         // make uevent path 
+         sprintf( uevent_path, "%s/uevent", parent_device );
          
-         if( rc == -ENOENT ) {
+         // get uevent 
+         rc = vdev_read_file( uevent_path, &uevent_buf, &uevent_len );
+         if( rc < 0 ) {
             
-            // not found 
-            continue;
-         }
-         else {
+            fprintf(stderr, "WARN: vdev_read_file('%s') rc = %d\n", uevent_path, rc );
             
+            free( parent_device );
+            parent_device = NULL;
             return rc;
          }
-      }
-      
-      if( devtype_name != NULL ) {
+         
+         // get devtype 
+         rc = vdev_sysfs_uevent_get_key( uevent_buf, uevent_len, "DEVTYPE", &devtype, &devtype_len );
+         free( uevent_buf );
+         
+         if( rc != 0 ) {
+            
+            if( rc == -ENOENT ) {
+               
+               // not found 
+               // next parent 
+               strcpy( cur_dir, parent_device );
+               
+               free( parent_device );
+               parent_device = NULL;
+               
+               continue;
+            }
+            else {
+               
+               free( parent_device );
+               parent_device = NULL;
+               
+               return rc;
+            }
+         }
+         
          // matches?
          if( strcmp( devtype, devtype_name ) == 0 ) {
             
             free( devtype );
             
             // this is the path to the device 
-            *devpath = strdup( cur_dir );
-            *devpath_len = strlen( cur_dir );
+            *devpath = parent_device;
+            *devpath_len = strlen( parent_device );
             
-            if( *devpath == NULL ) {
-               
-               return -ENOMEM;
-            }
+            // found!
+            rc = 0;
+            break;
+         }
+         else {
+            // no match.
+            // next device 
+            free( devtype );
             
-            else {
-               
-               // found!
-               rc = 0;
-               break;
-            }
+            strcpy( cur_dir, parent_device );
+            
+            free( parent_device );
+            parent_device = NULL;
+            continue;
          }
       }
       else {
          
-         // match any
+         // match only on subsystem 
+         *devpath = parent_device;
+         *devpath_len = strlen(parent_device);
+         
          rc = 0;
-         free( devtype );
          break;
       }
-      
-      free( devtype );
    }
    
    return rc;
@@ -959,6 +983,11 @@ int vdev_sysfs_device_path_from_subsystem_sysname( char const* sysfs_mount, char
 
 // get the parent device of a given device, using sysfs.
 // not all devices have parents; those that do will have a uevent file.
+// walk up the path until we reach /
+// return 0 on success
+// return -EINVAL if the dev path has no '/'
+// return -errno if stat'ing the parent path fails 
+// return -ENOMEM if OOM
 int vdev_sysfs_get_parent_device( char const* dev_path, char** ret_parent_device, size_t* ret_parent_device_len ) {
    
    char* parent_path = NULL;
@@ -975,28 +1004,40 @@ int vdev_sysfs_get_parent_device( char const* dev_path, char** ret_parent_device
    
    strcpy( parent_path, dev_path );
    
-   // lop off the child 
-   delim = rindex( parent_path, '/' );
-   if( delim == NULL ) {
+   while( strlen(parent_path) > 0 ) {
       
-      // invalid 
-      free( parent_path );
-      return -EINVAL;
-   }
-   
-   *delim = '\0';
-   parent_path_len = strlen( parent_path );
-   
-   // verify that this is a device...
-   strcat( parent_path, "/uevent" );
-   
-   rc = stat( parent_path, &sb );
-   if( rc != 0 ) {
+      // lop off the child 
+      delim = rindex( parent_path, '/' );
+      if( delim == NULL ) {
+         
+         // invalid 
+         free( parent_path );
+         return -EINVAL;
+      }
       
-      // nope 
-      rc = -errno;
-      free( parent_path );
-      return rc;
+      while( *delim == '/' && delim != parent_path ) {
+         *delim = '\0';
+         delim--;
+      }
+      
+      parent_path_len = strlen( parent_path );
+      
+      // verify that this is a device...
+      strcat( parent_path, "/uevent" );
+      
+      rc = stat( parent_path, &sb );
+      if( rc != 0 ) {
+         
+         // not a device
+         // remove /uevent 
+         parent_path[ parent_path_len ] = '\0';
+         continue;
+      }
+      else {
+         
+         // device!
+         break;
+      }
    }
    
    // lop off /uevent 
@@ -1042,8 +1083,8 @@ int vdev_sysfs_read_subsystem( char const* devpath, char** ret_subsystem, size_t
       return -EINVAL;
    }
    
-   *ret_subsystem = strdup( subsystem );
-   *ret_subsystem_len = strlen( subsystem );
+   *ret_subsystem = strdup( subsystem + 1 );
+   *ret_subsystem_len = strlen( subsystem + 1 );
    
    if( *ret_subsystem == NULL ) {
       return -ENOMEM;
