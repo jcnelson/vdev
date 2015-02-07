@@ -758,6 +758,7 @@ int main( int argc, char **argv ) {
    int err = 0;
    int rc = 0;
    char* tmp = NULL;    // for realpath success check
+   bool is_net_device = false;
    
    char devpath_class[4097];
    char devpath[4097];
@@ -874,6 +875,7 @@ int main( int argc, char **argv ) {
       
       vdev_property_add( "VDEV_NET_NAME_MAC", str );
       
+      is_net_device = true;
       ieee_oui(devpath, &names);
    }
 
@@ -886,6 +888,7 @@ int main( int argc, char **argv ) {
       if (snprintf(str, sizeof(str), "%s%s", prefix, names.ccw_group) < (int)sizeof(str)) {
          
          vdev_property_add( "VDEV_NET_NAME_PATH", str );
+         is_net_device = true;
       }
       
       goto out;
@@ -906,6 +909,7 @@ int main( int argc, char **argv ) {
          if (snprintf(str, sizeof(str), "%s%s", prefix, names.pci_onboard) < (int)sizeof(str)) {
             
             vdev_property_add( "VDEV_NET_NAME_ONBOARD", str );
+            is_net_device = true;
          }
       }
 
@@ -913,6 +917,7 @@ int main( int argc, char **argv ) {
          if (snprintf(str, sizeof(str), "%s%s", prefix, names.pci_onboard_label) < (int)sizeof(str)) {
             
             vdev_property_add( "VDEV_NET_LABEL_ONBOARD", str );
+            is_net_device = true;
          }
       }
 
@@ -920,6 +925,7 @@ int main( int argc, char **argv ) {
          if (snprintf(str, sizeof(str), "%s%s", prefix, names.pci_path) < (int)sizeof(str)) {
             
             vdev_property_add( "VDEV_NET_NAME_PATH", str );
+            is_net_device = true;
          }
       }
 
@@ -927,6 +933,7 @@ int main( int argc, char **argv ) {
          if (snprintf(str, sizeof(str), "%s%s", prefix, names.pci_slot) < (int)sizeof(str)) {
             
             vdev_property_add( "VDEV_NET_NAME_SLOT", str );
+            is_net_device = true;
          }
       }
       goto out;
@@ -942,6 +949,7 @@ int main( int argc, char **argv ) {
          if (snprintf(str, sizeof(str), "%s%s%s", prefix, names.pci_path, names.usb_ports) < (int)sizeof(str)) {
             
             vdev_property_add( "VDEV_NET_NAME_PATH", str );
+            is_net_device = true;
          }
       }
 
@@ -949,6 +957,7 @@ int main( int argc, char **argv ) {
          if (snprintf(str, sizeof(str), "%s%s%s", prefix, names.pci_slot, names.usb_ports) < (int)sizeof(str)) {
             
             vdev_property_add( "VDEV_NET_NAME_SLOT", str );
+            is_net_device = true;
          }
       }
       
@@ -965,6 +974,7 @@ int main( int argc, char **argv ) {
          if (snprintf(str, sizeof(str), "%s%s%s", prefix, names.pci_path, names.bcma_core) < (int)sizeof(str)) {
             
             vdev_property_add( "VDEV_NET_NAME_PATH", str );
+            is_net_device = true;
          }
       }
 
@@ -972,12 +982,17 @@ int main( int argc, char **argv ) {
          if (snprintf(str, sizeof(str), "%s%s%s", prefix, names.pci_slot, names.bcma_core) < (int)sizeof(str)) {
             
             vdev_property_add( "VDEV_NET_NAME_SLOT", str );
+            is_net_device = true;
          }
       }
       goto out;
    }
 out:
 
+   if( is_net_device ) {
+      vdev_property_add( "VDEV_NET", "1" );
+   }
+   
    vdev_property_print();
    vdev_property_free_all();
    
