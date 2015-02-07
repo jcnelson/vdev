@@ -206,12 +206,11 @@ static bool is_pci_multifunction( char const* sysfs_path ) {
 }
 
 
+// calculate the pci path and slot of the device
 static int dev_pci_slot( char const* dev_path, struct netnames *names) {
    
    unsigned domain, bus, slot, func, dev_port = 0;
    
-   size_t pci_path_offset = 0;
-   char *pci_path_ptr;
    char *attr;
    size_t attr_len;
    
@@ -249,32 +248,26 @@ static int dev_pci_slot( char const* dev_path, struct netnames *names) {
    }
 
    /* compose a name based on the raw kernel's PCI bus, slot numbers */
-   pci_path_ptr = names->pci_path;
-   memset( pci_path_ptr, 0, IFNAMSIZ );
+   memset( names->pci_path, 0, IFNAMSIZ+1 );
    
    if (domain > 0) {
       
-      sprintf( pci_path_ptr + pci_path_offset, "P%u", domain );
-      
-      pci_path_offset = strlen(pci_path_ptr);
+      sprintf( names->pci_path + strlen(names->pci_path), "P%u", domain );
    }
    
-   sprintf( pci_path_ptr + pci_path_offset, "p%us%u", bus, slot );
-   pci_path_offset = strlen( pci_path_ptr );
+   sprintf( names->pci_path + strlen(names->pci_path), "p%us%u", bus, slot );
    
    if (func > 0 || is_pci_multifunction(names->pcidev)) {
       
-      sprintf( pci_path_ptr + pci_path_offset, "f%u", func );
-      pci_path_offset = strlen( pci_path_ptr );
+      sprintf( names->pci_path + strlen(names->pci_path), "f%u", func );
    }
    
    if (dev_port > 0) {
       
-      sprintf( pci_path_ptr + pci_path_offset, "d%u", dev_port );
-      pci_path_offset = strlen( pci_path_ptr );
+      sprintf( names->pci_path + strlen(names->pci_path), "d%u", dev_port );
    }
    
-   if (pci_path_offset == 0) {
+   if (strlen(names->pci_path) == 0) {
       names->pci_path[0] = '\0';
    }
 
@@ -362,32 +355,27 @@ static int dev_pci_slot( char const* dev_path, struct netnames *names) {
 
    if (hotplug_slot > 0) {
             
-      pci_path_ptr = names->pci_slot;
-      pci_path_offset = strlen( names->pci_slot );
+      memset( names->pci_slot, 0, IFNAMSIZ+1 );
       
       if (domain > 0) {
          
-         sprintf( pci_path_ptr + pci_path_offset, "P%d", domain );
-         pci_path_offset = strlen( pci_path_ptr );
+         sprintf( names->pci_slot + strlen( names->pci_slot ), "P%d", domain );
       }
       
-      sprintf( pci_path_ptr + pci_path_offset, "s%d", hotplug_slot );
-      pci_path_offset = strlen( pci_path_ptr );
+      sprintf( names->pci_slot + strlen( names->pci_slot ), "s%d", hotplug_slot );
       
       if (func > 0 || is_pci_multifunction(names->pcidev)) {
          
-         sprintf( pci_path_ptr + pci_path_offset, "f%d", func );
-         pci_path_offset = strlen( pci_path_ptr );
+         sprintf( names->pci_slot + strlen( names->pci_slot ), "f%d", func );
       }
       
       if (dev_port > 0) {
          
-         sprintf( pci_path_ptr + pci_path_offset, "d%d", dev_port );
-         pci_path_offset = strlen( pci_path_ptr );
+         sprintf( names->pci_slot + strlen( names->pci_slot ), "d%d", dev_port );
       }
       
-      if (pci_path_offset == 0) {
-         names->pci_path[0] = '\0';
+      if (strlen(names->pci_slot) == 0) {
+         names->pci_slot[0] = '\0';
       }
    }
 out:
