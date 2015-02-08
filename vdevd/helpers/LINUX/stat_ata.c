@@ -83,6 +83,7 @@ static int disk_scsi_inquiry_command(int fd, void *buf, size_t buf_len) {
    memset( sense, 0, 32 * sizeof(uint8_t));
    memset( &io_v4, 0, sizeof(struct sg_io_v4) );
    memset( &io_hdr, 0, sizeof(struct sg_io_hdr) );
+   memset( cdb, 0, 6 * sizeof(uint8_t) );
    
    /*
    * INQUIRY, see SPC-4 section 6.4
@@ -119,6 +120,7 @@ static int disk_scsi_inquiry_command(int fd, void *buf, size_t buf_len) {
 
          ret = ioctl(fd, SG_IO, &io_hdr);
          if (ret != 0) {
+            
             return ret;
          }
 
@@ -127,9 +129,11 @@ static int disk_scsi_inquiry_command(int fd, void *buf, size_t buf_len) {
                io_hdr.host_status == 0 &&
                io_hdr.driver_status == 0)) {
                   errno = EIO;
+                  
                   return -1;
          }
       } else {
+         
          return ret;
       }
    }
@@ -139,6 +143,7 @@ static int disk_scsi_inquiry_command(int fd, void *buf, size_t buf_len) {
          io_v4.transport_status == 0 &&
          io_v4.driver_status == 0)) {
             errno = EIO;
+            
             return -1;
    }
 
@@ -362,9 +367,9 @@ static int disk_identify(int fd, uint8_t out_identify[512], int *out_is_packet_d
 
    int ret;
    uint8_t inquiry_buf[36];
-   int peripheral_device_type;
-   int all_nul_bytes;
-   int n;
+   int peripheral_device_type = 0;
+   int all_nul_bytes = 1;
+   int n = 0;
    int is_packet_device = 0;
 
    /* init results */
@@ -393,6 +398,7 @@ static int disk_identify(int fd, uint8_t out_identify[512], int *out_is_packet_d
    */
    ret = disk_scsi_inquiry_command (fd, inquiry_buf, sizeof (inquiry_buf));
    if (ret != 0) {
+      
       goto out;
    }
 
@@ -407,12 +413,14 @@ static int disk_identify(int fd, uint8_t out_identify[512], int *out_is_packet_d
    if (peripheral_device_type != 0x00) {
       ret = -1;
       errno = EIO;
+      
       goto out;
    }
 
    /* OK, now issue the IDENTIFY DEVICE command */
    ret = disk_identify_command(fd, out_identify, 512);
    if (ret != 0) {
+      
       goto out;
    }
 
@@ -427,6 +435,7 @@ check_nul_bytes:
    }
 
    if (all_nul_bytes) {
+      
       ret = -1;
       errno = EIO;
       goto out;
@@ -456,8 +465,9 @@ int main(int argc, char **argv ) {
    char serial[21];
    char revision[9];
    const char *node = NULL;
-   uint16_t word;
+   uint16_t word = 0;
    int is_packet_device = 0;
+   int rc = 0;
    
    // check usage 
    if( argc != 2 ) {
@@ -473,7 +483,8 @@ int main(int argc, char **argv ) {
       return 1;
    }
 
-   if (disk_identify(fd, identify.byte, &is_packet_device) == 0) {
+   rc = disk_identify(fd, identify.byte, &is_packet_device);
+   if( rc == 0 ) {
       /*
       * fix up only the fields from the IDENTIFY data that we are going to
       * use and copy it into the hd_driveid struct for convenience
@@ -499,10 +510,12 @@ int main(int argc, char **argv ) {
       memcpy(&id, identify.byte, sizeof id);
    }
    else {
+      
       /* If this fails, then try HDIO_GET_IDENTITY */
       if (ioctl(fd, HDIO_GET_IDENTITY, &id) != 0) {
          int errsv = -errno;
          fprintf( stderr, "HDIO_GET_IDENTITY failed for '%s': errno = %d\n", node, errsv);
+         close(fd);
          return 2;
       }
    }
@@ -544,7 +557,6 @@ int main(int argc, char **argv ) {
    } else {
       printf("VDEV_ATA_TYPE=disk\n");
    }
-   printf("VDEV_ATA_BUS=ata\n");
    printf("VDEV_ATA_MODEL=%s\n", model);
    printf("VDEV_ATA_MODEL_ENC=%s\n", model_enc);
    printf("VDEV_ATA_REVISION=%s\n", revision);
@@ -662,10 +674,13 @@ int main(int argc, char **argv ) {
    * All other values are reserved.
    */
    word = identify.wyde[108];
-   if ((word & 0xf000) == 0x5000)
-         printf("VDEV_ATA_WWN=0x%1$" PRIu64 "x\n"
-                  "VDEV_ATA_WWN_WITH_EXTENSION=0x%1$" PRIu64 "x\n",
-                  identify.octa[108/4]);
+   if ((word & 0xf000) == 0x5000) {
+      
+      // NOTE: word 108 has to come first--print this as big-endian
+      printf("VDEV_ATA_WWN=0x%" PRIx64 "\n"
+             "VDEV_ATA_WWN_WITH_EXTENSION=0x%" PRIx64 "\n",
+             htobe64( identify.octa[108/4] ), htobe64( identify.octa[108/4] ));
+   }
 
    /* from Linux's include/linux/ata.h */
    if (identify.wyde[0] == 0x848a ||
