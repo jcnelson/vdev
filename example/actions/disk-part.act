@@ -1,5 +1,5 @@
 [vdev-action]
-event=add
+event=any
 OS_SUBSYSTEM=block
 OS_DEVTYPE=partition
 command=exec $VDEV_HELPERS/disk.sh
