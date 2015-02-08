@@ -492,7 +492,8 @@ resend:
       io_v4.din_xfer_len = buflen;
       io_v4.din_xferp = (uintptr_t)buf;
       io_buf = (void *)&io_v4;
-   } else {
+   }
+   else {
       memzero(&io_hdr, sizeof(struct sg_io_hdr));
       io_hdr.interface_id = 'S';
       io_hdr.cmd_len = sizeof(inq_cmd);
@@ -1025,8 +1026,10 @@ int scsi_get_serial(struct scsi_id_device *dev_scsi, const char *devname, int pa
       struct timespec duration;
 
       fd = open(devname, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-      if (fd >= 0 || errno != EBUSY)
-            break;
+      if (fd >= 0 || errno != EBUSY) {
+         break;
+      }
+      
       duration.tv_sec = 0;
       duration.tv_nsec = (200 * 1000 * 1000) + (rand() % 100 * 1000 * 1000);
       nanosleep(&duration, NULL);
