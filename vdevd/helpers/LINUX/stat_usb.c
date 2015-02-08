@@ -395,38 +395,6 @@ int main( int argc, char **argv) {
    
    strcpy( sysfs_base, argv[1] );
    
-   /*
-   // if this directory has a 'device' link, follow it first
-   sprintf( path_tmp, "%s/device", sysfs_base );
-   rc = lstat( path_tmp, &sb );
-   
-   if( rc == 0 ) {
-      
-      if( S_ISLNK( sb.st_mode ) ) {
-         
-         // read the link 
-         memset( sysfs_base, 0, 8193 );
-         rc = readlink( path_tmp, sysfs_base, 8192 );
-         
-         if( rc > 0 ) {
-            
-            sprintf( path_tmp, "%s/%s", argv[1], sysfs_base );
-            
-            // resolve to the actual device
-            char* tmp = realpath( path_tmp, sysfs_base );
-            
-            if( tmp == NULL ) {
-               // won't follow 
-               rc = -errno;
-               
-               memset( sysfs_base, 0, 8193 );
-               strcpy( sysfs_base, argv[1] );
-            }
-         }
-      }
-   }
-   */
-   
    // find out what kind of device we are...
    get_device_type( sysfs_base, &devtype_str, &devtype_strlen );
    
