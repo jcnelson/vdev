@@ -22,23 +22,37 @@
 #include "util.h"
 
 int _VDEV_DEBUG_MESSAGES = 0;
+int _VDEV_INFO_MESSAGES = 0;
+int _VDEV_WARN_MESSAGES = 1;
 int _VDEV_ERROR_MESSAGES = 1;
 
 
 void vdev_set_debug_level( int d ) {
-   _VDEV_DEBUG_MESSAGES = d;
+   
+   if( d >= 1 ) {
+      _VDEV_INFO_MESSAGES = 1;
+   }
+   if( d >= 2 ) {
+      _VDEV_DEBUG_MESSAGES = d;
+   }
 }
 
 void vdev_set_error_level( int e ) {
-   _VDEV_ERROR_MESSAGES = e;
+   
+   if( e >= 1 ) {
+      _VDEV_ERROR_MESSAGES = 1;
+   }
+   if( e >= 2 ) {
+      _VDEV_WARN_MESSAGES = 1;
+   }
 }
 
 int vdev_get_debug_level() {
-   return _VDEV_DEBUG_MESSAGES;
+   return _VDEV_DEBUG_MESSAGES + _VDEV_INFO_MESSAGES;
 }
 
 int vdev_get_error_level() {
-   return _VDEV_ERROR_MESSAGES;
+   return _VDEV_ERROR_MESSAGES + _VDEV_WARN_MESSAGES;
 }
 
 // join two paths, writing the result to dest if dest is not NULL.

@@ -66,21 +66,40 @@
 #define VDEV_WHEREARG (int)getpid(), (int)pthread_self(), __FILE__, __LINE__, __func__
 
 extern int _VDEV_DEBUG_MESSAGES;
+extern int _VDEV_INFO_MESSAGES;
+extern int _VDEV_WARN_MESSAGES;
 extern int _VDEV_ERROR_MESSAGES;
 
 #define vdev_debug( format, ... ) \
    do { \
       if( _VDEV_DEBUG_MESSAGES ) { \
-         printf( VDEV_WHERESTR format, VDEV_WHEREARG, __VA_ARGS__ ); \
+         printf( VDEV_WHERESTR "DEBUG: " format, VDEV_WHEREARG, __VA_ARGS__ ); \
          fflush(stdout); \
       } \
    } while(0)
 
+   
+#define vdev_info( format, ... ) \
+   do { \
+      if( _VDEV_INFO_MESSAGES ) { \
+         printf( VDEV_WHERESTR "INFO: " format, VDEV_WHEREARG, __VA_ARGS__ ); \
+         fflush(stdout); \
+      } \
+   } while(0)
+
+   
+#define vdev_warn( format, ... ) \
+   do { \
+      if( _VDEV_WARN_MESSAGES ) { \
+         fprintf(stderr, VDEV_WHERESTR "WARN: " format, VDEV_WHEREARG, __VA_ARGS__); \
+         fflush(stderr); \
+      } \
+   } while(0)   
 
 #define vdev_error( format, ... ) \
    do { \
       if( _VDEV_ERROR_MESSAGES ) { \
-         fprintf(stderr, VDEV_WHERESTR format, VDEV_WHEREARG, __VA_ARGS__); \
+         fprintf(stderr, VDEV_WHERESTR "ERROR: " format, VDEV_WHEREARG, __VA_ARGS__); \
          fflush(stderr); \
       } \
    } while(0)
