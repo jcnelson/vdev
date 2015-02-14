@@ -114,7 +114,7 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
       return -ENOMEM;
    }
    
-   vdev_debug("Config file: %s\n", opts.config_file_path );
+   vdev_info("Config file: %s\n", opts.config_file_path );
    
    rc = vdev_config_init( vdev->config );
    if( rc != 0 ) {
@@ -137,9 +137,9 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
       return rc;
    }
    
-   vdev_debug("vdev actions dir: %s\n", vdev->config->acts_dir );
-   vdev_debug("firmware dir:     %s\n", vdev->config->firmware_dir );
-   vdev_debug("helpers dir:      %s\n", vdev->config->helpers_dir );
+   vdev_info("vdev actions dir: %s\n", vdev->config->acts_dir );
+   vdev_info("firmware dir:     %s\n", vdev->config->firmware_dir );
+   vdev_info("helpers dir:      %s\n", vdev->config->helpers_dir );
    
    vdev->mountpoint = vdev_strdup_or_null( opts.mountpoint );
    vdev->debug_level = opts.debug_level;
@@ -156,7 +156,7 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
    }
    else {
       
-      vdev_debug("mountpoint:       %s\n", vdev->mountpoint );
+      vdev_info("mountpoint:       %s\n", vdev->mountpoint );
    }
    
    vdev_opts_free( &opts );
