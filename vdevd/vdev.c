@@ -24,20 +24,15 @@
 #include "libvdev/opts.h"
 
 // start up the back-end
+// return 0 on success 
+// return -ENOMEM on OOM 
+// return negative if the OS-specific back-end fails to initialize
 int vdev_start( struct vdev_state* vdev ) {
    
    int rc = 0;
    
    // otherwise, it's already given
    vdev->running = true;
-   
-   // start processing requests 
-   rc = vdev_wq_start( &vdev->device_wq );
-   if( rc != 0 ) {
-      
-      vdev_error("vdev_wq_start rc = %d\n", rc );
-      return rc;
-   }
    
    // initialize OS-specific state, and start feeding requests
    vdev->os = VDEV_CALLOC( struct vdev_os_context, 1 );
@@ -47,12 +42,32 @@ int vdev_start( struct vdev_state* vdev ) {
       return -ENOMEM;
    }
    
+   // start processing requests 
+   rc = vdev_wq_start( &vdev->device_wq );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_wq_start rc = %d\n", rc );
+      
+      free( vdev->os );
+      vdev->os = NULL;
+      return rc;
+   }
+   
+   
    rc = vdev_os_context_init( vdev->os, vdev );
    
    if( rc != 0 ) {
    
       vdev_error("vdev_os_context_init rc = %d\n", rc );
       
+      int wqrc = vdev_wq_stop( &vdev->device_wq, false );
+      if( wqrc != 0 ) {
+         
+         vdev_error("vdev_wq_stop rc = %d\n", wqrc);
+      }
+      
+      free( vdev->os );
+      vdev->os = NULL;
       return rc;
    }
    
