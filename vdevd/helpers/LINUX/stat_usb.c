@@ -361,11 +361,6 @@ int main( int argc, char **argv) {
    char* if_subclass_str = NULL;
    size_t if_subclass_strlen = 0;
    
-   char* parent_device_devpath = NULL;
-   size_t parent_device_devpath_len = 0;
-   
-   struct stat sb;
-   
    memset( sysfs_base, 0, 8193 );
    memset( path_tmp, 0, 8193 );
    
