@@ -1,6 +1,6 @@
 /*
    vdev: a virtual device manager for *nix
-   Copyright (C) 2014  Jude Nelson
+   Copyright (C) 2015  Jude Nelson
 
    This program is dual-licensed: you can redistribute it and/or modify
    it under the terms of the GNU General Public License version 3 or later as 
@@ -27,6 +27,8 @@
 #include "ini.h"
 
 // ini parser callback 
+// return 1 on parsed (WARNING: masks OOM)
+// return 0 on not parsed
 static int vdev_config_ini_parser( void* userdata, char const* section, char const* name, char const* value ) {
    
    struct vdev_config* conf = (struct vdev_config*)userdata;
@@ -84,6 +86,18 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
          return 1;
       }
       
+      if( strcmp(name, VDEV_CONFIG_PIDFILE_PATH) == 0 ) {
+         
+         conf->pidfile_path = vdev_strdup_or_null( value );
+         return 1;
+      }
+      
+      if( strcmp(name, VDEV_CONFIG_LOGFILE_PATH) == 0 ) {
+         
+         conf->logfile_path = vdev_strdup_or_null( value );
+         return 1;
+      }
+      
       fprintf(stderr, "Unrecognized '%s' field '%s'\n", section, name);
       return 1;
    }
@@ -125,6 +139,7 @@ int vdev_config_sanity_check( struct vdev_config* conf ) {
 }
 
 // initialize a config 
+// always succeeds
 int vdev_config_init( struct vdev_config* conf ) {
    
    memset( conf, 0, sizeof(struct vdev_config) );
@@ -132,6 +147,8 @@ int vdev_config_init( struct vdev_config* conf ) {
 }
 
 // load from a file, by path
+// return on on success
+// return -errno on failure to open 
 int vdev_config_load( char const* path, struct vdev_config* conf ) {
    
    FILE* f = NULL;
@@ -150,6 +167,8 @@ int vdev_config_load( char const* path, struct vdev_config* conf ) {
 }
 
 // load from a file
+// return 0 on success
+// return -errno on failure to load
 int vdev_config_load_file( FILE* file, struct vdev_config* conf ) {
    
    int rc = 0;
@@ -163,6 +182,7 @@ int vdev_config_load_file( FILE* file, struct vdev_config* conf ) {
 }
 
 // free a config
+// always succeeds
 int vdev_config_free( struct vdev_config* conf ) {
    
    if( conf->firmware_dir != NULL ) {

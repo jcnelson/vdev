@@ -1,6 +1,6 @@
 /*
    vdev: a virtual device manager for *nix
-   Copyright (C) 2014  Jude Nelson
+   Copyright (C) 2015  Jude Nelson
 
    This program is dual-licensed: you can redistribute it and/or modify
    it under the terms of the GNU General Public License version 3 or later as 
@@ -35,6 +35,8 @@
 #define VDEV_CONFIG_HELPERS       "helpers"
 #define VDEV_CONFIG_DEFAULT_MODE  "default_permissions"
 #define VDEV_CONFIG_DEFAULT_POLICY "default_policy"     // allow or deny
+#define VDEV_CONFIG_PIDFILE_PATH  "pidfile"
+#define VDEV_CONFIG_LOGFILE_PATH  "logfile"
 
 struct vdev_config {
    
@@ -52,6 +54,12 @@ struct vdev_config {
    
    // default policy (0 for deny, 1 for allow)
    int default_policy;
+   
+   // PID file path 
+   char* pid_file;
+   
+   // logfile path (set to "syslog" to send directly to syslog)
+   char* logfile_path;
    
    // OS-specific configuration (for keys under "OS")
    vdev_params* os_config;
