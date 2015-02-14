@@ -24,6 +24,7 @@
 
 
 // wait for the queue to be empty 
+// always succeeds
 static int vdev_wq_wait_for_empty( struct vdev_wq* wq ) {
    
    pthread_mutex_lock( &wq->waiter_lock );
@@ -38,6 +39,7 @@ static int vdev_wq_wait_for_empty( struct vdev_wq* wq ) {
 }
 
 // wake up all threads waiting for the queue to be empty 
+// always succeeds
 static int vdev_wq_wakeup_waiters_on_empty( struct vdev_wq* wq ) {
    
    pthread_mutex_lock( &wq->waiter_lock );
@@ -56,6 +58,7 @@ static int vdev_wq_wakeup_waiters_on_empty( struct vdev_wq* wq ) {
 }
 
 // work queue main method
+// always succeeds
 static void* vdev_wq_main( void* cls ) {
 
    struct vdev_wq* wq = (struct vdev_wq*)cls;
@@ -140,7 +143,12 @@ int vdev_wq_init( struct vdev_wq* wq ) {
 
    memset( wq, 0, sizeof(struct vdev_wq) );
    
-   pthread_mutex_init( &wq->work_lock, NULL );
+   rc = pthread_mutex_init( &wq->work_lock, NULL );
+   if( rc != 0 ) {
+      
+      return -abs(rc);
+   }
+   
    sem_init( &wq->work_sem, 0, 0 );
    sem_init( &wq->end_sem, 0, 0 );
    
@@ -209,6 +217,7 @@ int vdev_wq_stop( struct vdev_wq* wq, bool wait ) {
 
 
 // free a work request queue
+// always succeeds
 static int vdev_wq_queue_free( struct vdev_wreq* wqueue ) {
 
    struct vdev_wreq* next = NULL;
@@ -248,6 +257,7 @@ int vdev_wq_free( struct vdev_wq* wq ) {
 }
 
 // create a work request
+// always succeeds
 int vdev_wreq_init( struct vdev_wreq* wreq, vdev_wq_func_t work, void* work_data ) {
 
    memset( wreq, 0, sizeof(struct vdev_wreq) );
@@ -259,6 +269,7 @@ int vdev_wreq_init( struct vdev_wreq* wreq, vdev_wq_func_t work, void* work_data
 }
 
 // free a work request
+// always succeeds
 int vdev_wreq_free( struct vdev_wreq* wreq ) {
 
    memset( wreq, 0, sizeof(struct vdev_wreq) );
@@ -268,6 +279,7 @@ int vdev_wreq_free( struct vdev_wreq* wreq ) {
 // enqueue work
 // return 0 on success
 // return -EINVAL if the work queue thread isn't running
+// return -ENOMEM if OOM
 int vdev_wq_add( struct vdev_wq* wq, struct vdev_wreq* wreq ) {
 
    int rc = 0;
