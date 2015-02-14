@@ -30,6 +30,8 @@ SGLIB_DEFINE_VECTOR_PROTOTYPES( vdev_action );
 SGLIB_DEFINE_VECTOR_FUNCTIONS( vdev_action );
    
 // initialize an action 
+// return 0 on success 
+// return -ENOMEM on OOM 
 int vdev_action_init( struct vdev_action* act, vdev_device_request_t trigger, char* path, char* command, bool async ) {
    
    int rc = 0;
@@ -56,11 +58,15 @@ int vdev_action_init( struct vdev_action* act, vdev_device_request_t trigger, ch
 }
 
 // add a device parameter to match on 
+// return 0 on success 
+// return -ENOMEM on OOM  
+// return -EEXIST if name already exists 
 int vdev_action_add_param( struct vdev_action* act, char const* name, char const* value ) {
    return vdev_params_add( &act->dev_params, name, value );
 }
 
 // free an action 
+// always succeeds
 int vdev_action_free( struct vdev_action* act ) {
    
    if( act->command != NULL ) {
@@ -101,6 +107,8 @@ int vdev_action_free( struct vdev_action* act ) {
 
 
 // convert an action into a device request 
+// return the constant associated with the type on success
+// return VDEV_DEVICE_INVALID if the type is not recognized
 vdev_device_request_t vdev_action_parse_trigger( char const* type ) {
    
    if( strcmp(type, VDEV_ACTION_EVENT_ADD) == 0 ) {
@@ -242,7 +250,7 @@ static int vdev_action_ini_parser( void* userdata, char const* section, char con
 
 // sanity check an action 
 // return 0 on success
-// return negative on invalid 
+// return -EINVAL if invalid
 int vdev_action_sanity_check( struct vdev_action* act ) {
    
    int rc = 0;
@@ -263,6 +271,9 @@ int vdev_action_sanity_check( struct vdev_action* act ) {
 }
 
 // load an action from a path
+// return -ENOMEM if OOM
+// return -errno on failure to open or read the file
+// return -EINVAL if the file could not be parsed
 int vdev_action_load( char const* path, struct vdev_action* act ) {
    
    int rc = 0;
@@ -299,6 +310,9 @@ int vdev_action_load( char const* path, struct vdev_action* act ) {
 
 
 // load an action from a file
+// return 0 on success
+// return -errno on failure to open, read, parse, or close
+// return -EINVAL if the loaded action fails our sanity tests
 int vdev_action_load_file( FILE* f, struct vdev_action* act ) {
    
    int rc = 0;
@@ -315,6 +329,7 @@ int vdev_action_load_file( FILE* f, struct vdev_action* act ) {
 }
 
 // free a C-style list of actions (including the list itself)
+// always succeeds
 int vdev_action_free_all( struct vdev_action* act_list, size_t num_acts ) {
    
    int rc = 0;
@@ -334,6 +349,10 @@ int vdev_action_free_all( struct vdev_action* act_list, size_t num_acts ) {
 
 
 // action loader 
+// return 0 on success
+// return -errno on failure to stat(2)
+// return -EINVAL if the file is invalid 
+// return -ENOMEM if OOM 
 int vdev_action_loader( char const* path, void* cls ) {
    
    int rc = 0;
@@ -380,6 +399,7 @@ int vdev_action_loader( char const* path, void* cls ) {
 }
 
 // free a vector of actions 
+// always succeeds
 static int vdev_action_vector_free( struct sglib_vdev_action_vector* acts ) {
    
    for( unsigned long i = 0; i < sglib_vdev_action_vector_size( acts ); i++ ) {
@@ -396,7 +416,9 @@ static int vdev_action_vector_free( struct sglib_vdev_action_vector* acts ) {
 
 // load all actions in a directory
 // return 0 on success
-// return negative on error
+// return -ENOMEM if OOM 
+// return -EINVAL if at least one action file failed to load due to a sanity test failure 
+// return -errno if at least one action file failed to load due to an I/O error
 int vdev_action_load_all( char const* dir_path, struct vdev_action** ret_acts, size_t* ret_num_acts ) {
    
    int rc = 0;
@@ -487,6 +509,7 @@ int vdev_action_run_sync( struct vdev_device_request* vreq, char const* command,
 
 // carry out an action, asynchronously.
 // return 0 if we were able to fork 
+// return -errno on failure to fork
 int vdev_action_run_async( struct vdev_device_request* req, char const* command ) {
    
    int rc = 0;
@@ -656,7 +679,8 @@ int vdev_action_find_next( struct vdev_device_request* vreq, struct vdev_action*
 // find the path to create for the given device request.
 // *path will be filled in with path to the device node, relative to the mountpoint.  *path must be NULL on call.
 // return 0 on success
-// return negative on failure 
+// return -EINVAL if *path is not NULL, or if we failed to match the vreq against our actions due to a regex error 
+// return -ENODATA if *path has zero-length
 int vdev_action_create_path( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts, char** path ) {
    
    int rc = 0;
