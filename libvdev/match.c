@@ -1,6 +1,6 @@
 /*
    vdev: a virtual device manager for *nix
-   Copyright (C) 2014  Jude Nelson
+   Copyright (C) 2015  Jude Nelson
 
    This program is dual-licensed: you can redistribute it and/or modify
    it under the terms of the GNU General Public License version 3 or later as 
