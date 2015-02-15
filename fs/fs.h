@@ -23,7 +23,6 @@
 #define _VDEVFS_H_
 
 #include "libvdev/util.h"
-#include "libvdev/opts.h"
 #include "libvdev/config.h"
 
 #include "fskit/fskit.h"

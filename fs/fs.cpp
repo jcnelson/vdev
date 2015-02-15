@@ -70,7 +70,6 @@ int vdevfs_init( struct vdevfs* vdev, int argc, char** argv ) {
    
    int rc = 0;
    int rh = 0;
-   struct vdev_opts opts;
    struct fskit_core* core = NULL;
    int fuse_argc = 0;
    char** fuse_argv = NULL;
@@ -89,70 +88,69 @@ int vdevfs_init( struct vdevfs* vdev, int argc, char** argv ) {
       return -ENOMEM;
    }
    
-   // parse opts 
-   rc = vdev_opts_parse( &opts, argc, argv, &fuse_argc, fuse_argv );
-   if( rc != 0 ) {
-      
-      vdev_error("vdev_opts_parse rc = %d\n", rc );
-      
-      vdev_usage( argv[0] );
-      
-      free( fs );
-      free( fuse_argv );
-      return rc;
-   }
-   
-   // get the mountpoint, but from FUSE 
-   if( opts.mountpoint != NULL ) {
-      free( opts.mountpoint );
-   }
-   
-   rc = vdev_get_mountpoint( fuse_argc, fuse_argv, &opts.mountpoint );
-   if( rc != 0 ) {
-      
-      vdev_error("vdev_get_mountpoint rc = %d\n", rc );
-      
-      vdev_usage( argv[0] );
-      
-      free( fs );
-      free( fuse_argv );
-      return rc;
-   }
-   
-   vdev_set_debug_level( opts.debug_level );
-   
    // load config 
    vdev->config = VDEV_CALLOC( struct vdev_config, 1 );
    if( vdev->config == NULL ) {
-      
-      vdev_opts_free( &opts );
       
       free( fs );
       free( fuse_argv );
       return -ENOMEM;
    }
    
-   vdev_debug("Config file: %s\n", opts.config_file_path );
-   
+   // init config 
    rc = vdev_config_init( vdev->config );
    if( rc != 0 ) {
       
       vdev_error("vdev_config_init rc = %d\n", rc );
       
       vdevfs_shutdown( vdev );
-      vdev_opts_free( &opts );
       free( fs );
       free( fuse_argv );
       return rc;
    }
    
-   rc = vdev_config_load( opts.config_file_path, vdev->config );
+   // parse opts 
+   rc = vdev_config_load_from_args( vdev->config, argc, argv, &fuse_argc, fuse_argv );
    if( rc != 0 ) {
       
-      vdev_error("vdev_config_load('%s') rc = %d\n", opts.config_file_path, rc );
+      vdev_error("vdev_opts_parse rc = %d\n", rc );
+      
+      vdev_config_usage( argv[0] );
+      
+      free( fs );
+      free( fuse_argv );
+      vdevfs_shutdown( vdev );
+      return rc;
+   }
+   
+   // get the mountpoint, but from FUSE 
+   if( vdev->config->mountpoint != NULL ) {
+      free( vdev->config->mountpoint );
+   }
+   
+   rc = vdev_get_mountpoint( fuse_argc, fuse_argv, &vdev->config->mountpoint );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_get_mountpoint rc = %d\n", rc );
+      
+      vdev_config_usage( argv[0] );
+      
+      free( fs );
+      free( fuse_argv );
+      return rc;
+   }
+   
+   vdev_set_debug_level( vdev->config->debug_level );
+   
+   
+   vdev_debug("Config file: %s\n", vdev->config->config_path );
+   
+   rc = vdev_config_load( vdev->config->config_path, vdev->config );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_config_load('%s') rc = %d\n", vdev->config->config_path, rc );
       
       vdevfs_shutdown( vdev );
-      vdev_opts_free( &opts );
       free( fs );
       free( fuse_argv );
       return rc;
@@ -168,15 +166,14 @@ int vdevfs_init( struct vdevfs* vdev, int argc, char** argv ) {
    fuse_argv[fuse_argc] = (char*)vdev_fuse_allow_other;
    fuse_argc++;
    
-   vdev->mountpoint = vdev_strdup_or_null( opts.mountpoint );
-   vdev->debug_level = opts.debug_level;
+   vdev->mountpoint = vdev_strdup_or_null( vdev->config->mountpoint );
+   vdev->debug_level = vdev->config->debug_level;
    
    if( vdev->mountpoint == NULL ) {
       
-      vdev_error("Failed to set mountpoint, opts.mountpount = '%s'\n", opts.mountpoint );
+      vdev_error("Failed to set mountpoint, config.mountpount = '%s'\n", vdev->config->mountpoint );
       
       vdevfs_shutdown( vdev );
-      vdev_opts_free( &opts );
       free( fuse_argv );
       free( fs );
       return -EINVAL;
@@ -185,8 +182,6 @@ int vdevfs_init( struct vdevfs* vdev, int argc, char** argv ) {
       
       vdev_debug("mountpoint:       %s\n", vdev->mountpoint );
    }
-   
-   vdev_opts_free( &opts );
    
    vdev->argc = argc;
    vdev->argv = argv;
