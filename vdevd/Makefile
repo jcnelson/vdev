@@ -1,6 +1,6 @@
 CPP    := gcc -std=c99 -Wall -g -fstack-protector -fstack-protector-all -Wno-unused-but-set-variable -Wno-unused-variable
 LIB   := -lpthread -lrt -lpstat -lvdev
-INC   := -I/usr/include -I/usr/local/include -I. 
+INC   := -I. -I../ -I/usr/include -I/usr/local/include
 LIBINC := -L../libvdev
 C_SRCS:= $(wildcard *.c) $(wildcard os/*.c)
 OBJ   := $(patsubst %.c,%.o,$(C_SRCS)) 
