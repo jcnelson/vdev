@@ -101,8 +101,6 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
    if( rc != 0 ) {
       
       vdev_error("vdev_config_init rc = %d\n", rc );
-      
-      vdev_shutdown( vdev );
       return rc;
    }
    
@@ -131,7 +129,14 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
       
       vdev_error("vdev_config_load('%s') rc = %d\n", vdev->config->config_path, rc );
       
-      vdev_shutdown( vdev );
+      return rc;
+   }
+   
+   // convert to absolute paths 
+   rc = vdev_config_fullpaths( vdev->config );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_config_fullpaths rc = %d\n", rc );
       
       return rc;
    }
@@ -139,6 +144,7 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
    vdev_info("vdev actions dir: '%s'\n", vdev->config->acts_dir );
    vdev_info("firmware dir:     '%s'\n", vdev->config->firmware_dir );
    vdev_info("helpers dir:      '%s'\n", vdev->config->helpers_dir );
+   vdev_info("logfile path:     '%s'\n", vdev->config->logfile_path );
    
    vdev->mountpoint = vdev_strdup_or_null( vdev->config->mountpoint );
    vdev->debug_level = vdev->config->debug_level;
@@ -148,7 +154,6 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
       
       vdev_error("Failed to set mountpoint, config->mountpount = '%s'\n", vdev->config->mountpoint );
       
-      vdev_shutdown( vdev );
       return -EINVAL;
    }
    else {
@@ -165,7 +170,6 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
       
       vdev_error("vdev_action_load_all('%s') rc = %d\n", vdev->config->acts_dir, rc );
       
-      vdev_shutdown( vdev );
       return rc;
    }
    
@@ -175,15 +179,16 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
       
       vdev_error("vdev_wq_init rc = %d\n", rc );
       
-      vdev_shutdown( vdev );
       return rc;
    }
-   
    
    return 0;
 }
 
+
 // main loop for the back-end 
+// return 0 on success
+// return -errno on failure to daemonize, or abnormal OS-specific back-end failure
 int vdev_main( struct vdev_state* vdev ) {
    
    int rc = 0;
@@ -191,6 +196,7 @@ int vdev_main( struct vdev_state* vdev ) {
    
    return rc;
 }
+
 
 // stop vdev 
 // NOTE: if this fails, there's not really a way to recover
