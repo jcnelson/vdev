@@ -44,48 +44,9 @@ static vdev_device_request_t vdev_linux_parse_device_request_type( char const* t
    return VDEV_DEVICE_INVALID;
 }
 
-// see if a device is a block or character device, based on sysfs.
-// if mode == S_IFCHR, then check if it's a charaacter device.  If mode == S_IFBLK, check block.
-// return 0 on success
-// return negative on error (failed result of stating /sys/dev/(block|char)/$major:$minor)
-static int vdev_linux_sysfs_confirm_mode( struct vdev_linux_context* ctx, unsigned int major, unsigned int minor, mode_t mode ) {
-   
-   int rc = 0;
-   struct stat sb;
-   
-   char dev_buf[100];
-   char* sysfs_path = NULL;
-   
-   if( mode == S_IFBLK ) {
-      sprintf( dev_buf, "/dev/block/%u:%u", major, minor );
-   }
-   else if( mode == S_IFCHR ) {
-      sprintf( dev_buf, "/dev/char/%u:%u", major, minor );
-   }
-   else {
-      return -EINVAL;
-   }
-   
-   sysfs_path = vdev_fullpath( ctx->sysfs_mountpoint, dev_buf, NULL );
-   if( sysfs_path == NULL ) {
-      
-      return -ENOMEM;
-   }
-   
-   // confirm that it exists
-   rc = stat( sysfs_path, &sb );
-   if( rc != 0 ) {
-      
-      rc = -errno;
-   }
-   
-   free( sysfs_path );
-   
-   return rc;
-}
-
 
 // make the full sysfs path from the dev path, plus an additional path 
+// return NULL on OOM
 static char* vdev_linux_sysfs_fullpath( char const* sysfs_mountpoint, char const* devpath, char const* attr_path ) {
    
    char* tmp = NULL;
@@ -104,6 +65,8 @@ static char* vdev_linux_sysfs_fullpath( char const* sysfs_mountpoint, char const
 
 
 // parse a device number pair 
+// return 0 on success, and set *major and *minor
+// return -EINVAL if we failed to parse
 static int vdev_linux_sysfs_parse_device_nums( char const* devbuf, unsigned int* major, unsigned int* minor ) {
    
    int rc = 0;
@@ -124,6 +87,9 @@ static int vdev_linux_sysfs_parse_device_nums( char const* devbuf, unsigned int*
 }
 
 // read the device major and minor number, using the devpath 
+// return 0 on success, and set *major and *minor 
+// return -ENOMEM on OOM 
+// return -errno on failure to open or read
 static int vdev_linux_sysfs_read_dev_nums( struct vdev_linux_context* ctx, char const* devpath, unsigned int* major, unsigned int* minor ) {
    
    int rc = 0;
@@ -178,6 +144,9 @@ static int vdev_linux_sysfs_read_dev_nums( struct vdev_linux_context* ctx, char 
 }
 
 // read the kernel-given device subsystem from sysfs 
+// return 0 on success, and set *subsystem
+// return -ENOMEM on OOM 
+// return negative on readlink failure
 static int vdev_linux_sysfs_read_subsystem( struct vdev_linux_context* ctx, char const* devpath, char** subsystem ) {
    
    int rc = 0;
@@ -204,6 +173,11 @@ static int vdev_linux_sysfs_read_subsystem( struct vdev_linux_context* ctx, char
    free( subsystem_path );
    
    *subsystem = vdev_basename( linkpath, NULL );
+   if( *subsystem == NULL ) {
+      
+      return -ENOMEM;
+   }
+   
    return 0;
 }
 
@@ -238,11 +212,11 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
    bool have_minor = false;
    mode_t dev_mode = 0;
    int line_count = 0;
-   bool not_param = false;
+   bool not_param = false;      // if set to true, add as an OS-specific parameter to the vreq
    
-   char* devpath = NULL;
-   char* subsystem = NULL;
-   char* full_devpath = NULL;
+   char* devpath = NULL;        // sysfs devpath 
+   char* subsystem = NULL;      // sysfs subsystem 
+   char* devname = (char*)VDEV_DEVICE_PATH_UNKNOWN;        // DEVNAME from uevent
    
    vdev_device_request_t reqtype = VDEV_DEVICE_INVALID;
    
@@ -296,16 +270,16 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
          devpath = value;
       }
       
+      // is this the devname?
+      else if( strcmp(key, "DEVNAME") == 0 ) {
+         
+         devname = value;
+      }
+      
       // subsystem given?
       else if( strcmp(key, "SUBSYSTEM") == 0 ) {
          
          subsystem = vdev_strdup_or_null( value );
-         
-         // early check--if this is a block, remember so 
-         if( strcasecmp(value, "block") == 0 ) {
-            
-            dev_mode = S_IFBLK;
-         }
       }
       
       // is this the major device number?
@@ -365,6 +339,7 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
       if( subsystem != NULL ) {
          free( subsystem );
       }
+      
       return -EINVAL;
    }
    
@@ -372,6 +347,12 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
       
       // explicit major and minor device numbers given 
       vdev_device_request_set_dev( vreq, makedev(major, minor) );
+   }
+   
+   if( devname != NULL ) {
+      
+      // use this as the device's path 
+      vdev_device_request_set_path( vreq, devname );
    }
    
    if( devpath != NULL ) {
@@ -407,32 +388,20 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
          if( rc == 0 ) {
             
             // yup!
-            vdev_device_request_add_param( vreq, "SUBSYSTEM", subsystem );
+            rc = vdev_device_request_add_param( vreq, "SUBSYSTEM", subsystem );
          }
-         else {
+         else if( rc != -ENOMEM ) {
+            
             // this is weird...
-            vdev_error("WARN: no subsystem found for '%s'\n", devpath );
+            vdev_warn("no subsystem found for '%s'\n", devpath );
             rc = 0;
          }
       }
-      
-      // read all files in the device path, and convert them to VDEV_OS_SYSFS_* variables
-      full_devpath = vdev_linux_sysfs_fullpath( ctx->sysfs_mountpoint, devpath, "/" );
-      if( full_devpath == NULL ) {
-         
-         if( subsystem != NULL ) {
-            free( subsystem );
-         }
-         
-         return -ENOMEM;
-      }
-      
-      free( full_devpath );
    }
    
-   if( have_major && have_minor && dev_mode == 0 ) {
+   if( have_major && have_minor ) {
       
-      if( subsystem != NULL && strcmp(subsystem, "block") == 0 ) {
+      if( subsystem != NULL && strcasecmp(subsystem, "block") == 0 ) {
          
          // this is a block 
          dev_mode = S_IFBLK;
@@ -441,28 +410,13 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
       else {
          
          // this is a character device--we have major/minor numbers
-         // confirm, though
-         rc = vdev_linux_sysfs_confirm_mode( ctx, major, minor, S_IFCHR );
-         if( rc != 0 ) {
-            
-            vdev_error("Expected (%u,%u) to be a character device; rc = %d\n", major, minor, rc );
-            
-            if( subsystem != NULL ) {
-               free( subsystem );
-            }
-            
-            return -EINVAL;
-         }
-         
          dev_mode = S_IFCHR;
       }
    
-      if( rc == 0 ) {
-      
-         // yup!
-         vdev_device_request_set_mode( vreq, dev_mode );
-      }
+      vdev_device_request_set_mode( vreq, dev_mode );
    }
+   
+   vdev_debug("subsystem = '%s', have_major=%d, major = %u, have_minor=%d, minor = %u, mode = %o\n", subsystem, have_major, major, have_minor, minor, dev_mode );
    
    if( subsystem != NULL ) {
       free( subsystem );
@@ -476,6 +430,10 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
 
 
 // yield the next device event
+// return 0 on success 
+// return 1 if there are no more devices
+// return -EAGAIN if vdev should try to get this device again 
+// return -errno on failure to poll for devices or read the next device packet.
 int vdev_os_next_device( struct vdev_device_request* vreq, void* cls ) {
    
    int rc = 0;
@@ -701,6 +659,8 @@ static int vdev_linux_find_sysfs_mountpoint( char* mountpoint, size_t mountpoint
 // replace newlines with '\0', making the uevent look like it came from the netlink socket
 // (i.e. so it can be parsed by vdev_linux_parse_request)
 // return 0 on success
+// return -ENOMEM on OOM
+// return -errno on failure to stat or read
 static int vdev_linux_sysfs_read_uevent( char const* fp_uevent, char** ret_uevent_buf, size_t* ret_uevent_len ) {
    
    int rc = 0;
@@ -768,7 +728,10 @@ static int vdev_linux_sysfs_read_uevent( char const* fp_uevent, char** ret_ueven
    return rc;
 }
 
+
 // append a key/value pair to a uevent buffer
+// return 0 on success
+// return -ENOMEM on OOM
 static int vdev_linux_uevent_append( char** ret_uevent_buf, size_t* ret_uevent_buf_len, char const* key, char const* value ) {
    
    char* tmp = NULL;
@@ -821,6 +784,7 @@ static int vdev_linux_sysfs_register_device( struct vdev_linux_context* ctx, cha
    char* full_devpath = NULL;
    char* devpath = NULL;
    char* devname = NULL;
+   char* delim = NULL;
    
    // extract the devpath from the uevent path 
    full_devpath = vdev_dirname( fp_uevent, NULL );
@@ -863,15 +827,31 @@ static int vdev_linux_sysfs_register_device( struct vdev_linux_context* ctx, cha
       return rc;
    }
    
-   // get the devname--it's the basename of the dev parent 
-   devname = vdev_basename( full_devpath, NULL );
-   if( devname == NULL ) {
+   
+   // see if the uevent has a devname.  Use that over our devname, if need be 
+   devname = strstr( uevent_buf, "DEVNAME=" );
+   if( devname != NULL ) {
       
-      free( uevent_buf );
-      free( full_devpath );
+      // have a devname!
+      devname += strlen("DEVNAME=") + 1;
       
-      return -ENOMEM;
-   }
+      size_t devname_len = strcspn( devname, "\n\0" );
+      if( devname_len > 0 ) {
+         
+         char* tmp = VDEV_CALLOC( char, devname_len + 1 );
+         if( tmp == NULL ) {
+            
+            free( uevent_buf );
+            free( full_devpath );
+            
+            return -ENOMEM;
+         }
+         
+         strncpy( tmp, devname, devname_len );
+         
+         devname = tmp;
+      }
+   } 
    
    // include the device path
    rc = vdev_linux_uevent_append( &uevent_buf, &uevent_buf_len, "DEVPATH", devpath );
@@ -885,17 +865,6 @@ static int vdev_linux_sysfs_register_device( struct vdev_linux_context* ctx, cha
       return rc;
    }
    
-   // include the device name
-   rc = vdev_linux_uevent_append( &uevent_buf, &uevent_buf_len, "DEVNAME", devname );
-   if( rc != 0 ) {
-     
-      vdev_error("vdev_linux_uevent_append('%s=%s') rc = %d\n", "DEVNAME", devname, rc );
-      
-      free( uevent_buf );
-      free( full_devpath );
-      free( devname );
-      return rc;
-   }
    
    // make the device request
    struct vdev_device_request* vreq = VDEV_CALLOC( struct vdev_device_request, 1 );
