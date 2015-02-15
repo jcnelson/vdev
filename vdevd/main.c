@@ -36,9 +36,66 @@ int main( int argc, char** argv ) {
       
       vdev_error("vdev_init rc = %d\n", rc );
       
+      vdev_shutdown( &vdev );
       exit(1);
    }
-
+   
+   // do we need to daemonize?
+   if( !vdev.config->foreground ) {
+      
+      // start logging 
+      if( vdev.config->logfile_path == NULL ) {
+         
+         fprintf(stderr, "No logfile specified\n");
+         
+         vdev_shutdown( &vdev );
+         exit(2);
+      }
+      
+      rc = vdev_log_redirect( vdev.config->logfile_path );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_log_redirect('%s') rc = %d\n", vdev.config->logfile_path, rc );
+         
+         vdev_shutdown( &vdev );
+         exit(2);
+      }
+       
+      // become a daemon
+      int keep_open[2] = {
+         STDOUT_FILENO,
+         STDERR_FILENO
+      };
+      
+      rc = vdev_daemonize( keep_open, 2 );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_daemonize rc = %d\n", rc );
+         vdev_shutdown( &vdev );
+         
+         exit(3);
+      }
+      
+      // write a pidfile 
+      if( vdev.config->pidfile_path != NULL ) {
+            
+         rc = vdev_pidfile_write( vdev.config->pidfile_path );
+         if( rc != 0 ) {
+            
+            vdev_error("vdev_pidfile_write('%s') rc = %d\n", vdev.config->pidfile_path, rc );
+            
+            vdev_shutdown( &vdev );
+            exit(4);
+         }
+      }
+   }
+   
+   // do we need to connect to syslog?
+   if( strcmp( vdev.config->logfile_path, "syslog" ) == 0 ) {
+      
+      vdev_debug("%s", "Switching to syslog for messages\n");
+      vdev_enable_syslog();
+   }
    
    // start up
    rc = vdev_start( &vdev );
@@ -56,8 +113,10 @@ int main( int argc, char** argv ) {
    if( rc != 0 ) {
       
       vdev_error("vdev_backend_main rc = %d\n", rc );
-      
    }
+   
+   // clean up
+   unlink( vdev.config->pidfile_path );
 
    vdev_stop( &vdev );
    vdev_shutdown( &vdev );
