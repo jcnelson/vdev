@@ -52,16 +52,16 @@ case "$DISK_TYPE" in
       
       # unknown type
       echo "Unknown disk type" >&2
-      exit 1
+      exit 2
       ;;
 
 esac
 
 # verify stat'ing succeeded; otherwise we're done (can't label by id)
-test 0 -ne $STAT_RET && exit 0
+test 0 -ne $STAT_RET && exit 3
 
 # verify that we got a disk ID; otherwise we're done (no label to set)
-test -z "$DISK_ID" && exit 0
+test -z "$DISK_ID" && exit 4
 
 # put label into place
 DISK_NAME="$DISK_TYPE-$DISK_ID"
@@ -72,7 +72,7 @@ if [ "$VDEV_OS_DEVTYPE" = "partition" ]; then
 
    PART=$(/bin/cat $VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH/partition)
 
-   test -z $PART && exit 0
+   test -z $PART && exit 5
 
    # include partition ID in the disk name
    PART_NAME="part${PART}"
@@ -141,7 +141,7 @@ case "$VDEV_ACTION" in
 
    *)
 
-      exit 2
+      exit 6
 
 esac
 
