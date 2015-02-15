@@ -30,6 +30,8 @@
 
 #define VDEV_API_ATTRS_PREFIX "API/attrs/"
 
+#define VDEV_DEVICE_PATH_UNKNOWN        "UNKNOWN"
+
 // device request type 
 typedef enum {
    VDEV_DEVICE_INVALID = 0,             // invalid request

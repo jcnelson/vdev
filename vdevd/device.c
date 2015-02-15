@@ -100,10 +100,10 @@ static int vdev_device_request_make_env_str( char const* key, char const* value,
 static char const* vdev_device_request_type_to_string( vdev_device_request_t req ) {
    
    static char const* req_tbl[] = {
-      "ADD",
-      "REMOVE",
-      "ANY",
-      "NONE"
+      "add",
+      "remove",
+      "any",
+      "none"
    };
    
    if( req < 0 || req > VDEV_DEVICE_ANY ) {
@@ -117,9 +117,9 @@ static char const* vdev_device_request_type_to_string( vdev_device_request_t req
 // mode to const string 
 static char const* vdev_device_request_mode_to_string( mode_t mode ) {
    
-   static char const* blk_str = "BLOCK";
-   static char const* chr_str = "CHAR";
-   static char const* none_str = "NONE";
+   static char const* blk_str = "block";
+   static char const* chr_str = "char";
+   static char const* none_str = "none";
    
    if( S_ISBLK(mode) ) {
       return blk_str;
@@ -405,15 +405,26 @@ static int vdev_device_add_metadata( struct vdev_device_request* req ) {
 
 
 // remove helper for vdev_device_remove_metadata
+// return 0 on success
+// return -errno for unlink failure
 static int vdev_device_remove_metadata_file( char const* fp, void* cls ) {
    
    int rc = 0;
+   
+   char name_buf[ VDEV_NAME_MAX + 1 ];
+   
+   vdev_basename( fp, name_buf );
+   
+   if( strcmp(name_buf, ".") == 0 || strcmp(name_buf, "..") == 0 ) {
+      // skip 
+      return 0;
+   }
    
    rc = unlink( fp );
    if( rc != 0 ) {
       
       rc = -errno;
-      vdev_error("WARN: vdev_device_remove_metadata_file('%s') rc = %d\n", fp, rc );
+      vdev_warn("WARN: vdev_device_remove_metadata_file('%s') rc = %d\n", fp, rc );
       return rc;
    }
    
@@ -451,6 +462,7 @@ static int vdev_device_remove_metadata( struct vdev_device_request* req ) {
    return rc;
 }
 
+
 // handler to add a device
 static int vdev_device_add( struct vdev_wreq* wreq, void* cls ) {
    
@@ -474,9 +486,9 @@ static int vdev_device_add( struct vdev_wreq* wreq, void* cls ) {
       req->renamed_path = vdev_strdup_or_null( req->path );
    }
    
-   vdev_debug("ADD device %p type '%s' at '%s' (%d:%d, original path='%s')\n", req, (S_ISBLK(req->mode) ? "block" : S_ISCHR(req->mode) ? "char" : "unknown"), req->renamed_path, major(req->dev), minor(req->dev), req->path );
+   vdev_debug("ADD device: type '%s' at '%s' ('%s' %d:%d)\n", (S_ISBLK(req->mode) ? "block" : S_ISCHR(req->mode) ? "char" : "unknown"), req->renamed_path, req->path, major(req->dev), minor(req->dev) );
    
-   if( req->renamed_path != NULL && req->dev != 0 && req->mode != 0 ) {
+   if( req->renamed_path != NULL && strcmp( req->renamed_path, VDEV_DEVICE_PATH_UNKNOWN ) != 0 && req->dev != 0 && req->mode != 0 ) {
       
       // make the device file
       char* fp = NULL;
@@ -589,9 +601,9 @@ static int vdev_device_remove( struct vdev_wreq* wreq, void* cls ) {
       req->renamed_path = vdev_strdup_or_null( req->path );
    }
    
-   vdev_debug("REMOVE device %p type '%s' at '%s' (%d:%d) (original path='%s')\n", req, (S_ISBLK(req->mode) ? "block" : S_ISCHR(req->mode) ? "char" : "unknown"), req->renamed_path, major(req->dev), minor(req->dev), req->path );
+   vdev_info("REMOVE device: type '%s' at '%s' ('%s' %d:%d)\n", (S_ISBLK(req->mode) ? "block" : S_ISCHR(req->mode) ? "char" : "unknown"), req->renamed_path, req->path, major(req->dev), minor(req->dev) );
       
-   if( req->renamed_path != NULL ) {
+   if( req->renamed_path != NULL && strcmp( req->renamed_path, VDEV_DEVICE_PATH_UNKNOWN ) != 0 ) {
       
       char* fp = vdev_fullpath( req->state->mountpoint, req->path, NULL );
    
@@ -627,7 +639,7 @@ static int vdev_device_remove( struct vdev_wreq* wreq, void* cls ) {
       
       // try to clean up directories 
       rc = vdev_rmdirs( fp );
-      if( rc != 0 && rc != -ENOTEMPTY ) {
+      if( rc != 0 && rc != -ENOTEMPTY && rc != -ENOENT ) {
          
          vdev_error("vdev_rmdirs('%s') rc = %d\n", fp, rc );
          
@@ -636,6 +648,9 @@ static int vdev_device_remove( struct vdev_wreq* wreq, void* cls ) {
          free( fp );
          
          return rc;
+      }
+      else {
+         rc = 0;
       }
       
       free( fp );
