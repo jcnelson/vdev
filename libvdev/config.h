@@ -99,6 +99,7 @@ int vdev_config_free( struct vdev_config* conf );
 
 int vdev_config_usage( char const* progname );
 int vdev_config_load_from_args( struct vdev_config* config, int argc, char** argv, int* fuse_argc, char** fuse_argv );
+int vdev_config_fullpaths( struct vdev_config* config );
 
 C_LINKAGE_END
 

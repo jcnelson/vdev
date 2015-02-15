@@ -288,6 +288,58 @@ int vdev_config_free( struct vdev_config* conf ) {
 }
 
 
+// convert all paths in the config to absolute paths 
+// return 0 on success 
+// return -ENOMEM on OOM 
+// return -ERANGE if cwd is too long
+int vdev_config_fullpaths( struct vdev_config* conf ) {
+   
+   int rc = 0;
+   
+   char** need_fullpath[] = {
+      &conf->firmware_dir,
+      &conf->acls_dir,
+      &conf->acts_dir,
+      &conf->helpers_dir,
+      &conf->pidfile_path,
+      &conf->logfile_path,
+      NULL
+   };
+   
+   char cwd_buf[ PATH_MAX + 1 ];
+   memset( cwd_buf, 0, PATH_MAX + 1 );
+   
+   char* tmp = getcwd( cwd_buf, PATH_MAX );
+   if( tmp == NULL ) {
+      
+      vdev_error("Current working directory exceeds %u bytes\n", PATH_MAX);
+      return -ERANGE;
+   }
+   
+   for( int i = 0; need_fullpath[i] != NULL; i++ ) {
+      
+      if( need_fullpath[i] != NULL ) {
+         
+         if( *(need_fullpath[i])[0] != '/' ) {
+               
+            // relative path 
+            char* new_path = vdev_fullpath( cwd_buf, *(need_fullpath)[i], NULL );
+            if( new_path == NULL ) {
+               
+               return -ENOMEM;
+            }
+            
+            free( *(need_fullpath[i]) );
+            *(need_fullpath[i]) = new_path;
+         }
+      }
+   }
+   
+   return 0;
+}
+
+
+
 // print usage statement 
 int vdev_config_usage( char const* progname ) {
    fprintf(stderr, "\
@@ -305,10 +357,16 @@ Options include:\n\
                   \n\
    -l, --log-file LOGFILE_PATH\n\
                   Path to which to log information.\n\
+                  Pass 'syslog' to log to syslog, instead of a logfile.\n\
                   \n\
    -1, --once\n\
                   Exit once all extant devices have been processed.\n\
                   \n\
+   -f, --foreground\n\
+                  Run in the foreground; do not daemonize\n\
+                  \n\
+   -p, --pidfile PATH\n\
+                  Write the PID of the daemon to PATH\n\
 ", progname );
   
   return 0;
@@ -344,8 +402,8 @@ int vdev_config_load_from_args( struct vdev_config* config, int argc, char** arg
    static struct option vdev_options[] = {
       {"config-file",     required_argument,   0, 'c'},
       {"verbose-level",   required_argument,   0, 'v'},
-      {"log-file",        required_argument,   0, 'l'},
-      {"pid-file",        required_argument,   0, 'p'},
+      {"logfile",         required_argument,   0, 'l'},
+      {"pidfile",         required_argument,   0, 'p'},
       {"once",            no_argument,         0, '1'},
       {"foreground",      no_argument,         0, 'f'},
       {0, 0, 0, 0}
@@ -356,7 +414,7 @@ int vdev_config_load_from_args( struct vdev_config* config, int argc, char** arg
    int c = 0;
    int fuse_optind = 0;
    
-   char const* optstr = "c:v:l:o:f1";
+   char const* optstr = "c:v:l:o:f1p:";
    
    fuse_argv[fuse_optind] = argv[0];
    fuse_optind++;
