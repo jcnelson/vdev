@@ -22,6 +22,8 @@
 #ifndef _VDEV_UTIL_H_
 #define _VDEV_UTIL_H_
 
+#define _POSIX_C_SOURCE 1
+
 #include <limits.h>
 #include <sys/types.h>
 #include <stdio.h>
@@ -32,8 +34,6 @@
 #include <fcntl.h>
 #include <libgen.h>
 #include <limits.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
@@ -163,6 +163,8 @@ int vdev_enable_syslog();
 // system functions 
 int vdev_daemonize( int* fd_keep, int num_fds );
 int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t max_output, int* exit_status );
+int vdev_log_redirect( char const* logfile_path );
+int vdev_pidfile_write( char const* pidfile_path );
 
 // parser functions 
 int vdev_keyvalue_next( char* keyvalue, char** key, char** value );

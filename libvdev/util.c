@@ -85,7 +85,7 @@ int vdev_daemonize( int* fd_keep, int num_fds ) {
       // child--no tty
       // become process group leader
       rc = setsid();
-      if( rc != 0 ) {
+      if( rc < 0 ) {
          
          rc = -errno;
          vdev_error("setsid() rc = %d\n", rc );
@@ -164,8 +164,8 @@ int vdev_daemonize( int* fd_keep, int num_fds ) {
    }
    else if( pid > 0 ) {
       
-      // parent--return 
-      return 0;
+      // parent--we're done 
+      _exit(0);
    }
    else {
       
@@ -175,6 +175,85 @@ int vdev_daemonize( int* fd_keep, int num_fds ) {
       return rc;
    }
 }
+
+
+// redirect stdout and stderr to a logfile 
+// return 0 on success 
+int vdev_log_redirect( char const* logfile_path ) {
+   
+   int logfd = 0;
+   int rc = 0;
+   FILE* f = NULL;
+   
+   f = fopen( logfile_path, "a" );
+   if( f == NULL ) {
+      
+      rc = -errno;
+      vdev_error("fopen('%s') rc = %d\n", logfile_path, rc );
+      return rc;
+   }
+   
+   logfd = fileno(f);
+   
+   close( STDOUT_FILENO );
+   close( STDERR_FILENO );
+   
+   rc = dup2( logfd, STDOUT_FILENO );
+   if( rc < 0 ) {
+      
+      rc = -errno;
+      vdev_error("dup2(STDOUT) rc = %d\n", rc );
+      return rc;
+   }
+   
+   rc = dup2( logfd, STDERR_FILENO );
+   if( rc < 0 ) {
+      
+      rc = -errno;
+      vdev_error("dup2(STDERR) rc = %d\n", rc );
+      
+      return rc;
+   }
+   
+   fclose( f );
+   logfd = -1;
+   
+   return 0;
+}
+
+
+// write a pidfile to a path 
+int vdev_pidfile_write( char const* pidfile_path ) {
+   
+   char pidbuf[50];
+   FILE* f = NULL;
+   size_t nw = 0;
+   int rc = 0;
+   
+   f = fopen( pidfile_path, "w+" );
+   if( f == NULL ) {
+      
+      rc = -errno;
+      vdev_error("fopen('%s') rc = %d\n", pidfile_path, rc );
+      return rc;
+   }
+   
+   memset( pidbuf, 0, 50 );
+   sprintf( pidbuf, "%d\n", getpid() );
+   
+   rc = vdev_write_uninterrupted( fileno(f), pidbuf, strlen(pidbuf) + 1 );
+   
+   fclose( f );
+   
+   if( rc < 0 ) {
+      
+      vdev_error("vdev_write_uninterrupted('%d') rc = %d\n", getpid(), rc );
+      return rc;
+   }
+   
+   return 0;
+}
+
 
 // join two paths, writing the result to dest if dest is not NULL.
 // otherwise, allocate and return a buffer containing the joined paths.
