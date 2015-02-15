@@ -484,6 +484,8 @@ int vdev_action_run_sync( struct vdev_device_request* vreq, char const* command,
    
    rc = vdev_subprocess( command, req_env, output, max_output, &exit_status );
    
+   vdev_debug("exit status %d\n", exit_status );
+   
    if( output != NULL && *output != NULL ) {
       
       vdev_debug("command output: '%s'\n", *output );
@@ -694,6 +696,8 @@ int vdev_action_create_path( struct vdev_device_request* vreq, struct vdev_actio
    
    while( act_offset < (signed)num_acts ) {
       
+      rc = 0;
+      
       // skip this action if there is no rename command 
       if( acts[act_offset].rename_command == NULL ) {
          act_offset++;
@@ -742,8 +746,6 @@ int vdev_action_create_path( struct vdev_device_request* vreq, struct vdev_actio
             new_path = NULL;
          }
       }
-      
-      rc = 0;
    }
    
    if( *path != NULL && strlen(*path) == 0 ) {
