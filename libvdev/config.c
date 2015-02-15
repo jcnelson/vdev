@@ -26,6 +26,11 @@
 
 #include "ini.h"
 
+// FUSE reserved options
+static const char* FUSE_OPT_O = "-o";
+static const char* FUSE_OPT_D = "-d";
+static const char* FUSE_OPT_F = "-f";
+
 // ini parser callback 
 // return 1 on parsed (WARNING: masks OOM)
 // return 0 on not parsed
@@ -40,34 +45,45 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
       
       if( strcmp(name, VDEV_CONFIG_FIRMWARE_DIR) == 0 ) {
          
-         // save this 
-         conf->firmware_dir = vdev_strdup_or_null( value );
+         if( conf->firmware_dir == NULL ) {
+            // save this 
+            conf->firmware_dir = vdev_strdup_or_null( value );
+         }
+         
          return 1;
       }
       
       if( strcmp(name, VDEV_CONFIG_ACLS) == 0 ) {
          
-         // save this 
-         conf->acls_dir = vdev_strdup_or_null( value );
+         if( conf->acls_dir == NULL ) {
+            // save this 
+            conf->acls_dir = vdev_strdup_or_null( value );
+         }
          return 1;
       }
       
       if( strcmp(name, VDEV_CONFIG_ACTIONS) == 0 ) {
          
-         // save this 
-         conf->acts_dir = vdev_strdup_or_null( value );
+         if( conf->acts_dir == NULL ) {
+            // save this 
+            conf->acts_dir = vdev_strdup_or_null( value );
+         }
+         
          return 1;
       }
       
       if( strcmp(name, VDEV_CONFIG_HELPERS) == 0 ) {
          
-         // save this 
-         conf->helpers_dir = vdev_strdup_or_null( value );
+         if( conf->helpers_dir == NULL ) {
+            // save this 
+            conf->helpers_dir = vdev_strdup_or_null( value );
+         }
+         
          return 1;
       }
       
       if( strcmp(name, VDEV_CONFIG_DEFAULT_MODE) == 0 ) {
-         
+      
          conf->default_mode = (mode_t)vdev_parse_uint64( value, &success );
          if( !success ) {
             
@@ -88,14 +104,61 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
       
       if( strcmp(name, VDEV_CONFIG_PIDFILE_PATH) == 0 ) {
          
-         conf->pidfile_path = vdev_strdup_or_null( value );
+         if( conf->pidfile_path == NULL ) {
+            conf->pidfile_path = vdev_strdup_or_null( value );
+         }
+         
          return 1;
       }
       
       if( strcmp(name, VDEV_CONFIG_LOGFILE_PATH) == 0 ) {
          
-         conf->logfile_path = vdev_strdup_or_null( value );
+         if( conf->logfile_path == NULL ) {
+            conf->logfile_path = vdev_strdup_or_null( value );
+         }
+         
          return 1;
+      }
+      
+      if( strcmp(name, VDEV_CONFIG_DEBUG_LEVEL) == 0 ) {
+         
+         int debug_level = (int)vdev_parse_uint64( value, &success );
+         if( !success ) {
+            
+            fprintf(stderr, "Invalid value '%s' for '%s'\n", value, name );
+            return 0;
+         }
+         else {
+            
+            conf->debug_level = MAX( debug_level, conf->debug_level );
+            return 1;
+         }
+      }
+      
+      if( strcmp(name, VDEV_CONFIG_MOUNTPOINT) == 0 ) {
+         
+         if( conf->mountpoint == NULL ) {
+            conf->mountpoint = vdev_strdup_or_null( value );
+         }
+         
+         return 1;
+      }
+      
+      if( strcmp(name, VDEV_CONFIG_ONCE) == 0 ) {
+         
+         if( !conf->once ) {
+            
+            conf->once = (bool)vdev_parse_uint64( value, &success );
+            if( !success ) {
+               
+               fprintf(stderr, "Invalid value '%s' for '%s'\n", value, name );
+               return 0;
+            }
+            else {
+               
+               return 1;
+            }
+         }
       }
       
       fprintf(stderr, "Unrecognized '%s' field '%s'\n", section, name);
@@ -125,13 +188,19 @@ int vdev_config_sanity_check( struct vdev_config* conf ) {
    
    if( conf->acls_dir == NULL ) {
       
-      fprintf(stderr, "ERR: Config file is missing 'acls='\n");
+      fprintf(stderr, "ERR: missing acls\n");
       rc = -EINVAL;
    }
    
    if( conf->acts_dir == NULL ) {
       
-      fprintf(stderr, "ERR: Config file is missing 'actions='\n");
+      fprintf(stderr, "ERR: missing actions\n");
+      rc = -EINVAL;
+   }
+   
+   if( conf->mountpoint == NULL ) {
+      
+      fprintf(stderr, "ERR: missing mountpoint\n");
       rc = -EINVAL;
    }
    
@@ -217,3 +286,195 @@ int vdev_config_free( struct vdev_config* conf ) {
    
    return 0;
 }
+
+
+// print usage statement 
+int vdev_config_usage( char const* progname ) {
+   fprintf(stderr, "\
+\
+Usage: %s [options] mountpoint\n\
+Options include:\n\
+\n\
+   -c, --config-file CONFIG_FILE\n\
+                  Path to the config file to use.\n\
+                  \n\
+   -v, --verbose-level VERBOSITY\n\
+                  Set the level of verbose output.  Valid values are\n\
+                  positive integers.  Larger integers lead to more\n\
+                  debugging information.\n\
+                  \n\
+   -l, --log-file LOGFILE_PATH\n\
+                  Path to which to log information.\n\
+                  \n\
+   -1, --once\n\
+                  Exit once all extant devices have been processed.\n\
+                  \n\
+", progname );
+  
+  return 0;
+}
+
+// get the mountpoint option, by taking the last argument that wasn't an optarg
+static int vdev_config_get_mountpoint_from_fuse( int fuse_argc, char** fuse_argv, char** ret_mountpoint ) {
+   
+   *ret_mountpoint = realpath( fuse_argv[ fuse_argc - 1 ], NULL );
+   
+   if( *ret_mountpoint == NULL ) {
+      
+      int rc = -errno;
+      printf("No mountpoint, rc = %d\n", rc);
+      
+      for( int i = 0; i < fuse_argc; i++ ) {
+         printf("argv[%d]: '%s'\n", i, fuse_argv[i]);
+      }
+      
+      return -EINVAL;
+   }
+   
+   return 0;
+}
+
+// parse command-line options from argv.
+// fill in fuse_argv with fuse-specific options.
+// config must be initialized; this method simply augments it 
+// return 0 on success 
+// return -1 on unrecognized option 
+int vdev_config_load_from_args( struct vdev_config* config, int argc, char** argv, int* fuse_argc, char** fuse_argv ) {
+   
+   static struct option vdev_options[] = {
+      {"config-file",     required_argument,   0, 'c'},
+      {"verbose-level",   required_argument,   0, 'v'},
+      {"log-file",        required_argument,   0, 'l'},
+      {"pid-file",        required_argument,   0, 'p'},
+      {"once",            no_argument,         0, '1'},
+      {"foreground",      no_argument,         0, 'f'},
+      {0, 0, 0, 0}
+   };
+
+   int rc = 0;
+   int opt_index = 0;
+   int c = 0;
+   int fuse_optind = 0;
+   
+   char const* optstr = "c:v:l:o:f1";
+   
+   fuse_argv[fuse_optind] = argv[0];
+   fuse_optind++;
+   
+   while(rc == 0 && c != -1) {
+      
+      c = getopt_long(argc, argv, optstr, vdev_options, &opt_index);
+      
+      if( c == -1 ) {
+         break;
+      }
+      
+      switch( c ) {
+         
+         case 'c': {
+            
+            if( config->config_path != NULL ) {
+               free( config->config_path );
+            }
+            
+            config->config_path = vdev_strdup_or_null( optarg );
+            break;
+         }
+         
+         case 'l': {
+            
+            if( config->logfile_path != NULL ) {
+               free( config->logfile_path );
+            }
+            
+            config->logfile_path = vdev_strdup_or_null( optarg );
+            break;
+         }
+         
+         case 'p': {
+            
+            if( config->pidfile_path != NULL ) {
+               free( config->pidfile_path );
+            }
+            
+            config->pidfile_path = vdev_strdup_or_null( optarg );
+            break;
+         }
+         
+         case 'v': {
+            
+            long debug_level = 0;
+            char* tmp = NULL;
+            
+            debug_level = strtol( optarg, &tmp, 10 );
+            
+            if( *tmp != '\0' ) {
+               fprintf(stderr, "Invalid argument for -d\n");
+               rc = -1;
+            }
+            else {
+               config->debug_level = debug_level;  
+            }
+            break;
+         }
+         
+         case '1': {
+            
+            config->once = true;
+            break;
+         }
+         
+         case 'd': {
+            // FUSE option 
+            fuse_argv[fuse_optind] = (char*)FUSE_OPT_D;
+            fuse_optind++;
+            break;
+         }
+         
+         case 'f': {
+            // FUSE option 
+            fuse_argv[fuse_optind] = (char*)FUSE_OPT_F;
+            fuse_optind++;
+            
+            config->foreground = true;
+            break;
+         }
+         
+         case 'o': {
+            // FUSE option 
+            fuse_argv[fuse_optind] = (char*)FUSE_OPT_O;
+            fuse_optind++;
+            
+            fuse_argv[fuse_optind] = optarg;
+            fuse_optind++;
+            break;
+         }
+         
+         default: {
+            
+            fprintf(stderr, "Unrecognized option -%c\n", c );
+            rc = -1;
+            break;
+         }
+      }
+   }
+   
+   if( rc != 0 ) {
+      return rc;
+   }
+   
+   // copy over non-option arguments to fuse_argv 
+   for( int i = optind; i < argc; i++ ) {
+      
+      fuse_argv[ fuse_optind ] = argv[i];
+      fuse_optind++;
+   }
+   
+   *fuse_argc = fuse_optind;
+   
+   // parse FUSE args to get the mountpoint 
+   rc = vdev_config_get_mountpoint_from_fuse( *fuse_argc, fuse_argv, &config->mountpoint );
+   
+   return rc;
+}
+
