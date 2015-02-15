@@ -1973,7 +1973,7 @@ void sglib___##type##_consistency_check(type *t) {\
    \
    int sglib_##type##_vector_push_back( struct sglib_##type##_vector* v, type t ) { \
       int rc = 0; \
-      if( v->len + 1 >= (1L << v->exp) ) { \
+      if( v->len + 1 >= (unsigned)(1L << v->exp) ) { \
          rc = sglib___##type##_vector_grow( v ); \
          if( rc == -ENOMEM ) { \
             return rc; \
