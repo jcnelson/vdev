@@ -724,6 +724,7 @@ int vdev_action_create_path( struct vdev_device_request* vreq, struct vdev_actio
          // matched! advance offset to next action
          i = act_offset + rc;
          act_offset += rc + 1;
+         rc = 0;
          
          if( acts[i].rename_command == NULL ) {
             continue;
