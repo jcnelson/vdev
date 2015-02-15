@@ -21,7 +21,7 @@
 
 #include "vdev.h"
 #include "action.h"
-#include "libvdev/opts.h"
+#include "libvdev/config.h"
 
 // start up the back-end
 // return 0 on success 
@@ -79,7 +79,6 @@ int vdev_start( struct vdev_state* vdev ) {
 int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
    
    int rc = 0;
-   struct vdev_opts opts;
    
    int fuse_argc = 0;
    char** fuse_argv = VDEV_CALLOC( char*, argc + 1 );
@@ -89,77 +88,73 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
       return -ENOMEM;
    }
    
-   // parse opts 
-   rc = vdev_opts_parse( &opts, argc, argv, &fuse_argc, fuse_argv );
-   
-   // not needed
-   free( fuse_argv );
-   
-   if( rc != 0 ) {
-      
-      vdev_error("vdev_opts_parse rc = %d\n", rc );
-      
-      vdev_usage( argv[0] );
-      
-      return rc;
-   }
-   
-   vdev_set_debug_level( opts.debug_level );
-   
-   // load config 
+   // config...
    vdev->config = VDEV_CALLOC( struct vdev_config, 1 );
    if( vdev->config == NULL ) {
       
-      vdev_opts_free( &opts );
+      free( fuse_argv );
       return -ENOMEM;
    }
    
-   vdev_info("Config file: %s\n", opts.config_file_path );
-   
+   // config init
    rc = vdev_config_init( vdev->config );
    if( rc != 0 ) {
       
       vdev_error("vdev_config_init rc = %d\n", rc );
       
       vdev_shutdown( vdev );
-      vdev_opts_free( &opts );
       return rc;
    }
    
-   rc = vdev_config_load( opts.config_file_path, vdev->config );
+   // parse config options from command-line 
+   rc = vdev_config_load_from_args( vdev->config, argc, argv, &fuse_argc, fuse_argv );
+   
+   // not needed for vdevd
+   free( fuse_argv );
+   
    if( rc != 0 ) {
       
-      vdev_error("vdev_config_load('%s') rc = %d\n", opts.config_file_path, rc );
+      vdev_error("vdev_config_load_from_argv rc = %d\n", rc );
       
-      vdev_shutdown( vdev );
-      vdev_opts_free( &opts );
+      vdev_config_usage( argv[0] );
       
       return rc;
    }
    
-   vdev_info("vdev actions dir: %s\n", vdev->config->acts_dir );
-   vdev_info("firmware dir:     %s\n", vdev->config->firmware_dir );
-   vdev_info("helpers dir:      %s\n", vdev->config->helpers_dir );
+   vdev_set_debug_level( vdev->config->debug_level );
    
-   vdev->mountpoint = vdev_strdup_or_null( opts.mountpoint );
-   vdev->debug_level = opts.debug_level;
-   vdev->once = opts.once;
+   vdev_info("Config file: '%s'\n", vdev->config->config_path );
+   
+   // load from file...
+   rc = vdev_config_load( vdev->config->config_path, vdev->config );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_config_load('%s') rc = %d\n", vdev->config->config_path, rc );
+      
+      vdev_shutdown( vdev );
+      
+      return rc;
+   }
+   
+   vdev_info("vdev actions dir: '%s'\n", vdev->config->acts_dir );
+   vdev_info("firmware dir:     '%s'\n", vdev->config->firmware_dir );
+   vdev_info("helpers dir:      '%s'\n", vdev->config->helpers_dir );
+   
+   vdev->mountpoint = vdev_strdup_or_null( vdev->config->mountpoint );
+   vdev->debug_level = vdev->config->debug_level;
+   vdev->once = vdev->config->once;
    
    if( vdev->mountpoint == NULL ) {
       
-      vdev_error("Failed to set mountpoint, opts.mountpount = '%s'\n", opts.mountpoint );
+      vdev_error("Failed to set mountpoint, config->mountpount = '%s'\n", vdev->config->mountpoint );
       
       vdev_shutdown( vdev );
-      vdev_opts_free( &opts );
-      
       return -EINVAL;
    }
    else {
       
-      vdev_info("mountpoint:       %s\n", vdev->mountpoint );
+      vdev_info("mountpoint:       '%s'\n", vdev->mountpoint );
    }
-   
-   vdev_opts_free( &opts );
    
    vdev->argc = argc;
    vdev->argv = argv;
