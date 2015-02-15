@@ -1,7 +1,7 @@
 CPP    := g++ -Wall -g -fstack-protector -fstack-protector-all -Wno-unused-but-set-variable -Wno-unused-variable
 LIB   := -lpthread -lrt -lpstat -lvdev -lfskit -lfskit_fuse -lfuse
 LIBINC := -L../libvdev
-INC   := -I/usr/include -I/usr/local/include -I. 
+INC   := -I. -I.. -I/usr/include -I/usr/local/include
 C_SRCS:= $(wildcard *.c) 
 CXSRCS:= $(wildcard *.cpp)
 OBJ   := $(patsubst %.c,%.o,$(C_SRCS)) $(patsubst %.cpp,%.o,$(CXSRCS))
