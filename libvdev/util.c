@@ -25,8 +25,10 @@ int _VDEV_DEBUG_MESSAGES = 0;
 int _VDEV_INFO_MESSAGES = 0;
 int _VDEV_WARN_MESSAGES = 1;
 int _VDEV_ERROR_MESSAGES = 1;
+int _VDEV_SYSLOG = 0;
 
 
+// set debug level, by setting for info and debug messages
 void vdev_set_debug_level( int d ) {
    
    if( d >= 1 ) {
@@ -37,6 +39,7 @@ void vdev_set_debug_level( int d ) {
    }
 }
 
+// set error level, by setting for warning and error messages
 void vdev_set_error_level( int e ) {
    
    if( e >= 1 ) {
@@ -47,16 +50,135 @@ void vdev_set_error_level( int e ) {
    }
 }
 
+// debug level is the sum of the levels enabled
 int vdev_get_debug_level() {
    return _VDEV_DEBUG_MESSAGES + _VDEV_INFO_MESSAGES;
 }
 
+// error level is the sum of the errors enable
 int vdev_get_error_level() {
    return _VDEV_ERROR_MESSAGES + _VDEV_WARN_MESSAGES;
 }
 
+// turn on syslog logging 
+// always succeeds
+int vdev_enable_syslog() {
+   
+   _VDEV_SYSLOG = 1;
+   openlog( VDEV_SYSLOG_IDENT, LOG_CONS | LOG_NDELAY | LOG_PID, LOG_DAEMON );
+   
+   return 0;
+}
+
+// become a daemon: fork, setsid, fork, have child close all file descriptors except for the ones in fd_keep (if non-NULL)
+// return 0 on success
+int vdev_daemonize( int* fd_keep, int num_fds ) {
+   
+   int rc = 0;
+   pid_t pid = 0;
+   
+   struct rlimit maxfds;
+   
+   pid = fork();
+   if( pid == 0 ) {
+      
+      // child--no tty
+      // become process group leader
+      rc = setsid();
+      if( rc != 0 ) {
+         
+         rc = -errno;
+         vdev_error("setsid() rc = %d\n", rc );
+         return rc;
+      }
+      
+      // fork again 
+      // stop us from ever regaining the tty
+      pid = fork();
+      if( pid == 0 ) {
+         
+         // child
+         // switch to /
+         rc = chdir("/");
+         if( rc != 0 ) {
+            
+            rc = -errno;
+            vdev_error("chdir('/') rc = %d\n", rc );
+            return rc;
+         }
+         
+         // own everything we create 
+         umask(0);
+         
+         // close all files, except for those that we want to keep 
+         rc = getrlimit( RLIMIT_NOFILE, &maxfds );
+         if( rc != 0 ) {
+            
+            rc = -errno;
+            vdev_error("getrlimit( RLIMIT_NOFILE ) rc = %d\n", rc );
+            
+            rc = 0;
+            
+            maxfds.rlim_cur = 0;
+            maxfds.rlim_max = 65536;    // should be big enough
+         }
+         
+         // close them all!
+         for( int i = 0; i < maxfds.rlim_max; i++ ) {
+            
+            bool do_close = true;
+            
+            // keep this one open?
+            if( fd_keep != NULL ) {
+               
+               for( int j = 0; j < num_fds; j++ ) {
+                  
+                  if( i == fd_keep[j] ) {
+                     do_close = false;
+                     break;
+                  }
+               }
+            }
+            
+            if( do_close ) {
+               
+               close( i );
+            }
+         }
+         
+         // now a daemon!
+         return 0;
+      }
+      else if( pid > 0 ) {
+         
+         // parent--die, but don't call userspace clean-up
+         _exit(0);
+      }
+      else {
+         
+         // failed to fork 
+         rc = -errno;
+         vdev_error("fork( parent=%d ) rc = %d\n", getpid(), rc );
+         return rc;
+      }
+   }
+   else if( pid > 0 ) {
+      
+      // parent--return 
+      return 0;
+   }
+   else {
+      
+      // error
+      rc = -errno;
+      vdev_error( "fork( parent=%d ) rc = %d\n", getpid(), rc );
+      return rc;
+   }
+}
+
 // join two paths, writing the result to dest if dest is not NULL.
 // otherwise, allocate and return a buffer containing the joined paths.
+// return NULL on OOM 
 char* vdev_fullpath( char const* root, char const* path, char* dest ) {
 
    char delim = 0;
@@ -82,6 +204,9 @@ char* vdev_fullpath( char const* root, char const* path, char* dest ) {
 
    if( dest == NULL ) {
       dest = VDEV_CALLOC( char, len );
+      if( dest == NULL ) {
+         return NULL;
+      }
    }
 
    memset(dest, 0, len);
@@ -99,6 +224,7 @@ char* vdev_fullpath( char const* root, char const* path, char* dest ) {
 // get the directory name of a path.
 // put it into dest if dest is not null.
 // otherwise, allocate a buffer and return it.
+// return NULL on OOM 
 char* vdev_dirname( char const* path, char* dest ) {
    
    if( path == NULL ) {
@@ -107,6 +233,9 @@ char* vdev_dirname( char const* path, char* dest ) {
    
    if( dest == NULL ) {
       dest = VDEV_CALLOC( char, strlen(path) + 1 );
+      if( dest == NULL ) {
+         return NULL;
+      }
    }
 
    // is this root?
@@ -140,6 +269,7 @@ char* vdev_dirname( char const* path, char* dest ) {
 }
 
 // determine how long the basename of a path is
+// return 0 if the length could not be determined
 size_t vdev_basename_len( char const* path ) {
    
    if( path == NULL ) {
@@ -170,6 +300,7 @@ size_t vdev_basename_len( char const* path ) {
 // get the basename of a (non-directory) path.
 // put it into dest, if dest is not null.
 // otherwise, allocate a buffer with it and return the buffer
+// return NULL on OOM, or if path is NULL
 char* vdev_basename( char const* path, char* dest ) {
 
    size_t len = 0;
@@ -181,7 +312,12 @@ char* vdev_basename( char const* path, char* dest ) {
    len = vdev_basename_len( path );
 
    if( dest == NULL ) {
+      
       dest = VDEV_CALLOC( char, len + 1 );
+      if( dest == NULL ) {
+         
+         return NULL;
+      }
    }
    else {
       memset( dest, 0, len + 1 );
@@ -361,6 +497,8 @@ int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t m
 
 
 // write, but mask EINTR
+// return number of bytes written on success 
+// return -errno on I/O error
 ssize_t vdev_write_uninterrupted( int fd, char const* buf, size_t len ) {
    
    ssize_t num_written = 0;
@@ -392,6 +530,8 @@ ssize_t vdev_write_uninterrupted( int fd, char const* buf, size_t len ) {
 
 
 // read, but mask EINTR
+// return number of bytes read on success 
+// return -errno on I/O error
 ssize_t vdev_read_uninterrupted( int fd, char* buf, size_t len ) {
    
    ssize_t num_read = 0;
@@ -423,6 +563,8 @@ ssize_t vdev_read_uninterrupted( int fd, char* buf, size_t len ) {
 
 
 // read a whole file, masking EINTR 
+// return 0 on success, filling buf with up to len bytes 
+// return -errno on open or read errors
 int vdev_read_file( char const* path, char* buf, size_t len ) {
    
    int fd = 0;
@@ -455,6 +597,9 @@ int vdev_read_file( char const* path, char* buf, size_t len ) {
 }
 
 // write a whole file, masking EINTR 
+// return 0 on success
+// return -EINVAL if buf or path is null 
+// return -errno on failiure to open or write or fsync 
 int vdev_write_file( char const* path, char const* buf, size_t len, int flags, mode_t mode ) {
    
    int fd = 0;
@@ -510,6 +655,7 @@ int vdev_write_file( char const* path, char const* buf, size_t len, int flags, m
 
 
 // free a list of dirents 
+// always succeeds
 static void vdev_dirents_free( struct dirent** dirents, int num_entries ) {
    
    if( dirents == NULL ) {
@@ -531,7 +677,11 @@ static void vdev_dirents_free( struct dirent** dirents, int num_entries ) {
 
 
 // process all files in a directory
-// return 0 on success, negative on error
+// return 0 on success
+// return -EINVAL if dir_path or loader are NULL 
+// return -ENOMEM if OOM 
+// return -errno on I/O error 
+// return non-zero if loader fails
 int vdev_load_all( char const* dir_path, vdev_dirent_loader_t loader, void* cls ) {
    
    struct dirent** dirents = NULL;
@@ -545,8 +695,9 @@ int vdev_load_all( char const* dir_path, vdev_dirent_loader_t loader, void* cls 
    num_entries = scandir( dir_path, &dirents, NULL, alphasort );
    if( num_entries < 0 ) {
       
-      vdev_error("scandir('%s') rc = %d\n", dir_path, num_entries );
-      return num_entries;
+      rc = -errno;
+      vdev_error("scandir('%s') rc = %d\n", dir_path, rc );
+      return rc;
    }
    
    for( int i = 0; i < num_entries; i++ ) {
@@ -582,7 +733,9 @@ int vdev_load_all( char const* dir_path, vdev_dirent_loader_t loader, void* cls 
 // get a passwd struct for a user.
 // on success, fill in pwd and *pwd_buf (the caller must free *pwd_buf, but not pwd).
 // return 0 on success
-// return negative on error
+// return -EINVAL if any argument is NULL 
+// return -ENOMEM onOOM 
+// return -ENOENT if the username cnanot be loaded
 int vdev_get_passwd( char const* username, struct passwd* pwd, char** pwd_buf ) {
    
    struct passwd* result = NULL;
@@ -633,6 +786,9 @@ int vdev_get_passwd( char const* username, struct passwd* pwd, char** pwd_buf ) 
 // get a group struct for a group.
 // on success, fill in grp and *grp_buf (the caller must free *grp_buf, but not grp).
 // return 0 on success
+// return -ENOMEM on OOM 
+// return -EINVAL if any argument is NULL 
+// return -ENOENT if the group cannot be found
 int vdev_get_group( char const* groupname, struct group* grp, char** grp_buf ) {
    
    struct group* result = NULL;
@@ -680,6 +836,8 @@ int vdev_get_group( char const* groupname, struct group* grp, char** grp_buf ) {
 
 // make a string of directories, given the path dirp
 // return 0 if the directory exists at the end of the call.
+// return -EINVAL if dirp is NULL 
+// return -ENOMEM if OOM 
 // return negative if the directory could not be created.
 int vdev_mkdirs( char const* dirp, int start, mode_t mode ) {
    
@@ -760,6 +918,9 @@ int vdev_rmdirs( char const* dirp ) {
       else {
          
          char* tmp = vdev_dirname( dirname, NULL );
+         if( tmp == NULL ) {
+            return -ENOMEM;
+         }
          
          free( dirname );
          
@@ -773,7 +934,10 @@ int vdev_rmdirs( char const* dirp ) {
 
 
 // parse an unsigned 64-bit number 
-// set *success to true if we succeeded
+// uint64_str must contain *only* the text of the number 
+// return the number, and set *success to true if we succeeded
+// return -EINVAL if any of hte arguments were NULL
+// return 0, LLONG_MAX, or LLONG_MIN if we failed
 uint64_t vdev_parse_uint64( char const* uint64_str, bool* success ) {
    
    if( uint64_str == NULL || success == NULL ) {
@@ -783,7 +947,7 @@ uint64_t vdev_parse_uint64( char const* uint64_str, bool* success ) {
    char* tmp = NULL;
    uint64_t uid = (uint64_t)strtoll( uint64_str, &tmp, 10 );
    
-   if( *tmp != '\0' ) {
+   if( tmp == uint64_str ) {
       *success = false;
    }
    else {
@@ -796,6 +960,7 @@ uint64_t vdev_parse_uint64( char const* uint64_str, bool* success ) {
 
 // given a null-terminated key=value string, chomp it into a null-terminated key and value.
 // return the original length of the string.
+// return -EINVAL if any argument is NULL
 // return negative on error
 int vdev_keyvalue_next( char* keyvalue, char** key, char** value ) {
    
@@ -827,6 +992,7 @@ int vdev_keyvalue_next( char* keyvalue, char** key, char** value ) {
 // parse a username or uid from a string.
 // translate a username into a uid, if needed
 // return 0 and set *uid on success 
+// return negative if we failed to look up the corresponding user (see vdev_get_passwd)
 // return negative on error 
 int vdev_parse_uid( char const* uid_str, uid_t* uid ) {
    
@@ -856,8 +1022,6 @@ int vdev_parse_uid( char const* uid_str, uid_t* uid ) {
       
       *uid = pwd.pw_uid;
       
-      vdev_debug("UID of '%s' is %d\n", uid_str, *uid );
-      
       free( pwd_buf );
    }
    
@@ -868,6 +1032,7 @@ int vdev_parse_uid( char const* uid_str, uid_t* uid ) {
 // parse a group name or GID from a string
 // translate a group name into a gid, if needed
 // return 0 and set gid on success 
+// return negative if we failed to look up the corresponding group (see vdev_get_group)
 // return negative on error
 int vdev_parse_gid( char const* gid_str, gid_t* gid ) {
    
@@ -897,8 +1062,6 @@ int vdev_parse_gid( char const* gid_str, gid_t* gid ) {
       
       *gid = grp.gr_gid;
       
-      vdev_debug("GID of '%s' is %d\n", gid_str, *gid );
-      
       free( grp_buf );
    }
    
@@ -908,6 +1071,8 @@ int vdev_parse_gid( char const* gid_str, gid_t* gid ) {
 
 // verify that a UID is valid
 // return 0 on success
+// return -ENOMEM on OOM 
+// return -ENOENT on failure to look up the user
 // return negative on error
 int vdev_validate_uid( uid_t uid ) {
    
@@ -947,6 +1112,7 @@ int vdev_validate_uid( uid_t uid ) {
    }
    
    if( uid != pwd.pw_uid ) {
+      // should *never* happen 
       rc = -EINVAL;
    }
    
@@ -957,7 +1123,9 @@ int vdev_validate_uid( uid_t uid ) {
 
 // verify that a GID is valid 
 // return 0 on success
-// return negative on error
+// return -ENOMEM on OOM 
+// return -ENOENT if we couldn't find the corresponding group 
+// return negative on other error
 int vdev_validate_gid( gid_t gid ) {
    
    struct group* result = NULL;

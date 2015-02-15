@@ -59,6 +59,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <grp.h>
+#include <syslog.h>
+#include <sys/resource.h>
 
 #include "pstat/libpstat.h"
 
@@ -69,12 +71,20 @@ extern int _VDEV_DEBUG_MESSAGES;
 extern int _VDEV_INFO_MESSAGES;
 extern int _VDEV_WARN_MESSAGES;
 extern int _VDEV_ERROR_MESSAGES;
+extern int _VDEV_SYSLOG;
+
+#define VDEV_SYSLOG_IDENT "vdev"
 
 #define vdev_debug( format, ... ) \
    do { \
       if( _VDEV_DEBUG_MESSAGES ) { \
-         printf( VDEV_WHERESTR "DEBUG: " format, VDEV_WHEREARG, __VA_ARGS__ ); \
-         fflush(stdout); \
+         if( _VDEV_SYSLOG ) { \
+            syslog( LOG_DAEMON | LOG_DEBUG, format, __VA_ARGS__ ); \
+         } \
+         else { \
+            printf( VDEV_WHERESTR "DEBUG: " format, VDEV_WHEREARG, __VA_ARGS__ ); \
+            fflush(stdout); \
+         } \
       } \
    } while(0)
 
@@ -82,8 +92,13 @@ extern int _VDEV_ERROR_MESSAGES;
 #define vdev_info( format, ... ) \
    do { \
       if( _VDEV_INFO_MESSAGES ) { \
-         printf( VDEV_WHERESTR "INFO: " format, VDEV_WHEREARG, __VA_ARGS__ ); \
-         fflush(stdout); \
+         if( _VDEV_SYSLOG ) { \
+            syslog( LOG_DAEMON | LOG_INFO, format, __VA_ARGS__ ); \
+         } \
+         else { \
+            printf( VDEV_WHERESTR "INFO: " format, VDEV_WHEREARG, __VA_ARGS__ ); \
+            fflush(stdout); \
+         } \
       } \
    } while(0)
 
@@ -91,16 +106,27 @@ extern int _VDEV_ERROR_MESSAGES;
 #define vdev_warn( format, ... ) \
    do { \
       if( _VDEV_WARN_MESSAGES ) { \
-         fprintf(stderr, VDEV_WHERESTR "WARN: " format, VDEV_WHEREARG, __VA_ARGS__); \
-         fflush(stderr); \
+         if( _VDEV_SYSLOG ) { \
+            syslog( LOG_DAEMON | LOG_WARNING, format, __VA_ARGS__ ); \
+         } \
+         else { \
+            fprintf(stderr, VDEV_WHERESTR "WARN: " format, VDEV_WHEREARG, __VA_ARGS__); \
+            fflush(stderr); \
+         } \
       } \
    } while(0)   
 
+   
 #define vdev_error( format, ... ) \
    do { \
       if( _VDEV_ERROR_MESSAGES ) { \
-         fprintf(stderr, VDEV_WHERESTR "ERROR: " format, VDEV_WHEREARG, __VA_ARGS__); \
-         fflush(stderr); \
+         if( _VDEV_SYSLOG ) { \
+            syslog( LOG_DAEMON | LOG_ERR, format, __VA_ARGS__ ); \
+         } \
+         else { \
+            fprintf(stderr, VDEV_WHERESTR "ERROR: " format, VDEV_WHEREARG, __VA_ARGS__); \
+            fflush(stderr); \
+         } \
       } \
    } while(0)
    
@@ -132,8 +158,10 @@ void vdev_set_debug_level( int d );
 void vdev_set_error_level( int e );
 int vdev_get_debug_level();
 int vdev_get_error_level();
+int vdev_enable_syslog();
 
-// shell functions 
+// system functions 
+int vdev_daemonize( int* fd_keep, int num_fds );
 int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t max_output, int* exit_status );
 
 // parser functions 
