@@ -1,4 +1,0 @@
-[vdev-action]
-event=any
-OS_SUBSYSTEM=bsg
-rename_command=echo -n "bsg/$VDEV_PATH"

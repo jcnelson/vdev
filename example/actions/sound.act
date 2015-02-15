@@ -1,4 +1,0 @@
-[vdev-action]
-event=any
-OS_SUBSYSTEM=sound
-rename_command=/bin/echo -n "snd/$VDEV_PATH"
