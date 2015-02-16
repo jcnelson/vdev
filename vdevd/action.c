@@ -678,7 +678,7 @@ int vdev_action_find_next( struct vdev_device_request* vreq, struct vdev_action*
 }
 
 
-// find the path to create for the given device request.
+// find the path to create for the given device request, but in a fail-fast manner (i.e. return on first error)
 // *path will be filled in with path to the device node, relative to the mountpoint.  *path must be NULL on call.
 // return 0 on success
 // return -EINVAL if *path is not NULL, or if we failed to match the vreq against our actions due to a regex error 
@@ -763,7 +763,8 @@ int vdev_action_create_path( struct vdev_device_request* vreq, struct vdev_actio
 }
 
 
-// run all actions for a device, sequentially, in lexographic order
+// run all actions for a device, sequentially, in lexographic order.
+// commands are executed in a fail-fast manner: if a command fails, this method returns immediately.
 // return 0 on success
 // return negative on failure
 int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts ) {
