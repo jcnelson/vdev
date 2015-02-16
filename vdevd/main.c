@@ -91,7 +91,7 @@ int main( int argc, char** argv ) {
    }
    
    // do we need to connect to syslog?
-   if( strcmp( vdev.config->logfile_path, "syslog" ) == 0 ) {
+   if( vdev.config->logfile_path != NULL && strcmp( vdev.config->logfile_path, "syslog" ) == 0 ) {
       
       vdev_debug("%s", "Switching to syslog for messages\n");
       vdev_enable_syslog();
