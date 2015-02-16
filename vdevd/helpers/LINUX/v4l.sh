@@ -1,5 +1,21 @@
 #!/bin/sh
 
+
+source $VDEV_HELPERS/subr.sh
+
+# removing? just blow the links away 
+if [ "$VDEV_ACTION" == "remove" ]; then 
+
+   remove_links $VDEV_METADATA
+   exit 0
+fi
+
+# must be adding...
+if [ "$VDEV_ACTION" != "add" ]; then 
+
+   fail 10 "Unknown action \'$VDEV_ACTION\'"
+fi
+
 BUS=
 INDEX=
 VENDOR=
@@ -35,24 +51,6 @@ fi
 
 # TODO: by-path
 
-case "$VDEV_ACTION" in 
-
-   add)
-
-      /bin/mkdir -p $VDEV_MOUNTPOINT/v4l/by-id
-      /bin/ln -s ../../$VDEV_PATH $VDEV_MOUNTPOINT/v4l/by-id/$ID
-      ;;
-
-   remove)
-
-      /bin/rm -f $VDEV_MOUNTPOINT/v4l/by-id/$ID
-      ;;
-
-   test)
-
-      echo "ln -s ../../$VDEV_PATH $VDEV_MOUNTPOINT/v4l/by-id/$ID"
-      ;;
-
-esac
+add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/v4l/by-id/$ID $VDEV_METADATA
 
 exit 0

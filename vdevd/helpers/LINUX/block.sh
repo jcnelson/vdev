@@ -2,22 +2,22 @@
 
 # helper to link a block device to /dev/block/$MAJOR:$MINOR
 
+source $VDEV_HELPERS/subr.sh
+
 case "$VDEV_ACTION" in 
 
    add)
 
-      /bin/mkdir -p $VDEV_MOUNTPOINT/block
-      /bin/ln -s ../$VDEV_PATH $VDEV_MOUNTPOINT/block/$VDEV_MAJOR:$VDEV_MINOR
+      add_link ../$VDEV_PATH $VDEV_MOUNTPOINT/block/$VDEV_MAJOR:$VDEV_MINOR $VDEV_METADATA
       ;;
 
    remove)
 
-      /bin/rm -f $VDEV_MOUNTPOINT/block/$VDEV_MAJOR:$VDEV_MINOR
+      remove_links $VDEV_METADATA
       ;;
 
-   test)
-
-      echo "ln -s ../$VDEV_PATH $VDEV_MOUNTPOINT/block/$VDEV_MAJOR:$VDEV_MINOR"
+   *)
+      fail 1 "Unknown action \'$VDEV_ACTION\'"
       ;;
 esac
 

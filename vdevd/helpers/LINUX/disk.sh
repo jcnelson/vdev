@@ -3,6 +3,22 @@
 # vdev helper for disks and partitions 
 # works for ATA, SATA, and USB disks.
 
+source $VDEV_HELPERS/subr.sh
+
+# if we're removing this disk, just blow away its symlinks
+if [ "$VDEV_ACTION" == "remove" ]; then 
+
+   remove_links $VDEV_METADATA
+   exit 0
+fi
+
+# otherwise, we're adding links.  Make sure...
+if [ "$VDEV_ACTION" != "add" ]; then 
+
+   fail 10 "Unknown action \'$VDEV_ACTION\'"
+fi
+
+
 DISK_TYPE=
 
 # is this an ATA disk?
@@ -15,7 +31,7 @@ if [ -z "$DISK_TYPE" ]; then
 fi
 
 # do we have a disk type?
-test -z "$DISK_TYPE" && exit 1
+test -z "$DISK_TYPE" && fail 1 "Unknown disk type"
 
 STAT_RET=
 DISK_ID=
@@ -51,17 +67,16 @@ case "$DISK_TYPE" in
    *)
       
       # unknown type
-      echo "Unknown disk type" >&2
-      exit 2
+      fail 2 "Unknown disk type $DISK_TYPE"
       ;;
 
 esac
 
 # verify stat'ing succeeded; otherwise we're done (can't label by id)
-test 0 -ne $STAT_RET && exit 3
+test 0 -ne $STAT_RET && fail 3 "stat_${DISK_TYPE} exited with $STAT_RET"
 
 # verify that we got a disk ID; otherwise we're done (no label to set)
-test -z "$DISK_ID" && exit 4
+test -z "$DISK_ID" && fail 4 "unknown disk ID"
 
 # put label into place
 DISK_NAME="$DISK_TYPE-$DISK_ID"
@@ -72,7 +87,7 @@ if [ "$VDEV_OS_DEVTYPE" = "partition" ]; then
 
    PART=$(/bin/cat $VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH/partition)
 
-   test -z $PART && exit 5
+   test -z $PART && fail 5 "unknown partition"
 
    # include partition ID in the disk name
    PART_NAME="part${PART}"
@@ -92,57 +107,16 @@ if [ -n "$DISK_WWN" ]; then
    fi
 fi
 
-# (un)install by-uuid
-case "$VDEV_ACTION" in
+  
+# add the disk
+if [ -n "$UUID" ]; then
+   add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-uuid/$UUID $VDEV_METADATA 
+fi
 
-   add)
-   
-      if [ -n "$UUID" ]; then 
-         /bin/mkdir -p $VDEV_MOUNTPOINT/disk/by-uuid
-         /bin/ln -s ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-uuid/$UUID
-      fi
+add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$DISK_NAME $VDEV_METADATA
 
-      /bin/mkdir -p $VDEV_MOUNTPOINT/disk/by-id
-      /bin/ln -s ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$DISK_NAME
-
-      if [ -n "$WWN" ]; then
-         /bin/ln -s ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$WWN
-      fi
-
-      ;;
-
-   remove)
-
-      if [ -n "$UUID" ]; then
-         /bin/rm -f $VDEV_MOUNTPOINT/disk/by-uuid/$UUID
-      fi
-      
-      /bin/rm -f $VDEV_MOUNTPOINT/disk/by-id/$DISK_NAME
-
-      if [ -n "$WWN" ]; then 
-         /bin/rm -f $VDEV_MOUNTPOINT/disk/by-id/$WWN 
-      fi 
-      
-      ;;
-
-   test)
-
-      if [ -n "$UUID" ]; then 
-         echo "ln -s ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-uuid/$UUID"
-      fi
-
-      echo "ln -s ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$DISK_NAME"
-
-      if [ -n "$WWN" ]; then 
-         echo "ln -s ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$WWN"
-      fi
-      
-      ;;
-
-   *)
-
-      exit 6
-
-esac
+if [ -n "$WWN" ]; then
+   add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$WWN $VDEV_METADATA
+fi
 
 exit 0

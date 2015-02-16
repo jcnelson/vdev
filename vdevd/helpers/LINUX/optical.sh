@@ -2,6 +2,22 @@
 
 # vdev helper to set up symlinks to optical (CD, DVD) devices, based on capability
 
+source $VDEV_HELPERS/subr.sh
+
+# removing? blow away the symlinks 
+if [ "$VDEV_ACTION" == "remove" ]; then 
+
+   remove_links $VDEV_METADATA
+   exit 0
+fi
+
+# otherwise, make sure we're adding 
+if [ "$VDEV_ACTION" != "add" ]; then 
+
+   fail 10 "Unknown action \'$VDEV_ACTION\'"
+fi
+
+
 STAT_OPTICAL=$VDEV_HELPERS/stat_optical
 
 # set up capability environment variables 
@@ -11,31 +27,7 @@ STAT_OPTICAL_EXIT=$?
 # verify that we stat'ed the optical device...
 test 0 -ne $STAT_OPTICAL_EXIT && exit 0
 
-test_device_symlink() {
-
-   TARGET=$1
-
-   echo "ln -s $VDEV_PATH $VDEV_MOUNTPOINT/$TARGET"
-   return $?
-}
-
-set_device_symlink() {
-   
-   TARGET=$1
-
-   /bin/ln -s $VDEV_PATH $VDEV_MOUNTPOINT/$TARGET
-   return $?
-}
-
-remove_device_symlink() {
-   
-   TARGET=$1
-
-   /bin/rm -f $VDEV_MOUNTPOINT/$TARGET
-   return $?
-}
-
-add_device_symlink() {
+add_capability_link() {
 
    # conditionally set the symlink if the capability is given 
    
@@ -44,7 +36,8 @@ add_device_symlink() {
    TARGET=$3
 
    if [ $CAPABILITY == "1" ]; then
-      set_device_symlink $TARGET
+
+      add_link $VDEV_PATH $VDEV_MOUNTPOINT/$TARGET $VDEV_METADATA
    fi
 
    return 0
@@ -52,53 +45,13 @@ add_device_symlink() {
 
 
 # always add 'cdrom'
-set_device_symlink "cdrom"
+add_link $VDEV_PATH $VDEV_MOUNTPOINT/"cdrom" $VDEV_METADATA 
 
-add_device_symlink $VDEV_PATH $VDEV_OPTICAL_CD_R "cdrw"
-add_device_symlink $VDEV_PATH $VDEV_OPTICAL_CD_RW "cdrw"
-add_device_symlink $VDEV_PATH $VDEV_OPTICAL_DVD "dvd"
-add_device_symlink $VDEV_PATH $VDEV_OPTICAL_DVD_R "dvdrw"
-add_device_symlink $VDEV_PATH $VDEV_OPTICAL_DVD_RAM "dvdrw"
-
-case "$VDEV_ACTION" in
-
-   add)
-   
-      set_device_symlink "cdrom"
-      
-      add_device_symlink $VDEV_PATH $VDEV_OPTICAL_CD_R "cdrw"
-      add_device_symlink $VDEV_PATH $VDEV_OPTICAL_CD_RW "cdrw"
-      add_device_symlink $VDEV_PATH $VDEV_OPTICAL_DVD "dvd"
-      add_device_symlink $VDEV_PATH $VDEV_OPTICAL_DVD_R "dvdrw"
-      add_device_symlink $VDEV_PATH $VDEV_OPTICAL_DVD_RAM "dvdrw"
-      
-      ;;
-
-   remove)
-
-      remove_device_symlink "cdrom"
-      
-      remove_device_symlink $VDEV_PATH $VDEV_OPTICAL_CD_R "cdrw"
-      remove_device_symlink $VDEV_PATH $VDEV_OPTICAL_CD_RW "cdrw"
-      remove_device_symlink $VDEV_PATH $VDEV_OPTICAL_DVD "dvd"
-      remove_device_symlink $VDEV_PATH $VDEV_OPTICAL_DVD_R "dvdrw"
-      remove_device_symlink $VDEV_PATH $VDEV_OPTICAL_DVD_RAM "dvdrw"
-
-      ;;
-
-   test)
-
-      
-      test_device_symlink "cdrom"
-      
-      test_device_symlink $VDEV_PATH $VDEV_OPTICAL_CD_R "cdrw"
-      test_device_symlink $VDEV_PATH $VDEV_OPTICAL_CD_RW "cdrw"
-      test_device_symlink $VDEV_PATH $VDEV_OPTICAL_DVD "dvd"
-      test_device_symlink $VDEV_PATH $VDEV_OPTICAL_DVD_R "dvdrw"
-      test_device_symlink $VDEV_PATH $VDEV_OPTICAL_DVD_RAM "dvdrw"
-
-      ;;
-
-esac
+# conditionally add symlinks, based on capability
+add_capability_link $VDEV_PATH $VDEV_OPTICAL_CD_R "cdrw"
+add_capability_link $VDEV_PATH $VDEV_OPTICAL_CD_RW "cdrw"
+add_capability_link $VDEV_PATH $VDEV_OPTICAL_DVD "dvd"
+add_capability_link $VDEV_PATH $VDEV_OPTICAL_DVD_R "dvdrw"
+add_capability_link $VDEV_PATH $VDEV_OPTICAL_DVD_RAM "dvdrw"
 
 exit 0
