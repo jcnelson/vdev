@@ -144,15 +144,20 @@ int vdev_device_request_to_env( struct vdev_device_request* req, char*** ret_env
    // mode --> VDEV_MODE
    // params --> VDEV_OS_* 
    // mountpoint --> VDEV_MOUNTPOINT
+   // metadata --> VDEV_METADATA 
    // helpers --> VDEV_HELPERS
+   // logfile --> VDEV_LOGFILE
    
-   size_t num_vars = 8 + sglib_vdev_params_len( req->params );
+   size_t num_vars = 10 + sglib_vdev_params_len( req->params );
    int i = 0;
    int rc = 0;
    char dev_buf[50];
    struct vdev_param_t* dp = NULL;
    struct sglib_vdev_params_iterator itr;
    char* vdev_path = req->renamed_path;
+   char metadata_dir[ PATH_MAX + 1 ];
+   
+   sprintf( metadata_dir, "%s/" VDEV_METADATA_PREFIX "/%s", req->state->mountpoint, req->renamed_path );
    
    if( vdev_path == NULL ) {
       vdev_path = req->path;
@@ -223,6 +228,24 @@ int vdev_device_request_to_env( struct vdev_device_request* req, char*** ret_env
    i++;
    
    rc = vdev_device_request_make_env_str( "VDEV_HELPERS", req->state->config->helpers_dir, &env[i] );
+   if( rc != 0 ) {
+      
+      VDEV_FREE_LIST( env );
+      return rc;
+   }
+   
+   i++;
+   
+   rc = vdev_device_request_make_env_str( "VDEV_METADATA", metadata_dir, &env[i] );
+   if( rc != 0 ) {
+      
+      VDEV_FREE_LIST( env );
+      return rc;
+   }
+   
+   i++;
+   
+   rc = vdev_device_request_make_env_str( "VDEV_LOGFILE", req->state->config->logfile_path, &env[i] );
    if( rc != 0 ) {
       
       VDEV_FREE_LIST( env );
@@ -325,7 +348,7 @@ int vdev_device_request_set_mode( struct vdev_device_request* req, mode_t mode )
 }
 
 // record extra metadata (i.e. vdev and OS parameters) for a device node
-// store it as $VDEV_MOUNTPOINT/%VDEV_API_ATTRS_PREFIX/$VDEV_PATH/$PARAM_KEY (set to the contents of $PARAM_VALUE)
+// store it as $VDEV_MOUNTPOINT/$VDEV_METADATA_PREFIX/$VDEV_PATH/$PARAM_KEY (set to the contents of $PARAM_VALUE)
 // return 0 on success
 // return negative on error
 static int vdev_device_add_metadata( struct vdev_device_request* req ) {
@@ -335,12 +358,12 @@ static int vdev_device_add_metadata( struct vdev_device_request* req ) {
    struct vdev_param_t* dp;
    
    char* base_dir = NULL;
-   char api_dir[4096];
+   char metadata_dir[ PATH_MAX + 1 ];
    
    // NOTE: req->path is guaranteed to be <= 256 characters
-   sprintf( api_dir, VDEV_API_ATTRS_PREFIX "/%s", req->renamed_path );
+   sprintf( metadata_dir, VDEV_METADATA_PREFIX "/%s", req->renamed_path );
    
-   base_dir = vdev_fullpath( req->state->mountpoint, api_dir, NULL );
+   base_dir = vdev_fullpath( req->state->mountpoint, metadata_dir, NULL );
    if( base_dir == NULL ) {
       
       return -ENOMEM;
@@ -350,7 +373,7 @@ static int vdev_device_add_metadata( struct vdev_device_request* req ) {
    
    if( rc != 0 ) {
       
-      vdev_error("vdev_mkdirs('%s') rc = %d\n", api_dir, rc );
+      vdev_error("vdev_mkdirs('%s') rc = %d\n", metadata_dir, rc );
       
       free( base_dir );
       return rc;
@@ -424,7 +447,7 @@ static int vdev_device_remove_metadata_file( char const* fp, void* cls ) {
    if( rc != 0 ) {
       
       rc = -errno;
-      vdev_warn("WARN: vdev_device_remove_metadata_file('%s') rc = %d\n", fp, rc );
+      vdev_warn("vdev_device_remove_metadata_file('%s') rc = %d\n", fp, rc );
       return rc;
    }
    
@@ -439,12 +462,12 @@ static int vdev_device_remove_metadata( struct vdev_device_request* req ) {
    int rc = 0;
    
    char* base_dir = NULL;
-   char api_dir[4096];
+   char metadata_dir[ PATH_MAX + 1 ];
    
    // NOTE: req->path is guaranteed to be <= 256 characters
-   sprintf( api_dir, VDEV_API_ATTRS_PREFIX "/%s", req->path );
+   sprintf( metadata_dir, VDEV_METADATA_PREFIX "/%s", req->path );
    
-   base_dir = vdev_fullpath( req->state->mountpoint, api_dir, NULL );
+   base_dir = vdev_fullpath( req->state->mountpoint, metadata_dir, NULL );
    if( base_dir == NULL ) {
       
       return -ENOMEM;
@@ -458,12 +481,25 @@ static int vdev_device_remove_metadata( struct vdev_device_request* req ) {
       vdev_error("vdev_load_all('%s') rc = %d\n", base_dir, rc );
    }
    
+   // remove the directory itself 
+   rc = rmdir( base_dir );
+   if( rc != 0 ) {
+      
+      rc = -errno;
+      vdev_warn("rmdir('%s') rc = %d\n", base_dir, rc );
+   }
+   
    free( base_dir );
    return rc;
 }
 
 
 // handler to add a device
+// rename the device, and if it succeeds, mknod the device (if it exists), 
+// return 0 on success, masking failure to write metadata or failure to run a specific command.
+// return -ENOMEM on OOM 
+// return -EACCES if we do not have enough privileges to create the device node 
+// return -EEXIST if the device node already exists
 static int vdev_device_add( struct vdev_wreq* wreq, void* cls ) {
    
    int rc = 0;
@@ -520,8 +556,7 @@ static int vdev_device_add( struct vdev_wreq* wreq, void* cls ) {
       if( strchr(req->renamed_path, '/') != NULL ) {
       
          // make sure the directories leading to this path exist
-         // 0777 is okay, since we'll equivocate about them
-         rc = vdev_mkdirs( fp_dir, strlen(req->state->mountpoint), 0777 );
+         rc = vdev_mkdirs( fp_dir, strlen(req->state->mountpoint), 0755 );
          if( rc != 0 ) {
          
             vdev_error("vdev_mkdirs('%s') rc = %d\n", fp_dir, rc );
@@ -532,9 +567,8 @@ static int vdev_device_add( struct vdev_wreq* wreq, void* cls ) {
       
       if( rc == 0 ) {
          
-         // call into our mknod() via FUSE (waking up inotify/kqueue listeners)
-         // it's okay to use 0777, since we'll equivocate about it later
-         rc = mknod( fp, req->mode | 0777, req->dev );
+         // make the device
+         rc = mknod( fp, req->mode | req->state->config->default_mode, req->dev );
          if( rc != 0 ) {
             
             rc = -errno;
@@ -566,7 +600,8 @@ static int vdev_device_add( struct vdev_wreq* wreq, void* cls ) {
       rc = vdev_action_run_commands( req, req->state->acts, req->state->num_acts );
       if( rc != 0 ) {
          
-         vdev_error("vdev_action_run_commands(ADD %p, dev=(%u, %u)) rc = %d\n", req, major(req->dev), minor(req->dev), rc );
+         vdev_error("vdev_action_run_commands(ADD %s, dev=(%u, %u)) rc = %d\n", req->renamed_path, major(req->dev), minor(req->dev), rc );
+         rc = 0;
       }
    }
    
@@ -578,7 +613,8 @@ static int vdev_device_add( struct vdev_wreq* wreq, void* cls ) {
 }
 
 // handler to remove a device (unlink)
-// need to fork to do this
+// return 0 on success.  This masks failure to unlink or clean up metadata or a failed action.
+// return -ENOMEM on OOM 
 static int vdev_device_remove( struct vdev_wreq* wreq, void* cls ) {
    
    int rc = 0;
@@ -603,11 +639,19 @@ static int vdev_device_remove( struct vdev_wreq* wreq, void* cls ) {
    
    vdev_info("REMOVE device: type '%s' at '%s' ('%s' %d:%d)\n", (S_ISBLK(req->mode) ? "block" : S_ISCHR(req->mode) ? "char" : "unknown"), req->renamed_path, req->path, major(req->dev), minor(req->dev) );
       
-   if( req->renamed_path != NULL && strcmp( req->renamed_path, VDEV_DEVICE_PATH_UNKNOWN ) != 0 ) {
+   if( req->renamed_path != NULL && strcmp( req->renamed_path, VDEV_DEVICE_PATH_UNKNOWN ) != 0 && req->dev != 0 && req->mode != 0 ) {
       
+      // call all REMOVE actions
+      rc = vdev_action_run_commands( req, req->state->acts, req->state->num_acts );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_action_run_all(REMOVE %s) rc = %d\n", req->renamed_path, rc );
+         rc = 0;
+      }
+      
+      // remove the data itself
       char* fp = vdev_fullpath( req->state->mountpoint, req->path, NULL );
-   
-      // call into our unlink() via FUSE (waking up inotify/kqueue listeners)
+      
       rc = unlink( fp );
       if( rc != 0 ) {
          
@@ -615,17 +659,9 @@ static int vdev_device_remove( struct vdev_wreq* wreq, void* cls ) {
          
          if( rc != -ENOENT ) {
             vdev_error("unlink(%s) rc = %d\n", fp, rc );
-            
-            vdev_device_request_free( req );
-            free( req );
-            free( fp );
-            
-            return rc;
          }
-         else {
-            
-            rc = 0;
-         }
+         
+         rc = 0;
       }
       
       // remove metadata 
@@ -642,28 +678,10 @@ static int vdev_device_remove( struct vdev_wreq* wreq, void* cls ) {
       if( rc != 0 && rc != -ENOTEMPTY && rc != -ENOENT ) {
          
          vdev_error("vdev_rmdirs('%s') rc = %d\n", fp, rc );
-         
-         vdev_device_request_free( req );
-         free( req );
-         free( fp );
-         
-         return rc;
-      }
-      else {
          rc = 0;
       }
       
       free( fp );
-   }
-      
-   if( rc == 0 ) {
-      
-      // call all REMOVE actions
-      rc = vdev_action_run_commands( req, req->state->acts, req->state->num_acts );
-      if( rc != 0 ) {
-         
-         vdev_error("vdev_action_run_all(REMOVE %p) rc = %d\n", req, rc );
-      }
    }
    
    // done with this request 
