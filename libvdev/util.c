@@ -496,6 +496,7 @@ int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t m
             if( *output == NULL ) {
                
                // out of memory 
+               close( p[0] );
                return -ENOMEM;
             }
             
