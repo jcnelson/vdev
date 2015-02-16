@@ -1,4 +1,4 @@
 [vdev-action]
-event=add
+event=any
 path=^sr[0-9]*$
 command=exec $VDEV_HELPERS/optical.sh
