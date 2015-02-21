@@ -245,14 +245,17 @@ int vdev_device_request_to_env( struct vdev_device_request* req, char*** ret_env
    
    i++;
    
-   rc = vdev_device_request_make_env_str( "VDEV_LOGFILE", req->state->config->logfile_path, &env[i] );
-   if( rc != 0 ) {
+   if( req->state->config->logfile_path != NULL && strcasecmp( req->state->config->logfile_path, "syslog" ) != 0 ) {
       
-      VDEV_FREE_LIST( env );
-      return rc;
+      rc = vdev_device_request_make_env_str( "VDEV_LOGFILE", req->state->config->logfile_path, &env[i] );
+      if( rc != 0 ) {
+         
+         VDEV_FREE_LIST( env );
+         return rc;
+      }
+      
+      i++;
    }
-   
-   i++;
    
    // add all OS-specific parameters 
    for( dp = sglib_vdev_params_it_init_inorder( &itr, req->params ); dp != NULL; dp = sglib_vdev_params_it_next( &itr ) ) {
