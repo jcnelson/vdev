@@ -45,6 +45,11 @@
 #define LONG(x) ((x)/BITS_PER_LONG)
 #define test_bit(bit, array)    ((array[LONG(bit)] >> OFF(bit)) & 1)
 
+#define VDEV_INPUT_CLASS_KBD            0x1
+#define VDEV_INPUT_CLASS_MOUSE          0x2
+#define VDEV_INPUT_CLASS_JOYSTICK       0x3
+
+int g_input_class = 0;
 
 static inline int abs_size_mm(const struct input_absinfo *absinfo) {
    /* Resolution is defined to be in units/mm for ABS_X/Y */
@@ -98,8 +103,6 @@ static void get_cap_mask( char const* sysfs_cap_path, unsigned long *bitmask, si
    char* word;
    unsigned long val;
    int rc = 0;
-   ssize_t nr = 0;
-   ssize_t num_read = 0;
    
    memset( text, 0, 4096 );
    
@@ -108,31 +111,14 @@ static void get_cap_mask( char const* sysfs_cap_path, unsigned long *bitmask, si
       return;
    }
    
-   while( num_read < 4096 ) {
-      
-      nr = read( fd, text + num_read, 4096 - num_read );
-      
-      if( nr < 0 ) {
-         
-         rc = -errno;
-         if( rc == -EINTR ) {
-            continue;
-         }
-         else {
-            log_debug("read(%d) errno = %d\n", fd, rc );
-            close(fd);
-            return;
-         }
-      }
-      
-      if( nr == 0 ) {
-         break;
-      }
-      
-      num_read += nr;
-   }
-   
+   rc = vdev_read_uninterrupted( fd, text, 4096 );
    close( fd );
+   
+   if( rc < 0 ) {
+      
+      log_debug("read('%s') errno = %d\n", sysfs_cap_path, rc );   
+      return;
+   }
    
    memset( bitmask, 0, bitmask_len * sizeof(unsigned long) );
    
@@ -188,6 +174,8 @@ static void test_pointers (const unsigned long* bitmask_ev,
       if (test_bit (BTN_STYLUS, bitmask_key) || test_bit (BTN_TOOL_PEN, bitmask_key)) {
          
          vdev_property_add( "VDEV_INPUT_TABLET", "1" );
+         
+         g_input_class = VDEV_INPUT_CLASS_MOUSE;
       }
       
       else if (test_bit (BTN_TOOL_FINGER, bitmask_key) && !test_bit (BTN_TOOL_PEN, bitmask_key)) {
@@ -203,6 +191,8 @@ static void test_pointers (const unsigned long* bitmask_ev,
       else if (test_bit (BTN_TOUCH, bitmask_key)) {
          
          vdev_property_add( "VDEV_INPUT_TOUCHSCREEN", "1" );
+         
+         g_input_class = VDEV_INPUT_CLASS_MOUSE;
       }
       
       /* joysticks don't necessarily have to have buttons; e. g.
@@ -221,6 +211,8 @@ static void test_pointers (const unsigned long* bitmask_ev,
                test_bit (ABS_BRAKE, bitmask_abs)) {
          
          vdev_property_add( "VDEV_INPUT_JOYSTICK", "1" );
+         
+         g_input_class = VDEV_INPUT_CLASS_JOYSTICK;
       }
    }
 
@@ -234,11 +226,15 @@ static void test_pointers (const unsigned long* bitmask_ev,
    if (is_mouse) {
       
       vdev_property_add( "VDEV_INPUT_MOUSE", "1" );
+      
+      g_input_class = VDEV_INPUT_CLASS_MOUSE;
    }
    
    if( is_touchpad ) {
       
       vdev_property_add( "VDEV_INPUT_TOUCHPAD", "1" );
+      
+      g_input_class = VDEV_INPUT_CLASS_MOUSE;
    }
 }
 
@@ -283,13 +279,15 @@ static void test_key (const unsigned long* bitmask_ev,
    if ((bitmask_key[0] & mask) == mask) {
       
       vdev_property_add( "VDEV_INPUT_KEYBOARD", "1" );
+      
+      g_input_class = VDEV_INPUT_CLASS_KBD;
    }
 }
 
 
 void usage(char const* program_name ) {
    
-   fprintf(stderr, "Usage: %s /path/to/input/device/file", program_name);
+   fprintf(stderr, "Usage: %s /path/to/input/device/file\n", program_name);
    
 }
 
@@ -383,6 +381,28 @@ int main( int argc, char** argv ) {
    if( strncmp( basename, "event", 5) == 0 ) {
       
       extract_input_resolution( argv[1] );
+   }
+   
+   // state the input class too 
+   switch( g_input_class ) {
+      
+      case VDEV_INPUT_CLASS_JOYSTICK: {
+         
+         vdev_property_add( "VDEV_INPUT_CLASS", "joystick" );
+         break;
+      }
+      
+      case VDEV_INPUT_CLASS_MOUSE: {
+         
+         vdev_property_add( "VDEV_INPUT_CLASS", "mouse" );
+         break;
+      }
+      
+      case VDEV_INPUT_CLASS_KBD: {
+         
+         vdev_property_add( "VDEV_INPUT_CLASS", "kbd" );
+         break;
+      }
    }
    
    vdev_property_print();
