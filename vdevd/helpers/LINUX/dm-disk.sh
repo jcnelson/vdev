@@ -3,7 +3,7 @@
 
 # helper for generating dm block device paths.
 
-source $VDEV_HELPERS/subr.sh
+. $VDEV_HELPERS/subr.sh
 
 # if removing, just blow away the links
 if [ "$VDEV_ACTION" == "remove" ]; then
@@ -15,13 +15,12 @@ fi
 # make sure we're adding... 
 if [ "$VDEV_ACTION" != "add" ]; then 
 
-   fail 10 "Unknown action \'$VDEV_ACTION\'"
+   fail 10 "Unknown action '$VDEV_ACTION'"
 fi
 
 DM_QUERY="/sbin/dmsetup -j $VDEV_MAJOR -m $VDEV_MINOR --noudevrules --noudevsync --noheadings --columns info"
 
 # get name and UUID, for /dev/disk/by-id
-# TODO: WWN
 DM_NAME=$($DM_QUERY -oname)
 DM_UUID=$($DM_QUERY -oUUID)
 
