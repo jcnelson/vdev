@@ -1,4 +1,4 @@
 [vdev-action]
 event=any
 OS_SUBSYSTEM=drm
-rename_command=echo -n "$VDEV_OS_DEVNAME"
+rename_command=test "$VDEV_PATH" != "UNKNOWN" && echo -n "$VDEV_OS_DEVNAME"; exit 0
