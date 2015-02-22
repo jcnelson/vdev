@@ -2,4 +2,4 @@
 event=add
 path=^audio$
 OS_SUBSYSTEM=sound
-command=/bin/mknod $VDEV_MOUNTPOINT/audio c $VDEV_MAJOR $VDEV_MINOR
+command=test -f $VDEV_MOUNTPOINT/audio || /bin/mknod $VDEV_MOUNTPOINT/audio c $VDEV_MAJOR $VDEV_MINOR && exit $?; exit 0
