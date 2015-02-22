@@ -1,9 +1,9 @@
 #!/bin/sh
 
-# vdev helper for disks and partitions 
+# vdev helper for setting up symlinks to disks and partitions 
 # works for ATA, SATA, and USB disks.
 
-source $VDEV_HELPERS/subr.sh
+. $VDEV_HELPERS/subr.sh
 
 # if we're removing this disk, just blow away its symlinks
 if [ "$VDEV_ACTION" == "remove" ]; then 
@@ -15,11 +15,8 @@ fi
 # otherwise, we're adding links.  Make sure...
 if [ "$VDEV_ACTION" != "add" ]; then 
 
-   fail 10 "Unknown action \'$VDEV_ACTION\'"
+   fail 10 "Unknown action '$VDEV_ACTION'"
 fi
-
-
-DISK_TYPE=
 
 # is this an ATA disk?
 DISK_TYPE=$(test -n "$(echo $VDEV_OS_DEVPATH | /bin/grep -i ata)" && echo "ata")
@@ -30,8 +27,8 @@ if [ -z "$DISK_TYPE" ]; then
    DISK_TYPE=$(test -n "$(echo $VDEV_OS_DEVPATH | /bin/grep -i usb)" && echo "usb")
 fi
 
-# do we have a disk type?
-test -z "$DISK_TYPE" && fail 1 "Unknown disk type"
+# is this a disk type this script supports?
+test -z "$DISK_TYPE" && exit 0
 
 STAT_RET=
 DISK_ID=
@@ -67,7 +64,7 @@ case "$DISK_TYPE" in
    *)
       
       # unknown type
-      fail 2 "Unknown disk type $DISK_TYPE"
+      fail 2 "Unknown disk type '$DISK_TYPE'"
       ;;
 
 esac
