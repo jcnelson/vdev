@@ -2,7 +2,7 @@
 
 # vdev helper to set up symlinks to optical (CD, DVD) devices, based on capability
 
-source $VDEV_HELPERS/subr.sh
+. $VDEV_HELPERS/subr.sh
 
 # removing? blow away the symlinks 
 if [ "$VDEV_ACTION" == "remove" ]; then 
@@ -14,18 +14,15 @@ fi
 # otherwise, make sure we're adding 
 if [ "$VDEV_ACTION" != "add" ]; then 
 
-   fail 10 "Unknown action \'$VDEV_ACTION\'"
+   fail 10 "Unknown action '$VDEV_ACTION'"
 fi
 
-
-STAT_OPTICAL=$VDEV_HELPERS/stat_optical
-
 # set up capability environment variables 
-eval $($STAT_OPTICAL $VDEV_MOUNTPOINT/$VDEV_PATH)
-STAT_OPTICAL_EXIT=$?
+eval $($VDEV_HELPERS/stat_optical $VDEV_MOUNTPOINT/$VDEV_PATH)
+STAT_RC=$?
 
 # verify that we stat'ed the optical device...
-test 0 -ne $STAT_OPTICAL_EXIT && exit 0
+test 0 -ne $STAT_RC && fail 1 "Not an optical device"
 
 add_capability_link() {
 
@@ -39,13 +36,11 @@ add_capability_link() {
 
       add_link $VDEV_PATH $VDEV_MOUNTPOINT/$TARGET $VDEV_METADATA
    fi
-
-   return 0
 }
 
 
 # always add 'cdrom'
-add_link $VDEV_PATH $VDEV_MOUNTPOINT/"cdrom" $VDEV_METADATA 
+add_link $VDEV_PATH $VDEV_MOUNTPOINT/cdrom $VDEV_METADATA 
 
 # conditionally add symlinks, based on capability
 add_capability_link $VDEV_PATH $VDEV_OPTICAL_CD_R "cdrw"
