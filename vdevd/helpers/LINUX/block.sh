@@ -2,7 +2,7 @@
 
 # helper to link a block device to /dev/block/$MAJOR:$MINOR
 
-source $VDEV_HELPERS/subr.sh
+. $VDEV_HELPERS/subr.sh
 
 case "$VDEV_ACTION" in 
 
