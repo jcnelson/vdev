@@ -751,12 +751,21 @@ int vdev_action_create_path( struct vdev_device_request* vreq, struct vdev_actio
    
    if( *path != NULL && strlen(*path) == 0 ) {
       
-      vdev_error("Zero-length path generated for '%s'\n", vreq->path );
-      
-      free( *path );
-      *path = NULL;
-      
-      rc = -ENODATA;
+      // if this is "UNKNOWN", then just reset to "UNKNOWN"
+      if( strcmp(vreq->path, VDEV_DEVICE_PATH_UNKNOWN) == 0 ) {
+         
+         free( *path );
+         *path = vdev_strdup_or_null( VDEV_DEVICE_PATH_UNKNOWN );
+      }
+      else {
+         
+         vdev_error("Zero-length path generated for '%s'\n", vreq->path );
+         
+         free( *path );
+         *path = NULL;
+         
+         rc = -ENODATA;
+      }
    }
    
    return rc;
@@ -764,7 +773,7 @@ int vdev_action_create_path( struct vdev_device_request* vreq, struct vdev_actio
 
 
 // run all actions for a device, sequentially, in lexographic order.
-// commands are executed in a fail-fast manner: if a command fails, this method returns immediately.
+// commands are executed optimistically--even if one fails, the other subsequent ones will be attempted
 // return 0 on success
 // return negative on failure
 int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts ) {
@@ -823,7 +832,15 @@ int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_acti
          if( rc != 0 ) {
             
             vdev_error("%s('%s') rc = %d\n", method, acts[i].command, rc );
-            return rc;
+            
+            if( rc < 0 ) {
+               return rc;
+            }
+            else {
+               
+               // mask non-zero exit statuses 
+               rc = 0;  
+            }
          }
       }
    }
