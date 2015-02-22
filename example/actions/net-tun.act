@@ -2,4 +2,4 @@
 event=any
 OS_SUBSYSTEM=misc
 path=^tun$
-rename_command=echo -n "net/$VDEV_PATH"
+rename_command=test "$VDEV_PATH" != "UNKNOWN" && echo -n "net/$VDEV_PATH"; exit 0
