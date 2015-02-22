@@ -1,0 +1,4 @@
+[vdev-action]
+event=any
+OS_SUBSYSTEM=input
+command=exec $VDEV_HELPERS/input.sh
