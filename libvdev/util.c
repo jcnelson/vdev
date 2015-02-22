@@ -551,7 +551,7 @@ int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t m
       
       if( WIFEXITED( status ) ) {
          
-         *exit_status = WEXITSTATUS( *exit_status );
+         *exit_status = WEXITSTATUS( status );
       }
       else if( WIFSIGNALED( status ) ) {
          
