@@ -43,9 +43,7 @@ remove_links() {
    while read LINKNAME; do
 
       DIRNAME=$(echo $LINKNAME | /bin/sed -r "s/[^/]+$//g")
-
-      echo "remove $LINKNAME" >> /tmp/vdev-subr.log 
-
+      
       /bin/rm -f $LINKNAME
       /bin/rmdir $DIRNAME 2>/dev/null
 
@@ -54,6 +52,24 @@ remove_links() {
    /bin/rm -f $METADATA/links
    
    return 0
+}
+
+
+# log a message to the logfile, or stdout 
+# arguments:
+#   $1  message to log 
+vdev_log() {
+   
+   if [ -z "$VDEV_LOGFILE" ]; then
+      # stdout 
+      echo "$1" >> /tmp/vdev-subr.log
+
+   else
+
+      # logfile 
+      echo "$1" >> $VDEV_LOGFILE
+
+   fi 
 }
 
 # log a message to vdev's log and exit 
@@ -65,9 +81,52 @@ fail() {
    MSG=$2
 
    if [ -n "$MSG" ]; then
-      echo "$PROGNAME \'$VDEV_PATH\': $MSG" >> $VDEV_LOGFILE
+      vdev_log "$PROGNAME '$VDEV_PATH': $MSG"
    fi
 
    exit $CODE
+}
+
+
+# print the list of device drivers in a sysfs device path 
+#   $1  sysfs device path
+drivers() {
+   
+   SYSFS_PATH=$1
+
+   # strip trailing '/'
+   SYSFS_PATH=$(echo $SYSFS_PATH | /bin/sed -r "s/[/]+$//g")
+   
+   while [ -n "$SYSFS_PATH" ]; do
+      
+      # driver name is the base path name of the link target of $SYSFS_PATH/driver
+      test -L $SYSFS_PATH/driver && /bin/readlink $SYSFS_PATH/driver | /bin/sed -r "s/[^/]*\///g"
+
+      # search parent 
+      SYSFS_PATH=$(echo $SYSFS_PATH | /bin/sed -r "s/[^/]+$//g" | /bin/sed -r "s/[/]+$//g")
+      
+   done
+}
+
+
+# print the list of subsystems in a sysfs device path 
+#  $1   sysfs device path 
+# NOTE: uniqueness is not guaranteed!
+subsystems() {
+
+   SYSFS_PATH=$1
+
+   # strip trailing '/'
+   SYSFS_PATH=$(echo $SYSFS_PATH | /bin/sed -r "s/[/]+$//g")
+   
+   while [ -n "$SYSFS_PATH" ]; do
+      
+      # subsystem name is the base path name of the link target of $SYSFS_PATH/subsystem
+      test -L $SYSFS_PATH/subsystem && /bin/readlink $SYSFS_PATH/subsystem | /bin/sed -r "s/[^/]*\///g"
+
+      # search parent 
+      SYSFS_PATH=$(echo $SYSFS_PATH | /bin/sed -r "s/[^/]+$//g" | /bin/sed -r "s/[/]+$//g")
+      
+   done
 }
 
