@@ -460,7 +460,9 @@ int vdev_property_free_all( void ) {
 
 
 // read a file, masking EINTR
-static ssize_t vdev_read_uninterrupted( int fd, char* buf, size_t len ) {
+// return the number of bytes read on success
+// return -errno on failure
+ssize_t vdev_read_uninterrupted( int fd, char* buf, size_t len ) {
    
    ssize_t num_read = 0;
    
@@ -575,6 +577,7 @@ int vdev_sysfs_read_attr( char const* sysfs_device_path, char const* attr_name, 
    }
 }
 
+
 // find a field value from a uevent 
 // return 0 on success
 // return -ENOENT if the key is not found 
@@ -639,6 +642,8 @@ int vdev_sysfs_uevent_get_key( char const* uevent_buf, size_t uevent_buflen, cha
 }
 
 // read a whole file into RAM
+// return 0 on success, and set *file_buf and *file_buf_len 
+// return negative on error
 int vdev_read_file( char const* path, char** file_buf, size_t* file_buf_len ) {
    
    int fd = 0;
@@ -683,6 +688,44 @@ int vdev_read_file( char const* path, char** file_buf, size_t* file_buf_len ) {
    *file_buf_len = rc;
    
    return 0;
+}
+
+
+// find a field in the uevent buffer, using vdev_read_file and vdev_sysfs_uevent_get_key
+// return 0 on success, and set *value and *value_len 
+// return negative on error
+int vdev_sysfs_uevent_read_key( char const* sysfs_device_path, char const* uevent_key, char** uevent_value, size_t* uevent_value_len ) {
+   
+   int rc = 0;
+   
+   char* uevent_buf = NULL;
+   size_t uevent_len = 0;
+   
+   char* uevent_path = (char*)calloc( strlen(sysfs_device_path) + strlen("/uevent") + 1, 1 );
+   if( uevent_path == NULL ) {
+      
+      return -ENOMEM;
+   }
+   
+   sprintf( uevent_path, "%s/uevent", sysfs_device_path );
+   
+   // get uevent 
+   rc = vdev_read_file( uevent_path, &uevent_buf, &uevent_len );
+   if( rc < 0 ) {
+      
+      if( DEBUG ) {
+         fprintf(stderr, "WARN: vdev_read_file('%s') rc = %d\n", uevent_path, rc );
+      }
+      return rc;
+   }
+   
+   // get devtype 
+   rc = vdev_sysfs_uevent_get_key( uevent_buf, uevent_len, uevent_key, uevent_value, uevent_value_len );
+   
+   free( uevent_buf );
+   free( uevent_path );
+   
+   return rc;
 }
 
 
@@ -986,6 +1029,7 @@ int vdev_sysfs_device_path_from_subsystem_sysname( char const* sysfs_mount, char
 // walk up the path until we reach /
 // return 0 on success
 // return -EINVAL if the dev path has no '/'
+// return -ENOENT if this dev has no parent
 // return -errno if stat'ing the parent path fails 
 // return -ENOMEM if OOM
 int vdev_sysfs_get_parent_device( char const* dev_path, char** ret_parent_device, size_t* ret_parent_device_len ) {
@@ -1013,6 +1057,13 @@ int vdev_sysfs_get_parent_device( char const* dev_path, char** ret_parent_device
          // invalid 
          free( parent_path );
          return -EINVAL;
+      }
+      
+      if( delim == parent_path ) {
+         
+         // reached /
+         free( parent_path );
+         return -ENOENT;
       }
       
       while( *delim == '/' && delim != parent_path ) {
@@ -1128,4 +1179,90 @@ int vdev_sysfs_get_sysname( char const* devpath, char** ret_sysname, size_t* ret
     
    return 0;
 }
+
+
+// get the sysnum of a device from the device path 
+int vdev_sysfs_get_sysnum( char const* devpath, int* sysnum ) {
+   
+   int rc = 0;
+   char* sysname = NULL;
+   size_t sysname_len = 0;
+   int i = 0;
+   
+   // last digits at the end of the sysname 
+   rc = vdev_sysfs_get_sysname( devpath, &sysname, &sysname_len );
+   if( rc != 0 ) {
+      return rc;
+   }
+   
+   while( isdigit( sysname[ sysname_len - i ] ) ) {
+      i++;
+   }
+   i++;
+   
+   *sysnum = strtol( sysname + sysname_len - i, NULL, 10 );
+   
+   free( sysname );
+   
+   return 0;
+}
+
+
+// get the absolute sysfs device path from a major/minor pair and device type 
+// return 0 on success, and set *syspath and *syspath_len 
+// return negative on error 
+int vdev_sysfs_get_syspath_from_device( char const* sysfs_mountpoint, mode_t mode, unsigned int major, unsigned int minor, char** syspath, size_t* syspath_len ) {
+   
+   char* devpath = (char*)calloc( strlen(sysfs_mountpoint) + 4097, 1 );
+   char linkbuf[4097];
+   
+   if( devpath == NULL ) {
+      return -ENOMEM;
+   }
+   
+   int rc = 0;
+   
+   memset( linkbuf, 0, 4097 );
+   
+   if( S_ISCHR( mode ) ) {
+      
+      // character device 
+      sprintf(devpath, "%s/dev/char/%u:%u", sysfs_mountpoint, major, minor );
+   }
+   else if( S_ISBLK( mode ) ) {
+      
+      // block device 
+      sprintf(devpath, "%s/dev/block/%u:%u", sysfs_mountpoint, major, minor );
+   }
+   else {
+      
+      free( devpath );
+      return -EINVAL;
+   }
+   
+   rc = readlink( devpath, linkbuf, 4097 );
+   if( rc < 0 ) {
+      
+      rc = -errno;
+      free( devpath );
+      return rc;
+   }
+   
+   // link should start with "../devices"
+   if( strncmp( linkbuf, "../../devices", strlen("../../devices") ) != 0 ) {
+      
+      // sysfs structure changed???
+      free( devpath );
+      return -EIO;
+   }
+   
+   sprintf( devpath, "%s/%s", sysfs_mountpoint, linkbuf + strlen("../../") );
+   
+   *syspath = devpath;
+   *syspath_len = strlen(devpath);
+   
+   return 0;
+}
+
+
 

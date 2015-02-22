@@ -25,6 +25,7 @@
 
 #define _BSD_SOURCE
 #define _POSIX_C_SOURCE 200809L
+#define _GNU_SOURCE
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,13 +44,15 @@
 #include <time.h>
 #include <dirent.h>
 
-#define DEBUG 1
+#ifndef DEBUG
+#define DEBUG 0
+#endif
 
 #define VDEV_WHERESTR "%05d: [%16s:%04u] %s: "
 #define VDEV_WHEREARG (int)getpid(), __FILE__, __LINE__, __func__
 
 #define log_debug(x, ...) if( DEBUG ) { fprintf(stderr, VDEV_WHERESTR x "\n", VDEV_WHEREARG, __VA_ARGS__); }
-#define log_error(x, ...) if( 1 ) { fprintf(stderr,VDEV_WHERESTR x "\n", VDEV_WHEREARG, __VA_ARGS__); }
+#define log_error(x, ...) if( DEBUG ) { fprintf(stderr,VDEV_WHERESTR x "\n", VDEV_WHEREARG, __VA_ARGS__); }
 
 #ifndef memzero 
 #define memzero(b, z) memset( b, 0, z )
@@ -102,6 +105,7 @@ int vdev_property_free_all( void );
 
 // sysfs methods 
 int vdev_sysfs_read_attr( char const* sysfs_device_path, char const* attr_name, char** value, size_t* value_len );
+int vdev_sysfs_uevent_read_key( char const* sysfs_device_path, char const* uevent_key, char** uevent_value, size_t* uevent_value_len );
 int vdev_sysfs_uevent_get_key( char const* uevent_buf, size_t uevent_buflen, char const* key, char** value, size_t* value_len );
 int vdev_sysfs_get_parent_with_subsystem_devtype( char const* sysfs_device_path, char const* subsystem_name, char const* devtype_name, char** devpath, size_t* devpath_len );
 int vdev_sysfs_read_device_path( char const* sysfs_dir, char** devpath, size_t* devpath_len );
@@ -109,8 +113,11 @@ int vdev_sysfs_device_path_from_subsystem_sysname( char const* sysfs_mount, char
 int vdev_sysfs_get_parent_device( char const* dev_path, char** ret_parent_device, size_t* ret_parent_device_len );
 int vdev_sysfs_read_subsystem( char const* devpath, char** ret_subsystem, size_t* ret_subsystem_len );
 int vdev_sysfs_get_sysname( char const* devpath, char** sysname, size_t* sysname_len );
+int vdev_sysfs_get_sysnum( char const* devpath, int* sysnum );
+int vdev_sysfs_get_syspath_from_device( char const* sysfs_mountpoint, mode_t mode, unsigned int major, unsigned int minor, char** syspath, size_t* syspath_len );
 
 // file operations 
+ssize_t vdev_read_uninterrupted( int fd, char* buf, size_t len );
 int vdev_read_file( char const* path, char** file_buf, size_t* file_buf_len );
 
 #endif
