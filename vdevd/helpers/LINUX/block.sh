@@ -17,7 +17,7 @@ case "$VDEV_ACTION" in
       ;;
 
    *)
-      fail 1 "Unknown action \'$VDEV_ACTION\'"
+      fail 1 "Unknown action '$VDEV_ACTION'"
       ;;
 esac
 
