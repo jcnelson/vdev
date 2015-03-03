@@ -91,8 +91,10 @@ if [ "$VDEV_OS_DEVTYPE" = "partition" ]; then
    DISK_NAME="$DISK_NAME-$PART_NAME"
 fi
 
-# get disk UUID
-UUID=$(/sbin/blkid | /bin/grep "$VDEV_PATH:" | /bin/sed 's/[^ ]* UUID="\([^ ]*\)" .*/\1/g')
+# get disk UUID and LABEL 
+BLKID=$(/sbin/blkid | /bin/grep "$VDEV_PATH:")
+UUID=$(echo "$BLKID" | /bin/grep "UUID=" | /bin/sed 's/[^ ]* UUID="\([^ ]*\)" .*/\1/g')
+LABEL=$(echo "$BLKID" | /bin/grep "LABEL=" | /bin/sed 's/[^ ]* LABEL="\([^ ]*\)" .*/\1/g')
 
 # get disk WWN, if set 
 WWN=
@@ -111,6 +113,10 @@ if [ -n "$UUID" ]; then
 fi
 
 add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$DISK_NAME $VDEV_METADATA
+
+if [ -n "$LABEL" ]; then 
+   add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-label/$LABEL $VDEV_METADATA
+fi
 
 if [ -n "$WWN" ]; then
    add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$WWN $VDEV_METADATA
