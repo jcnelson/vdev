@@ -6,7 +6,7 @@ C_SRCS:= $(wildcard *.c)
 HEADERS := $(wildcard *.h)
 OBJ   := $(patsubst %.c,%.o,$(C_SRCS))
 
-DEFS  := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS -D_BSD_SOURCE
+DEFS  := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS 
 
 VERSION_MAJOR := 1
 VERSION_MINOR := 0
