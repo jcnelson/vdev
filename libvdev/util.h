@@ -5,7 +5,7 @@
    This program is dual-licensed: you can redistribute it and/or modify
    it under the terms of the GNU General Public License version 3 or later as 
    published by the Free Software Foundation. For the terms of this 
-   license, see LICENSE.LGPLv3+ or <http://www.gnu.org/licenses/>.
+   license, see LICENSE.GPLv3+ or <http://www.gnu.org/licenses/>.
 
    You are free to use this program under the terms of the GNU General
    Public License, but WITHOUT ANY WARRANTY; without even the implied 
@@ -22,7 +22,17 @@
 #ifndef _VDEV_UTIL_H_
 #define _VDEV_UTIL_H_
 
-#define _POSIX_C_SOURCE 1
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif 
+
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE 700
+#endif 
+
+#ifndef _BSD_SOURCE
+#define _BSD_SOURCE
+#endif
 
 #include <limits.h>
 #include <sys/types.h>
@@ -150,6 +160,7 @@ extern int _VDEV_SYSLOG;
 #endif 
 
 typedef int (*vdev_dirent_loader_t)( char const*, void* );
+typedef int (*vdev_dirent_loader_at_t)( int, struct dirent* dent, void* );
 
 C_LINKAGE_BEGIN
 
@@ -178,6 +189,7 @@ int vdev_write_file( char const* path, char const* buf, size_t len, int flags, m
 
 // directory I/O
 int vdev_load_all( char const* dir_path, vdev_dirent_loader_t loader, void* cls );
+int vdev_load_all_at( int dirfd, vdev_dirent_loader_at_t loader_at, void* cls );
 int vdev_mkdirs( char const* dirp, int start, mode_t mode );
 int vdev_rmdirs( char const* dirp );
 
@@ -194,6 +206,9 @@ char* vdev_fullpath( char const* root, char const* path, char* dest );
 char* vdev_dirname( char const* path, char* dest );
 size_t vdev_basename_len( char const* path );
 char* vdev_basename( char const* path, char* dest );
+
+// setup 
+void vdev_setup_global(void);
 
 C_LINKAGE_END
 

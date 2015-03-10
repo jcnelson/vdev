@@ -5,7 +5,7 @@
    This program is dual-licensed: you can redistribute it and/or modify
    it under the terms of the GNU General Public License version 3 or later as 
    published by the Free Software Foundation. For the terms of this 
-   license, see LICENSE.LGPLv3+ or <http://www.gnu.org/licenses/>.
+   license, see LICENSE.GPLv3+ or <http://www.gnu.org/licenses/>.
 
    You are free to use this program under the terms of the GNU General
    Public License, but WITHOUT ANY WARRANTY; without even the implied 
@@ -707,26 +707,6 @@ int vdev_write_file( char const* path, char const* buf, size_t len, int flags, m
       return rc;
    }
    
-   while( true ) {
-      
-      rc = fsync( fd );
-      if( rc != 0 ) {
-      
-         rc = -errno;
-         
-         if( rc == -EINTR ) {
-            continue;
-         }
-         
-         vdev_error("fsync('%s') rc = %d\n", path, rc );
-      
-         close( fd );
-         return rc;
-      }
-      
-      break;
-   }
-   
    // NOTE: not much we can do if close() fails...
    close( fd );
       
@@ -756,7 +736,168 @@ static void vdev_dirents_free( struct dirent** dirents, int num_entries ) {
 }
 
 
-// process all files in a directory
+// portable scandirat() implementation--behaves as close to the Linux scandirat(3) interface as possible.
+int vdev_portable_scandirat( int dirfd, char const* dirp, struct dirent ***namelist, int (*filter)( const struct dirent* ), int (*compar)( const struct dirent**, const struct dirent** ) ) {
+   
+   int rc = 0;
+   
+   DIR* dirh = NULL;
+   struct dirent next;
+   struct dirent* result = NULL;
+   struct dirent* next_dup = NULL;
+   int dirp_fd = -1;
+   
+   struct dirent** namelist_buf = NULL;
+   struct dirent** namelist_tmp = NULL;
+   ssize_t num_dirents = 0;
+   ssize_t num_dirents_capacity = 0;
+   
+   dirp_fd = openat( dirfd, dirp, O_DIRECTORY );
+   if( dirp_fd < 0 ) {
+      
+      rc = -errno;
+      return rc;
+   }
+   
+   // open the duplicated handle instead
+   dirh = fdopendir( dirp_fd );
+   if( dirh == NULL ) {
+      
+      rc = -errno;
+      
+      close( dirp_fd );
+      return rc;
+   }
+   
+   while( 1 ) {
+      
+      // next dirent 
+      rc = readdir_r( dirh, &next, &result );
+      
+      // done?
+      if( result == NULL ) {
+         break;
+      }
+      
+      // error?
+      if( rc != 0 ) {
+         
+         rc = -rc;
+         break;
+      }
+      
+      // filter?
+      if( filter != NULL ) {
+         
+         rc = (*filter)( &next );
+         if( rc == 0 ) {
+            
+            // skip
+            continue;
+         }
+      }
+      
+      // increase (double) space?
+      if( num_dirents >= num_dirents_capacity ) {
+         
+         if( num_dirents_capacity == 0 ) {
+            num_dirents_capacity = 1;
+         }
+         
+         num_dirents_capacity <<= 1;
+         
+         namelist_tmp = (struct dirent**)realloc( namelist_buf, (num_dirents_capacity + 1) * sizeof( struct dirent ) );
+         if( namelist_tmp == NULL ) {
+            
+            // OOM 
+            rc = -ENOMEM;
+            break;
+         }
+         
+         namelist_buf = namelist_tmp;
+      }
+      
+      // duplicate 
+      next_dup = VDEV_CALLOC( struct dirent, 1 );
+      if( next_dup == NULL ) {
+         
+         // OOM 
+         rc = -ENOMEM;
+         break;
+      }
+      
+      memcpy( next_dup, &next, sizeof( struct dirent ) );
+      
+      // insert 
+      namelist_buf[ num_dirents ] = next_dup;
+      namelist_buf[ num_dirents+1 ] = NULL;
+      num_dirents++;
+   }
+   
+   closedir( dirh );
+   
+   if( rc < 0 ) {
+      
+      // error--clean up
+      vdev_dirents_free( namelist_buf, num_dirents );
+      return rc;
+   }
+   
+   // sort?
+   if( compar != NULL ) {
+      
+      qsort( (void*)namelist_buf, num_dirents, sizeof(struct dirent*), (int (*)(const void*, const void*))compar );
+   }
+   
+   // finished!
+   *namelist = namelist_buf;
+   return num_dirents;
+}
+
+
+// process all files in a directory, given a descriptor to it.
+// return 0 on success 
+// return -EINVAL if loader is NULL
+// return -EBADF if dirfd is invalid 
+// return non-zero of loader_at returns non-zero
+int vdev_load_all_at( int dirfd, vdev_dirent_loader_at_t loader_at, void* cls ) {
+   
+   struct dirent** dirents = NULL;
+   int num_entries = 0;
+   int rc = 0;
+   
+   if( loader_at == NULL ) {
+      return -EINVAL;
+   }
+   
+   num_entries = vdev_portable_scandirat( dirfd, ".", &dirents, NULL, alphasort );
+   if( num_entries < 0 ) {
+      
+      rc = -errno;
+      vdev_error("scandirat(%d) rc = %d\n", dirfd, rc );
+      return rc;
+   }
+   
+   for( int i = 0; i < num_entries; i++ ) {
+      
+      // process this 
+      rc = (*loader_at)( dirfd, dirents[i], cls );
+      if( rc != 0 ) {
+         
+         vdev_error("loader_at(%d, '%s') rc = %d\n", dirfd, dirents[i]->d_name, rc );
+         
+         vdev_dirents_free( dirents, num_entries );
+         return rc;
+      }
+   }
+   
+   vdev_dirents_free( dirents, num_entries );
+   
+   return rc;
+}
+
+
+// process all files in a directory with a loader
 // return 0 on success
 // return -EINVAL if dir_path or loader are NULL 
 // return -ENOMEM if OOM 
@@ -814,7 +955,7 @@ int vdev_load_all( char const* dir_path, vdev_dirent_loader_t loader, void* cls 
 // on success, fill in pwd and *pwd_buf (the caller must free *pwd_buf, but not pwd).
 // return 0 on success
 // return -EINVAL if any argument is NULL 
-// return -ENOMEM onOOM 
+// return -ENOMEM on OOM 
 // return -ENOENT if the username cnanot be loaded
 int vdev_get_passwd( char const* username, struct passwd* pwd, char** pwd_buf ) {
    
@@ -1251,3 +1392,28 @@ int vdev_validate_gid( gid_t gid ) {
    
    return rc;
 }
+
+
+// set up the library
+// always succeeds
+void vdev_setup_global(void) {
+   
+   // seed random from monotonic clock 
+   struct timespec ts_mono;
+   struct timespec ts_clock;
+   int rc = 0;
+   unsigned short seedv[3];
+   int32_t lower_32;
+   
+   clock_gettime( CLOCK_MONOTONIC, &ts_mono );
+   clock_gettime( CLOCK_REALTIME, &ts_clock );
+   
+   // NOTE: it's okay to use uninitialized memory for the random seed,
+   // so we don't really care if clock_gettime fails 
+   
+   lower_32 = ts_mono.tv_nsec + ts_clock.tv_nsec;
+   memcpy( seedv, &lower_32, 3 );
+   
+   seed48( seedv );
+}
+
