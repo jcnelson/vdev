@@ -1,11 +1,11 @@
 /*
    vdev: a virtual device manager for *nix
-   Copyright (C) 2014  Jude Nelson
+   Copyright (C) 2015  Jude Nelson
 
    This program is dual-licensed: you can redistribute it and/or modify
    it under the terms of the GNU General Public License version 3 or later as 
    published by the Free Software Foundation. For the terms of this 
-   license, see LICENSE.LGPLv3+ or <http://www.gnu.org/licenses/>.
+   license, see LICENSE.GPLv3+ or <http://www.gnu.org/licenses/>.
 
    You are free to use this program under the terms of the GNU General
    Public License, but WITHOUT ANY WARRANTY; without even the implied 
@@ -114,11 +114,22 @@ int main( int argc, char** argv ) {
       
       vdev_error("vdev_backend_main rc = %d\n", rc );
    }
+
+   // flush all requests
+   vdev_stop( &vdev );
+   
+   // if running once, find and remove all devices not processed initially.
+   // use the metadata directory to figure this out
+   if( vdev.once ) {
+      
+      rc = vdev_remove_unplugged_devices( &vdev );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_remove_unplugged_devices() rc = %d\n", rc );
+      }
+   }
    
    // clean up
-   unlink( vdev.config->pidfile_path );
-
-   vdev_stop( &vdev );
    vdev_shutdown( &vdev );
    
    return rc;
