@@ -1,4 +1,4 @@
-CPP    := cc -Wall -g -std=c99
+CPP    := gcc -Wall -g -std=c99
 LIB   := -lpthread -lrt 
 INC   := -I/usr/include -I/usr/local/include -I. 
 C_SRCS:= $(wildcard *.c) $(wildcard os/*.c)
