@@ -1,11 +1,11 @@
 /*
    vdev: a virtual device manager for *nix
-   Copyright (C) 2014  Jude Nelson
+   Copyright (C) 2015  Jude Nelson
 
    This program is dual-licensed: you can redistribute it and/or modify
    it under the terms of the GNU General Public License version 3 or later as 
    published by the Free Software Foundation. For the terms of this 
-   license, see LICENSE.LGPLv3+ or <http://www.gnu.org/licenses/>.
+   license, see LICENSE.GPLv3+ or <http://www.gnu.org/licenses/>.
 
    You are free to use this program under the terms of the GNU General
    Public License, but WITHOUT ANY WARRANTY; without even the implied 
@@ -24,12 +24,6 @@
 #include "linux.h"
 #include "workqueue.h"
 #include "libvdev/sglib.h"
-
-typedef char* cstr;
-
-// string vectors
-SGLIB_DEFINE_VECTOR_PROTOTYPES( cstr );
-SGLIB_DEFINE_VECTOR_FUNCTIONS( cstr );
 
 // parse a uevent action 
 static vdev_device_request_t vdev_linux_parse_device_request_type( char const* type ) {
@@ -643,6 +637,8 @@ static int vdev_linux_find_sysfs_mountpoint( char* mountpoint, size_t mountpoint
       }
    }
    
+   fclose( f );
+   
    if( line_buf != NULL ) {
       free( line_buf );
    }
@@ -774,6 +770,7 @@ static int vdev_linux_uevent_append( char** ret_uevent_buf, size_t* ret_uevent_b
 // that is, read the uevent file, generate a device request, and add it to the initial_requests list in the ctx.
 // NOTE: it is assumed that fp_uevent--the full path to the uevent file--lives in /sys/devices
 // return 0 on success
+// return -ENOMEM on OOM
 // return negative on error.
 static int vdev_linux_sysfs_register_device( struct vdev_linux_context* ctx, char const* fp_uevent ) {
    
@@ -929,6 +926,9 @@ struct vdev_linux_sysfs_scan_context {
 };
 
 // populate a /sys/devices directory with its child directories
+// return 0 on success
+// return -ENOMEM on OOM
+// return -errno on failure to stat
 static int vdev_linux_sysfs_scan_device_directory( char const* fp, void* cls ) {
    
    struct vdev_linux_sysfs_scan_context* scan_ctx = (struct vdev_linux_sysfs_scan_context*)cls;
@@ -1083,6 +1083,8 @@ static int vdev_linux_sysfs_find_devices( struct vdev_linux_context* ctx, struct
 }
 
 
+// free a list of cstr vectors
+// always succeeds
 static int vdev_cstr_vector_free_all( struct sglib_cstr_vector* vec ) {
    
    // free all strings
@@ -1203,6 +1205,9 @@ static int vdev_linux_sysfs_trigger_events( struct vdev_linux_context* ctx ) {
 
 
 // start listening for kernel events via netlink
+// only do so if we're *NOT* going to run once (check the config)
+// return 0 on success
+// return -errno on error (failure to socket(2), setsockopt(2), bind(2), or walk sysfs)
 static int vdev_linux_context_init( struct vdev_os_context* os_ctx, struct vdev_linux_context* ctx ) {
    
    int rc = 0;
@@ -1212,54 +1217,62 @@ static int vdev_linux_context_init( struct vdev_os_context* os_ctx, struct vdev_
    
    ctx->os_ctx = os_ctx;
    
-   ctx->nl_addr.nl_family = AF_NETLINK;
-   ctx->nl_addr.nl_pid = getpid();
-   ctx->nl_addr.nl_groups = -1;
-   
-   ctx->pfd.fd = socket( PF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT );
-   if( ctx->pfd.fd < 0 ) {
+   // if we're just running once, don't set up the netlink socket 
+   if( !os_ctx->state->config->once ) {
       
-      rc = -errno;
-      vdev_error("socket(PF_NETLINK) rc = %d\n", rc);
-      return rc;
-   }
-   
-   ctx->pfd.events = POLLIN;
-   
-   // big receive buffer, if running as root 
-   if( geteuid() == 0 ) {
-      rc = setsockopt( ctx->pfd.fd, SOL_SOCKET, SO_RCVBUFFORCE, &slen, sizeof(slen) );
+      ctx->nl_addr.nl_family = AF_NETLINK;
+      ctx->nl_addr.nl_pid = getpid();
+      ctx->nl_addr.nl_groups = -1;
+      
+      ctx->pfd.fd = socket( PF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT );
+      if( ctx->pfd.fd < 0 ) {
+         
+         rc = -errno;
+         vdev_error("socket(PF_NETLINK) rc = %d\n", rc);
+         return rc;
+      }
+      
+      ctx->pfd.events = POLLIN;
+      
+      // big receive buffer, if running as root 
+      if( geteuid() == 0 ) {
+         rc = setsockopt( ctx->pfd.fd, SOL_SOCKET, SO_RCVBUFFORCE, &slen, sizeof(slen) );
+         if( rc < 0 ) {
+            
+            rc = -errno;
+            vdev_error("setsockopt(SO_RCVBUFFORCE) rc = %d\n", rc);
+            
+            close( ctx->pfd.fd );
+            return rc;
+         }
+      }
+      
+      // check credentials of message--only root should be able talk to us
+      rc = setsockopt( ctx->pfd.fd, SOL_SOCKET, SO_PASSCRED, &slen, sizeof(slen) );
       if( rc < 0 ) {
          
          rc = -errno;
-         vdev_error("setsockopt(SO_RCVBUFFORCE) rc = %d\n", rc);
+         vdev_error("setsockopt(SO_PASSCRED) rc = %d\n", rc );
+         
+         close( ctx->pfd.fd );
+         return rc;
+         
+      }
+         
+      // bind to the address
+      rc = bind( ctx->pfd.fd, (struct sockaddr*)&ctx->nl_addr, sizeof(struct sockaddr_nl) );
+      if( rc != 0 ) {
+         
+         rc = -errno;
+         vdev_error("bind(%d) rc = %d\n", ctx->pfd.fd, rc );
          
          close( ctx->pfd.fd );
          return rc;
       }
    }
-   
-   // check credentials of message--only root should be able talk to us
-   rc = setsockopt( ctx->pfd.fd, SOL_SOCKET, SO_PASSCRED, &slen, sizeof(slen) );
-   if( rc < 0 ) {
+   else {
       
-      rc = -errno;
-      vdev_error("setsockopt(SO_PASSCRED) rc = %d\n", rc );
-      
-      close( ctx->pfd.fd );
-      return rc;
-      
-   }
-        
-   // bind to the address
-   rc = bind( ctx->pfd.fd, (struct sockaddr*)&ctx->nl_addr, sizeof(struct sockaddr_nl) );
-   if( rc != 0 ) {
-      
-      rc = -errno;
-      vdev_error("bind(%d) rc = %d\n", ctx->pfd.fd, rc );
-      
-      close( ctx->pfd.fd );
-      return rc;
+      ctx->pfd.fd = -1;
    }
    
    // lookup sysfs mountpoint
@@ -1291,7 +1304,11 @@ static int vdev_linux_context_shutdown( struct vdev_linux_context* ctx ) {
    
    // shut down 
    if( ctx != NULL ) {
-      close( ctx->pfd.fd );
+      
+      if( ctx->pfd.fd >= 0 ) {
+         close( ctx->pfd.fd );
+         ctx->pfd.fd = -1;
+      }
       
       if( ctx->initial_requests != NULL ) {
          
