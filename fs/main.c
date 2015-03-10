@@ -5,7 +5,7 @@
    This program is dual-licensed: you can redistribute it and/or modify
    it under the terms of the GNU General Public License version 3 or later as 
    published by the Free Software Foundation. For the terms of this 
-   license, see LICENSE.LGPLv3+ or <http://www.gnu.org/licenses/>.
+   license, see LICENSE.GPLv3+ or <http://www.gnu.org/licenses/>.
 
    You are free to use this program under the terms of the GNU General
    Public License, but WITHOUT ANY WARRANTY; without even the implied 
@@ -34,7 +34,7 @@ int main( int argc, char** argv ) {
    rc = vdevfs_init( &vdev, argc, argv );
    if( rc != 0 ) {
       
-      vdev_error("vdev_init rc = %d\n", rc );
+      vdev_error("vdevfs_init rc = %d\n", rc );
       
       exit(1);
    }
