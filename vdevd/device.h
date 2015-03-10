@@ -5,7 +5,7 @@
    This program is dual-licensed: you can redistribute it and/or modify
    it under the terms of the GNU General Public License version 3 or later as 
    published by the Free Software Foundation. For the terms of this 
-   license, see LICENSE.LGPLv3+ or <http://www.gnu.org/licenses/>.
+   license, see LICENSE.GPLv3+ or <http://www.gnu.org/licenses/>.
 
    You are free to use this program under the terms of the GNU General
    Public License, but WITHOUT ANY WARRANTY; without even the implied 
@@ -32,11 +32,13 @@
 
 #define VDEV_DEVICE_PATH_UNKNOWN        "UNKNOWN"
 
+#define VDEV_METADATA_PARAM_INSTANCE    "vdev_instance"
+
 // device request type 
 typedef enum {
    VDEV_DEVICE_INVALID = 0,             // invalid request
    VDEV_DEVICE_ADD,
-   VDEV_DEVICE_REMOVE,   
+   VDEV_DEVICE_REMOVE,
    VDEV_DEVICE_ANY                      // only useful for actions
 } vdev_device_request_t;
 
@@ -93,6 +95,9 @@ int vdev_device_request_enqueue( struct vdev_wq* wq, struct vdev_device_request*
 
 // sanity check structure 
 int vdev_device_request_sanity_check( struct vdev_device_request* req );
+
+// device metadata 
+char* vdev_device_metadata_fullpath( char const* mountpoint, char const* device_path );
 
 C_LINKAGE_END
 
