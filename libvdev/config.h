@@ -5,7 +5,7 @@
    This program is dual-licensed: you can redistribute it and/or modify
    it under the terms of the GNU General Public License version 3 or later as 
    published by the Free Software Foundation. For the terms of this 
-   license, see LICENSE.LGPLv3+ or <http://www.gnu.org/licenses/>.
+   license, see LICENSE.GPLv3+ or <http://www.gnu.org/licenses/>.
 
    You are free to use this program under the terms of the GNU General
    Public License, but WITHOUT ANY WARRANTY; without even the implied 
@@ -43,6 +43,9 @@
 #define VDEV_CONFIG_MOUNTPOINT    "mountpoint"
 #define VDEV_CONFIG_ONCE          "run_once"
 #define VDEV_CONFIG_FOREGROUND    "foreground"
+
+#define VDEV_CONFIG_INSTANCE_NONCE_LEN 32
+#define VDEV_CONFIG_INSTANCE_NONCE_STRLEN (2*VDEV_CONFIG_INSTANCE_NONCE_LEN + 1)
 
 // structure for both file configuration and command-line options
 struct vdev_config {
@@ -88,6 +91,9 @@ struct vdev_config {
    
    // default permission bits for mknod 
    mode_t default_mode;
+   
+   // printable 256-bit instance nonce--randomly generated and unique per execution 
+   char instance_str[VDEV_CONFIG_INSTANCE_NONCE_STRLEN];
 };
 
 C_LINKAGE_BEGIN

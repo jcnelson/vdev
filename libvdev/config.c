@@ -5,7 +5,7 @@
    This program is dual-licensed: you can redistribute it and/or modify
    it under the terms of the GNU General Public License version 3 or later as 
    published by the Free Software Foundation. For the terms of this 
-   license, see LICENSE.LGPLv3+ or <http://www.gnu.org/licenses/>.
+   license, see LICENSE.GPLv3+ or <http://www.gnu.org/licenses/>.
 
    You are free to use this program under the terms of the GNU General
    Public License, but WITHOUT ANY WARRANTY; without even the implied 
@@ -84,8 +84,10 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
       
       if( strcmp(name, VDEV_CONFIG_DEFAULT_MODE) == 0 ) {
       
-         conf->default_mode = (mode_t)vdev_parse_uint64( value, &success );
-         if( !success ) {
+         char* tmp = NULL;
+         conf->default_mode = (mode_t)strtoul( value, &tmp, 8 );
+         
+         if( *tmp != '\0' ) {
             
             fprintf(stderr, "Invalid value '%s' for '%s'\n", value, name );
             return 0;
@@ -207,6 +209,52 @@ int vdev_config_sanity_check( struct vdev_config* conf ) {
    return rc;
 }
 
+
+// convert a number between 0 and 16 to its hex representation 
+// hex must have at least 2 characters
+// always succeeds 
+void vdev_bin_to_hex( unsigned char num, char* hex ) {
+   
+   unsigned char upper = num >> 4;
+   unsigned char lower = num & 0xf;
+   
+   if( upper < 10 ) {
+      hex[0] = upper + '0';
+   }
+   else {
+      hex[0] = upper + 'A';
+   }
+   
+   if( lower < 10 ) {
+      hex[1] = lower + '0';
+   }
+   else {
+      hex[1] = lower + 'A';
+   }
+}
+
+// generate an instance nonce 
+// NOTE: not thread-safe, since it uses mrand48(3) (can't use /dev/urandom, since it doesn't exist yet)
+// always succeeds 
+static void vdev_config_make_instance_nonce( struct vdev_config* conf ) {
+
+   char instance[VDEV_CONFIG_INSTANCE_NONCE_LEN];
+   
+   // generate an instance nonce 
+   for( int i = 0; i < VDEV_CONFIG_INSTANCE_NONCE_LEN; i++ ) {
+      
+      instance[i] = (char)mrand48();
+   }
+   
+   memset( conf->instance_str, 0, VDEV_CONFIG_INSTANCE_NONCE_STRLEN );
+   
+   for( int i = 0; i < VDEV_CONFIG_INSTANCE_NONCE_LEN; i++ ) {
+      
+      vdev_bin_to_hex( (unsigned char)instance[i], &conf->instance_str[2*i] );
+   }
+}
+   
+
 // initialize a config 
 // always succeeds
 int vdev_config_init( struct vdev_config* conf ) {
@@ -232,6 +280,11 @@ int vdev_config_load( char const* path, struct vdev_config* conf ) {
    rc = vdev_config_load_file( f, conf );
    
    fclose( f );
+   
+   if( rc == 0 ) {
+      
+      vdev_config_make_instance_nonce( conf );
+   }
    return rc;
 }
 
@@ -282,6 +335,18 @@ int vdev_config_free( struct vdev_config* conf ) {
       
       free( conf->helpers_dir );
       conf->helpers_dir = NULL;
+   }
+   
+   if( conf->config_path != NULL ) {
+      
+      free( conf->config_path );
+      conf->config_path = NULL;
+   }
+   
+   if( conf->mountpoint != NULL ) {
+      
+      free( conf->mountpoint );
+      conf->mountpoint = NULL;
    }
    
    return 0;
