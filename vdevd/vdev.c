@@ -144,7 +144,7 @@ static int vdev_remove_unplugged_device( char const* path, void* cls ) {
       return 0;
    }
    
-   // is this a device node?
+   // is this a device file?
    if( S_ISBLK( sb.st_mode ) || S_ISCHR( sb.st_mode ) ) {
       
       // what's the instance value?
@@ -160,9 +160,38 @@ static int vdev_remove_unplugged_device( char const* path, void* cls ) {
       // does it match ours?
       if( strcmp( state->config->instance_str, instance_str ) != 0 ) {
 
-         vdev_debug("Remove unplugged device '%s'", path );
+         struct vdev_device_request* to_delete = NULL;
+         char const* device_path = NULL;
          
-         // TODO 
+         vdev_debug("Remove unplugged device '%s'\n", path );
+         
+         device_path = path + strlen( state->mountpoint );
+         
+         to_delete = VDEV_CALLOC( struct vdev_device_request, 1 );
+         if( to_delete == NULL ) {
+            
+            // OOM 
+            return -ENOMEM;
+         }
+         
+         rc = vdev_device_request_init( to_delete, state, VDEV_DEVICE_REMOVE, device_path );
+         if( rc != 0 ) {
+            
+            // OOM 
+            return rc;
+         }
+         
+         // populate 
+         vdev_device_request_set_dev( to_delete, sb.st_rdev );
+         vdev_device_request_set_mode( to_delete, S_ISBLK( sb.st_mode ) ? S_IFBLK : S_IFCHR );
+         
+         // remove it 
+         rc = vdev_device_remove( to_delete );
+         if( rc != 0 ) {
+            
+            vdev_warn("vdev_device_remove('%s') rc = %d\n", device_path, rc );
+            rc = 0;
+         }
       }
    }
    
