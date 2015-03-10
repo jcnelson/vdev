@@ -317,6 +317,8 @@ int vdev_device_request_to_env( struct vdev_device_request* req, char*** ret_env
 
 
 // set the path 
+// return 0 on success
+// return -ENOMEM on OOM
 int vdev_device_request_set_path( struct vdev_device_request* req, char const* path ) {
    
    if( req->path != NULL ) {
@@ -325,10 +327,15 @@ int vdev_device_request_set_path( struct vdev_device_request* req, char const* p
    
    req->path = vdev_strdup_or_null( path );
    
+   if( req->path == NULL && path != NULL ) {
+      return -ENOMEM;
+   }
+   
    return 0;
 }
 
 // set the device 
+// always succeeds
 int vdev_device_request_set_dev( struct vdev_device_request* req, dev_t dev ) {
    
    req->dev = dev;
@@ -618,10 +625,9 @@ static int vdev_device_remove_metadata( struct vdev_device_request* req ) {
 // return -ENOMEM on OOM 
 // return -EACCES if we do not have enough privileges to create the device node 
 // return -EEXIST if the device node already exists
-static int vdev_device_add( struct vdev_wreq* wreq, void* cls ) {
+int vdev_device_add( struct vdev_device_request* req ) {
    
    int rc = 0;
-   struct vdev_device_request* req = (struct vdev_device_request*)cls;
    int update_only = 0;         // if 1, only update metadata; don't run actions.
    
    // do the rename, possibly generating it
@@ -641,6 +647,14 @@ static int vdev_device_add( struct vdev_wreq* wreq, void* cls ) {
       
       // base path becomes renamed path (trivial rename)
       req->renamed_path = vdev_strdup_or_null( req->path );
+      if( req->renamed_path == NULL && req->path != NULL ) {
+         
+         // done with this request
+         vdev_device_request_free( req );
+         free( req );
+      
+         return -ENOMEM;
+      }
    }
    
    vdev_debug("ADD device: type '%s' at '%s' ('%s' %d:%d)\n", (S_ISBLK(req->mode) ? "block" : S_ISCHR(req->mode) ? "char" : "unknown"), req->renamed_path, req->path, major(req->dev), minor(req->dev) );
@@ -801,13 +815,20 @@ static int vdev_device_add( struct vdev_wreq* wreq, void* cls ) {
    return rc;
 }
 
+// workqueue call to vdev_device_add
+static int vdev_device_add_wq( struct vdev_wreq* wreq, void* cls ) {
+   
+   struct vdev_device_request* req = (struct vdev_device_request*)cls;
+   return vdev_device_add( req );
+}
+
+
 // handler to remove a device (unlink)
 // return 0 on success.  This masks failure to unlink or clean up metadata or a failed action.
 // return -ENOMEM on OOM 
-static int vdev_device_remove( struct vdev_wreq* wreq, void* cls ) {
+int vdev_device_remove( struct vdev_device_request* req ) {
    
    int rc = 0;
-   struct vdev_device_request* req = (struct vdev_device_request*)cls;
    
    // do the rename, possibly generating it
    rc = vdev_action_create_path( req, req->state->acts, req->state->num_acts, &req->renamed_path );
@@ -823,7 +844,16 @@ static int vdev_device_remove( struct vdev_wreq* wreq, void* cls ) {
    }
    
    if( req->renamed_path == NULL ) {
+      
       req->renamed_path = vdev_strdup_or_null( req->path );
+      if( req->renamed_path == NULL && req->path == NULL ) {
+         
+         // done with this request
+         vdev_device_request_free( req );
+         free( req );
+      
+         return -ENOMEM;
+      }
    }
    
    vdev_info("REMOVE device: type '%s' at '%s' ('%s' %d:%d)\n", (S_ISBLK(req->mode) ? "block" : S_ISCHR(req->mode) ? "char" : "unknown"), req->renamed_path, req->path, major(req->dev), minor(req->dev) );
@@ -885,6 +915,14 @@ static int vdev_device_remove( struct vdev_wreq* wreq, void* cls ) {
 }
 
 
+// workqueue call to vdev_device_remove 
+static int vdev_device_remove_wq( struct vdev_wreq* wreq, void* cls ) {
+   
+   struct vdev_device_request* req = (struct vdev_device_request*)cls;
+   return vdev_device_remove( req );
+}
+
+
 // enqueue a device request
 int vdev_device_request_enqueue( struct vdev_wq* wq, struct vdev_device_request* req ) {
    
@@ -906,13 +944,13 @@ int vdev_device_request_enqueue( struct vdev_wq* wq, struct vdev_device_request*
       
       case VDEV_DEVICE_ADD: {
          
-         vdev_wreq_init( &wreq, vdev_device_add, req );
+         vdev_wreq_init( &wreq, vdev_device_add_wq, req );
          break;
       }
       
       case VDEV_DEVICE_REMOVE: {
          
-         vdev_wreq_init( &wreq, vdev_device_remove, req );
+         vdev_wreq_init( &wreq, vdev_device_remove_wq, req );
          break;
       }
       

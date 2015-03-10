@@ -99,6 +99,10 @@ int vdev_device_request_sanity_check( struct vdev_device_request* req );
 // device metadata 
 char* vdev_device_metadata_fullpath( char const* mountpoint, char const* device_path );
 
+// add/remove devices 
+int vdev_device_add( struct vdev_device_request* req );
+int vdev_device_remove( struct vdev_device_request* req );
+
 C_LINKAGE_END
 
 #endif
