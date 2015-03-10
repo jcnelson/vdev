@@ -5,7 +5,7 @@
    This program is dual-licensed: you can redistribute it and/or modify
    it under the terms of the GNU General Public License version 3 or later as 
    published by the Free Software Foundation. For the terms of this 
-   license, see LICENSE.LGPLv3+ or <http://www.gnu.org/licenses/>.
+   license, see LICENSE.GPLv3+ or <http://www.gnu.org/licenses/>.
 
    You are free to use this program under the terms of the GNU General
    Public License, but WITHOUT ANY WARRANTY; without even the implied 
@@ -21,6 +21,8 @@
 
 #ifndef _VDEVFS_H_
 #define _VDEVFS_H_
+
+#include <fcntl.h>
 
 #include "libvdev/util.h"
 #include "libvdev/config.h"
@@ -44,6 +46,9 @@ struct vdevfs {
    // mountpoint; where /dev is
    char* mountpoint;
    
+   // mountpoint dir handle, underneath /dev
+   int mountpoint_dirfd;
+   
    // debug level 
    int debug_level;
    
@@ -52,14 +57,26 @@ struct vdevfs {
    
    // acls
    struct vdev_acl* acls;
-   size_t num_acls;
+   size_t num_acls; 
    
+   // close route handler id
+   int close_rh;
 };
+
 
 C_LINKAGE_BEGIN
    
-int vdev_stat( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct stat* sb );
-int vdev_readdir( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct fskit_dir_entry** dirents, size_t num_dirents );
+int vdevfs_mkdir( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, mode_t mode, void** inode_cls );
+int vdevfs_mknod( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, mode_t mode, dev_t dev, void** inode_cls );
+int vdevfs_create( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, mode_t mode, void** inode_cls, void** handle_cls );
+int vdevfs_open( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, int flags, void** handle_cls );
+int vdevfs_read( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, char* buf, size_t len, off_t offset, void* handle_cls );
+int vdevfs_write( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, char* buf, size_t len, off_t offset, void* handle_cls );
+int vdevfs_close( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, void* handle_cls );
+int vdevfs_sync( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent );
+int vdevfs_detach( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, void* inode_cls );
+int vdevfs_stat( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct stat* sb );
+int vdevfs_readdir( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct fskit_dir_entry** dirents, size_t num_dirents );
 
 int vdevfs_init( struct vdevfs* vdev, int argc, char** argv );
 int vdevfs_main( struct vdevfs* vdev, int fuse_argc, char** fuse_argv );
