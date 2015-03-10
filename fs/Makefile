@@ -5,7 +5,7 @@ INC   := -I. -I.. -I/usr/include -I/usr/local/include
 C_SRCS:= $(wildcard *.c) 
 CXSRCS:= $(wildcard *.cpp)
 OBJ   := $(patsubst %.c,%.o,$(C_SRCS)) $(patsubst %.cpp,%.o,$(CXSRCS))
-DEFS  := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS -D_FILE_OFFSET_BITS=64 -D_BSD_SOURCE 
+DEFS  := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS -D_FILE_OFFSET_BITS=64
 
 VDEVFS := vdevfs
 
