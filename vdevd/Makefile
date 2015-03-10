@@ -4,7 +4,7 @@ INC   := -I. -I../ -I/usr/include -I/usr/local/include
 LIBINC := -L../libvdev
 C_SRCS:= $(wildcard *.c) $(wildcard os/*.c)
 OBJ   := $(patsubst %.c,%.o,$(C_SRCS)) 
-DEFS  := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS -D_FILE_OFFSET_BITS=64 -D_BSD_SOURCE 
+DEFS  := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS -D_FILE_OFFSET_BITS=64
 
 VDEV := vdevd
 
