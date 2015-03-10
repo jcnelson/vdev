@@ -5,7 +5,7 @@
    This program is dual-licensed: you can redistribute it and/or modify
    it under the terms of the GNU General Public License version 3 or later as 
    published by the Free Software Foundation. For the terms of this 
-   license, see LICENSE.LGPLv3+ or <http://www.gnu.org/licenses/>.
+   license, see LICENSE.GPLv3+ or <http://www.gnu.org/licenses/>.
 
    You are free to use this program under the terms of the GNU General
    Public License, but WITHOUT ANY WARRANTY; without even the implied 
@@ -64,6 +64,7 @@ struct vdev_state {
    bool once;
 };
 
+typedef char* cstr;
 
 C_LINKAGE_BEGIN
 
@@ -72,6 +73,10 @@ int vdev_start( struct vdev_state* vdev );
 int vdev_main( struct vdev_state* vdev );
 int vdev_stop( struct vdev_state* vdev );
 int vdev_shutdown( struct vdev_state* vdev );
+
+int vdev_remove_unplugged_devices( struct vdev_state* state );
+
+SGLIB_DEFINE_VECTOR_PROTOTYPES( cstr );
 
 C_LINKAGE_END
 
