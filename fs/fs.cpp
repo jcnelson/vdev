@@ -470,7 +470,7 @@ int vdevfs_init( struct vdevfs* vdev, int argc, char** argv ) {
    }
    
    vdev_set_debug_level( vdev->config->debug_level );
-   
+   vdev_set_error_level( vdev->config->error_level );
    
    vdev_debug("Config file: %s\n", vdev->config->config_path );
    
@@ -500,7 +500,6 @@ int vdevfs_init( struct vdevfs* vdev, int argc, char** argv ) {
    fuse_argc++;
    
    vdev->mountpoint = vdev_strdup_or_null( vdev->config->mountpoint );
-   vdev->debug_level = vdev->config->debug_level;
    
    if( vdev->mountpoint == NULL ) {
       
@@ -521,7 +520,8 @@ int vdevfs_init( struct vdevfs* vdev, int argc, char** argv ) {
    vdev->fuse_argc = fuse_argc;
    vdev->fuse_argv = fuse_argv;
    
-   fskit_set_debug_level( vdev->debug_level );
+   fskit_set_debug_level( vdev->config->debug_level );
+   fskit_set_error_level( vdev->config->error_level );
    
    // get mountpoint directory 
    dirfd = open( vdev->mountpoint, O_DIRECTORY );

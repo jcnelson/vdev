@@ -49,9 +49,6 @@ struct vdevfs {
    // mountpoint dir handle, underneath /dev
    int mountpoint_dirfd;
    
-   // debug level 
-   int debug_level;
-   
    // fskit core
    struct fskit_fuse_state* fs;
    
