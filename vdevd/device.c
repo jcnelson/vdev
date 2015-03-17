@@ -148,8 +148,10 @@ int vdev_device_request_to_env( struct vdev_device_request* req, char*** ret_env
    // helpers --> VDEV_HELPERS
    // logfile --> VDEV_LOGFILE
    // vdev instance nonce --> VDEV_INSTANCE
+   // firmware directory --> VDEV_FIRMWARE_DIR
+   // interface naming rules --> VDEV_IFNAMES_PATH
    
-   size_t num_vars = 11 + sglib_vdev_params_len( req->params );
+   size_t num_vars = 13 + sglib_vdev_params_len( req->params );
    int i = 0;
    int rc = 0;
    char dev_buf[50];
@@ -278,6 +280,30 @@ int vdev_device_request_to_env( struct vdev_device_request* req, char*** ret_env
    }
    
    i++;
+   
+   if( req->state->config->firmware_dir != NULL ) {
+      
+      rc = vdev_device_request_make_env_str( "VDEV_FIRMWARE_DIR", req->state->config->firmware_dir, &env[i] );
+      if( rc != 0 ) {
+      
+         VDEV_FREE_LIST( env );
+         return rc;
+      }
+      
+      i++;
+   }
+   
+   if( req->state->config->ifnames_path != NULL ) {
+      
+      rc = vdev_device_request_make_env_str( "VDEV_IFNAMES_PATH", req->state->config->firmware_dir, &env[i] );
+      if( rc != 0 ) {
+      
+         VDEV_FREE_LIST( env );
+         return rc;
+      }
+      
+      i++
+   }
    
    // add all OS-specific parameters 
    for( dp = sglib_vdev_params_it_init_inorder( &itr, req->params ); dp != NULL; dp = sglib_vdev_params_it_next( &itr ) ) {
