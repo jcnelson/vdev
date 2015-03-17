@@ -302,7 +302,7 @@ int vdev_device_request_to_env( struct vdev_device_request* req, char*** ret_env
          return rc;
       }
       
-      i++
+      i++;
    }
    
    // add all OS-specific parameters 
