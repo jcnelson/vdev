@@ -370,6 +370,7 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
    }
    
    vdev_set_debug_level( vdev->config->debug_level );
+   vdev_set_error_level( vdev->config->error_level );
    
    vdev_info("Config file: '%s'\n", vdev->config->config_path );
    
@@ -398,7 +399,6 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
    vdev_info("default mode:      0%o\n", vdev->config->default_mode );
    
    vdev->mountpoint = vdev_strdup_or_null( vdev->config->mountpoint );
-   vdev->debug_level = vdev->config->debug_level;
    vdev->once = vdev->config->once;
    
    if( vdev->mountpoint == NULL ) {

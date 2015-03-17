@@ -41,9 +41,6 @@ struct vdev_state {
    // mountpoint; where /dev is
    char* mountpoint;
    
-   // debug level 
-   int debug_level;
-   
    // OS context
    struct vdev_os_context* os;
    
