@@ -31,7 +31,6 @@
 #define VDEV_OS_CONFIG_NAME     "vdev-OS"
 
 #define VDEV_CONFIG_FIRMWARE_DIR  "firmware"
-#define VDEV_CONFIG_PSTAT         "proc_check"
 #define VDEV_CONFIG_ACLS          "acls"
 #define VDEV_CONFIG_ACTIONS       "actions"
 #define VDEV_CONFIG_HELPERS       "helpers"
@@ -39,10 +38,11 @@
 #define VDEV_CONFIG_DEFAULT_POLICY "default_policy"     // allow or deny
 #define VDEV_CONFIG_PIDFILE_PATH  "pidfile"
 #define VDEV_CONFIG_LOGFILE_PATH  "logfile"
-#define VDEV_CONFIG_DEBUG_LEVEL   "debuglevel"
+#define VDEV_CONFIG_LOG_LEVEL     "loglevel"
 #define VDEV_CONFIG_MOUNTPOINT    "mountpoint"
 #define VDEV_CONFIG_ONCE          "run_once"
 #define VDEV_CONFIG_FOREGROUND    "foreground"
+#define VDEV_CONFIG_IFNAMES       "ifnames"
 
 #define VDEV_CONFIG_INSTANCE_NONCE_LEN 32
 #define VDEV_CONFIG_INSTANCE_NONCE_STRLEN (2*VDEV_CONFIG_INSTANCE_NONCE_LEN + 1)
@@ -55,6 +55,9 @@ struct vdev_config {
    
    // firmware directory 
    char* firmware_dir;
+   
+   // interface names file 
+   char* ifnames_path;
    
    // ACLs directory 
    char* acls_dir;
@@ -70,6 +73,9 @@ struct vdev_config {
    
    // debug level
    int debug_level;
+   
+   // error level 
+   int error_level;
    
    // PID file path 
    char* pidfile_path;

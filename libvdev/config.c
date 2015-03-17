@@ -40,10 +40,10 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
    bool success = false;
    int rc = 0;
    
-   if( strcmp(section, VDEV_CONFIG_NAME) == 0 ) {
+   if( strcmp( section, VDEV_CONFIG_NAME ) == 0 ) {
       
       
-      if( strcmp(name, VDEV_CONFIG_FIRMWARE_DIR) == 0 ) {
+      if( strcmp( name, VDEV_CONFIG_FIRMWARE_DIR ) == 0 ) {
          
          if( conf->firmware_dir == NULL ) {
             // save this 
@@ -53,7 +53,7 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
          return 1;
       }
       
-      if( strcmp(name, VDEV_CONFIG_ACLS) == 0 ) {
+      if( strcmp( name, VDEV_CONFIG_ACLS ) == 0 ) {
          
          if( conf->acls_dir == NULL ) {
             // save this 
@@ -62,7 +62,7 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
          return 1;
       }
       
-      if( strcmp(name, VDEV_CONFIG_ACTIONS) == 0 ) {
+      if( strcmp( name, VDEV_CONFIG_ACTIONS ) == 0 ) {
          
          if( conf->acts_dir == NULL ) {
             // save this 
@@ -72,7 +72,7 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
          return 1;
       }
       
-      if( strcmp(name, VDEV_CONFIG_HELPERS) == 0 ) {
+      if( strcmp( name, VDEV_CONFIG_HELPERS ) == 0 ) {
          
          if( conf->helpers_dir == NULL ) {
             // save this 
@@ -82,7 +82,7 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
          return 1;
       }
       
-      if( strcmp(name, VDEV_CONFIG_DEFAULT_MODE) == 0 ) {
+      if( strcmp( name, VDEV_CONFIG_DEFAULT_MODE ) == 0 ) {
       
          char* tmp = NULL;
          conf->default_mode = (mode_t)strtoul( value, &tmp, 8 );
@@ -98,13 +98,13 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
          }
       }
       
-      if( strcmp(name, VDEV_CONFIG_DEFAULT_POLICY) == 0 ) {
+      if( strcmp( name, VDEV_CONFIG_DEFAULT_POLICY ) == 0 ) {
          
          conf->default_policy = strcasecmp( value, "allow" ) ? 1 : 0;
          return 1;
       }
       
-      if( strcmp(name, VDEV_CONFIG_PIDFILE_PATH) == 0 ) {
+      if( strcmp( name, VDEV_CONFIG_PIDFILE_PATH ) == 0 ) {
          
          if( conf->pidfile_path == NULL ) {
             conf->pidfile_path = vdev_strdup_or_null( value );
@@ -113,7 +113,7 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
          return 1;
       }
       
-      if( strcmp(name, VDEV_CONFIG_LOGFILE_PATH) == 0 ) {
+      if( strcmp( name, VDEV_CONFIG_LOGFILE_PATH ) == 0 ) {
          
          if( conf->logfile_path == NULL ) {
             conf->logfile_path = vdev_strdup_or_null( value );
@@ -122,22 +122,38 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
          return 1;
       }
       
-      if( strcmp(name, VDEV_CONFIG_DEBUG_LEVEL) == 0 ) {
+      if( strcmp( name, VDEV_CONFIG_LOG_LEVEL ) == 0 ) {
          
-         int debug_level = (int)vdev_parse_uint64( value, &success );
-         if( !success ) {
+         if( strcasecmp( name, "debug" ) == 0 ) {
             
-            fprintf(stderr, "Invalid value '%s' for '%s'\n", value, name );
-            return 0;
+            conf->debug_level = 2;
+            conf->error_level = 2;
+         }
+         else if( strcasecmp( name, "info" ) == 0 ) {
+            
+            conf->debug_level = 1;
+            conf->error_level = 2;
+         }
+         else if( strcasecmp( name, "warn" ) == 0 || strcasecmp( name, "warning" ) == 0 ) {
+            
+            conf->debug_level = 0;
+            conf->error_level = 2;
+         }
+         else if( strcasecmp( name, "error" ) == 0 || strcasecmp( name, "critical" ) == 0 ) {
+            
+            conf->debug_level = 0;
+            conf->error_level = 1;
          }
          else {
             
-            conf->debug_level = MAX( debug_level, conf->debug_level );
-            return 1;
+            fprintf(stderr, "Unrecognized value '%s' for '%s'\n", value, name );
+            return 0;
          }
+         
+         return 1;
       }
       
-      if( strcmp(name, VDEV_CONFIG_MOUNTPOINT) == 0 ) {
+      if( strcmp( name, VDEV_CONFIG_MOUNTPOINT ) == 0 ) {
          
          if( conf->mountpoint == NULL ) {
             conf->mountpoint = vdev_strdup_or_null( value );
@@ -146,10 +162,19 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
          return 1;
       }
       
-      if( strcmp(name, VDEV_CONFIG_ONCE) == 0 ) {
+      if( strcmp( name, VDEV_CONFIG_ONCE ) == 0 ) {
          
-         if( !conf->once ) {
+         if( strcasecmp( name, "true" ) == 0 ) {
             
+            conf->once = true;
+         }
+         else if( strcasecmp( name, "false" ) == 0 ) {
+            
+            conf->once = false;
+         }
+         else if( !conf->once ) {
+            
+            // maybe it's 0 or non-zero?
             conf->once = (bool)vdev_parse_uint64( value, &success );
             if( !success ) {
                
@@ -163,11 +188,21 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
          }
       }
       
+      if( strcmp( name, VDEV_CONFIG_IFNAMES ) == 0 ) {
+         
+         if( conf->ifnames_path == NULL ) {
+            
+            conf->ifnames_path = vdev_strdup_or_null( value );
+         }
+            
+         return 1;  
+      }
+      
       fprintf(stderr, "Unrecognized '%s' field '%s'\n", section, name);
       return 1;
    }
    
-   if( strcmp( section, VDEV_OS_CONFIG_NAME) == 0 ) {
+   if( strcmp( section, VDEV_OS_CONFIG_NAME ) == 0 ) {
       
       // OS-specific config value
       rc = vdev_params_add( &conf->os_config, name, value );
@@ -347,6 +382,12 @@ int vdev_config_free( struct vdev_config* conf ) {
       
       free( conf->mountpoint );
       conf->mountpoint = NULL;
+   }
+   
+   if( conf->ifnames_path != NULL ) {
+      
+      free( conf->ifnames_path );
+      conf->ifnames_path = NULL;
    }
    
    return 0;
