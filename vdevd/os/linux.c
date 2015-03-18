@@ -176,17 +176,27 @@ static int vdev_linux_sysfs_read_subsystem( struct vdev_linux_context* ctx, char
 }
 
 
-// print a uevent
-static int vdev_linux_debug_uevent( char const* uevent_buf, size_t uevent_buf_len ) {
+// print a uevent, either with debugging or error loglevels
+static int vdev_linux_log_uevent( char const* uevent_buf, size_t uevent_buf_len, bool debug ) {
       
    for( unsigned int i = 0; i < uevent_buf_len; ) {
-      vdev_debug("uevent '%s'\n", uevent_buf + i );
+      
+      if( debug ) {
+         vdev_debug("uevent '%s'\n", uevent_buf + i );
+      }
+      else {
+         vdev_error("uevent '%s'\n", uevent_buf + i );
+      }
+      
       i += strlen(uevent_buf + i) + 1;
    }
    
    return 0;
 }
 
+
+#define vdev_linux_debug_uevent( uevent_buf, uevent_buf_len ) vdev_linux_log_uevent( uevent_buf, uevent_buf_len, true )
+#define vdev_linux_error_uevent( uevent_buf, uevent_buf_len ) vdev_linux_log_uevent( uevent_buf, uevent_buf_len, false )
 
 
 // parse a uevent, and use the information to fill in a device request.
@@ -235,6 +245,8 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
       if( rc < 0 ) {
          
          vdev_error("Invalid line %d (byte %d): '%s'\n", line_count, offset, buf + offset);
+         vdev_linux_error_uevent( nlbuf, buflen );
+         
          return -EINVAL;
       }
       
@@ -249,6 +261,7 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
          if( reqtype == VDEV_DEVICE_INVALID ) {
             
             vdev_error("Invalid ACTION '%s'\n", value );
+            vdev_linux_error_uevent( nlbuf, buflen );
             
             return -EINVAL;
          }
@@ -285,6 +298,8 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
          if( *tmp != '\0' ) {
             
             vdev_error("Invalid 'MAJOR' value '%s'\n", value);
+            vdev_linux_error_uevent( nlbuf, buflen );
+            
             return -EINVAL;
          }
          
@@ -301,6 +316,8 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
          if( *tmp != '\0' ) {
             
             vdev_error("Invalid 'MINOR' value '%s'\n", value );
+            vdev_linux_error_uevent( nlbuf, buflen );
+            
             return -EINVAL;
          }
          
@@ -318,7 +335,8 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
    if( reqtype == VDEV_DEVICE_INVALID ) {
       
       vdev_error("%s", "No ACTION given\n");
-   
+      vdev_linux_error_uevent( nlbuf, buflen );
+      
       if( subsystem != NULL ) {
          free( subsystem );
       }
@@ -329,6 +347,7 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
    if( (!have_major && have_minor) || (have_major && !have_minor) ) {
       
       vdev_error("Missing device information: major=%d, minor=%d\n", have_major, have_minor );
+      vdev_linux_error_uevent( nlbuf, buflen );
       
       if( subsystem != NULL ) {
          free( subsystem );
