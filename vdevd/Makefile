@@ -1,5 +1,5 @@
 CPP    := gcc -std=c99 -Wall -g -fstack-protector -fstack-protector-all -Wno-unused-but-set-variable -Wno-unused-variable
-LIB   := -lpthread -lrt -lpstat -lvdev
+LIB   := -lpthread -lrt -lvdev
 INC   := -I. -I../ -I/usr/include -I/usr/local/include
 LIBINC := -L../libvdev
 C_SRCS:= $(wildcard *.c) $(wildcard os/*.c)

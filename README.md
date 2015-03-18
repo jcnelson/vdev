@@ -26,11 +26,11 @@ There are two binaries in vdev:  the hotplug daemon vdevd, and the userspace fil
 To build vdevd, you'll need:
 * libc
 * libpthread
-* [libpstat](https://github.com/jcnelson/libpstat)
 
 For vdevfs, you'll need all of the above, plus:
 * libstdc++
 * FUSE
+* [libpstat](https://github.com/jcnelson/libpstat)
 * [fskit](https://github.com/jcnelson/fskit)
 
 Building
