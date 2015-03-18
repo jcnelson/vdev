@@ -220,7 +220,6 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
    char* devpath = NULL;        // sysfs devpath 
    char* subsystem = NULL;      // sysfs subsystem 
    char* devname = (char*)VDEV_DEVICE_PATH_UNKNOWN;        // DEVNAME from uevent
-   char linebuf[4096];          // NOTE: maximum size of a uevent
    
    vdev_device_request_t reqtype = VDEV_DEVICE_INVALID;
    
@@ -240,13 +239,11 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
       line_count++;
       not_param = false;
       
-      strcpy( linebuf, buf + offset );
-      
-      rc = vdev_keyvalue_next( linebuf, &key, &value );
+      rc = vdev_keyvalue_next( buf + offset, &key, &value );
       
       if( rc < 0 ) {
          
-         vdev_error("Invalid line %d (byte %d): '%s'\n", line_count, offset, linebuf );
+         vdev_error("Invalid line %d (byte %d): '%s'\n", line_count, offset, buf + offset );
          vdev_linux_error_uevent( nlbuf, buflen );
          
          return -EINVAL;
