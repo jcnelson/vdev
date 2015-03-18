@@ -201,7 +201,6 @@ static int vdev_linux_log_uevent( char const* uevent_buf, size_t uevent_buf_len,
 
 // parse a uevent, and use the information to fill in a device request.
 // nlbuf must be a contiguous concatenation of null-terminated KEY=VALUE strings.
-// NOTE: This method *modifies* buf to parse it!
 // return 0 on success
 static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev_device_request* vreq, char* nlbuf, ssize_t buflen ) {
    
@@ -221,6 +220,7 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
    char* devpath = NULL;        // sysfs devpath 
    char* subsystem = NULL;      // sysfs subsystem 
    char* devname = (char*)VDEV_DEVICE_PATH_UNKNOWN;        // DEVNAME from uevent
+   char linebuf[4096];          // NOTE: maximum size of a uevent
    
    vdev_device_request_t reqtype = VDEV_DEVICE_INVALID;
    
@@ -240,11 +240,13 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
       line_count++;
       not_param = false;
       
-      rc = vdev_keyvalue_next( buf + offset, &key, &value );
+      strcpy( linebuf, buf + offset );
+      
+      rc = vdev_keyvalue_next( linebuf, &key, &value );
       
       if( rc < 0 ) {
          
-         vdev_error("Invalid line %d (byte %d): '%s'\n", line_count, offset, buf + offset);
+         vdev_error("Invalid line %d (byte %d): '%s'\n", line_count, offset, linebuf );
          vdev_linux_error_uevent( nlbuf, buflen );
          
          return -EINVAL;
