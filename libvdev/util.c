@@ -70,14 +70,14 @@ int vdev_enable_syslog() {
    return 0;
 }
 
-// become a daemon: fork, setsid, fork, have child close all file descriptors except for the ones in fd_keep (if non-NULL)
-// return 0 on success
-int vdev_daemonize( int* fd_keep, int num_fds ) {
+// become a daemon: fork, setsid, fork, umask
+// return 0 on child
+// return 1 on parent 
+// return -errno on failure to fork 
+int vdev_daemonize(void) {
    
    int rc = 0;
    pid_t pid = 0;
-   
-   struct rlimit maxfds;
    
    pid = fork();
    if( pid == 0 ) {
@@ -110,42 +110,6 @@ int vdev_daemonize( int* fd_keep, int num_fds ) {
          // own everything we create 
          umask(0);
          
-         // close all files, except for those that we want to keep 
-         rc = getrlimit( RLIMIT_NOFILE, &maxfds );
-         if( rc != 0 ) {
-            
-            rc = -errno;
-            vdev_error("getrlimit( RLIMIT_NOFILE ) rc = %d\n", rc );
-            
-            rc = 0;
-            
-            maxfds.rlim_cur = 0;
-            maxfds.rlim_max = 65536;    // should be big enough
-         }
-         
-         // close them all!
-         for( int i = 0; i < maxfds.rlim_max; i++ ) {
-            
-            bool do_close = true;
-            
-            // keep this one open?
-            if( fd_keep != NULL ) {
-               
-               for( int j = 0; j < num_fds; j++ ) {
-                  
-                  if( i == fd_keep[j] ) {
-                     do_close = false;
-                     break;
-                  }
-               }
-            }
-            
-            if( do_close ) {
-               
-               close( i );
-            }
-         }
-         
          // now a daemon!
          return 0;
       }
@@ -165,7 +129,7 @@ int vdev_daemonize( int* fd_keep, int num_fds ) {
    else if( pid > 0 ) {
       
       // parent--we're done 
-      _exit(0);
+      return 1;
    }
    else {
       
@@ -855,7 +819,7 @@ int vdev_portable_scandirat( int dirfd, char const* dirp, struct dirent ***namel
 }
 
 
-// process all files in a directory, given a descriptor to it.
+// process all files in a directory, given a descriptor to it.  Search in alphanumeric order
 // return 0 on success 
 // return -EINVAL if loader is NULL
 // return -EBADF if dirfd is invalid 
@@ -897,7 +861,7 @@ int vdev_load_all_at( int dirfd, vdev_dirent_loader_at_t loader_at, void* cls ) 
 }
 
 
-// process all files in a directory with a loader
+// process all files in a directory with a loader, in alphanumeric order
 // return 0 on success
 // return -EINVAL if dir_path or loader are NULL 
 // return -ENOMEM if OOM 

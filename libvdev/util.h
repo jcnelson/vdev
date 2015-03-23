@@ -77,6 +77,12 @@
 #define VDEV_WHERESTR "%05d:%05d: [%16s:%04u] %s: "
 #define VDEV_WHEREARG (int)getpid(), (int)pthread_self(), __FILE__, __LINE__, __func__
 
+#define VDEV_LOGLEVEL_DEBUG     2
+#define VDEV_LOGLEVEL_INFO      1
+#define VDEV_LOGLEVEL_NONE      0
+#define VDEV_LOGLEVEL_WARN      2
+#define VDEV_LOGLEVEL_ERROR     1
+
 extern int _VDEV_DEBUG_MESSAGES;
 extern int _VDEV_INFO_MESSAGES;
 extern int _VDEV_WARN_MESSAGES;
@@ -172,7 +178,7 @@ int vdev_get_error_level();
 int vdev_enable_syslog();
 
 // system functions 
-int vdev_daemonize( int* fd_keep, int num_fds );
+int vdev_daemonize( void );
 int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t max_output, int* exit_status );
 int vdev_log_redirect( char const* logfile_path );
 int vdev_pidfile_write( char const* pidfile_path );
