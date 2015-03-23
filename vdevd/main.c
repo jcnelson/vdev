@@ -25,8 +25,13 @@
 int main( int argc, char** argv ) {
    
    int rc = 0;
-   pid_t pid = 0;
    struct vdev_state vdev;
+   int device_quiesce_pipe[2];
+   bool is_child = false;
+   bool is_parent = false;
+   ssize_t nr = 0;
+   
+   int flush_fd = -1;   // FD to write to once we finish flushing the initial device requests
    
    memset( &vdev, 0, sizeof(struct vdev_state) );
    
@@ -36,102 +41,182 @@ int main( int argc, char** argv ) {
       
       vdev_error("vdev_init rc = %d\n", rc );
       
-      vdev_shutdown( &vdev );
+      vdev_shutdown( &vdev, false );
       exit(1);
    }
    
-   // do we need to daemonize?
+   // run the preseed command 
+   rc = vdev_preseed_run( &vdev );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_preseed_run rc = %d\n", rc );
+      
+      vdev_shutdown( &vdev, false );
+      exit(1);
+   }
+   
+   // if we're going to daemonize, then redirect logging to the logfile
    if( !vdev.config->foreground ) {
       
-      // start logging 
+      // sanity check
       if( vdev.config->logfile_path == NULL ) {
          
          fprintf(stderr, "No logfile specified\n");
          
-         vdev_shutdown( &vdev );
+         vdev_shutdown( &vdev, false );
          exit(2);
       }
       
-      rc = vdev_log_redirect( vdev.config->logfile_path );
-      if( rc != 0 ) {
+      // do we need to connect to syslog?
+      if( strcmp( vdev.config->logfile_path, "syslog" ) == 0 ) {
          
-         vdev_error("vdev_log_redirect('%s') rc = %d\n", vdev.config->logfile_path, rc );
-         
-         vdev_shutdown( &vdev );
-         exit(2);
-      }
-       
-      // become a daemon
-      int keep_open[2] = {
-         STDOUT_FILENO,
-         STDERR_FILENO
-      };
-      
-      rc = vdev_daemonize( keep_open, 2 );
-      if( rc != 0 ) {
-         
-         vdev_error("vdev_daemonize rc = %d\n", rc );
-         vdev_shutdown( &vdev );
-         
-         exit(3);
+         vdev_debug("%s", "Switching to syslog for messages\n");
+         vdev_enable_syslog();
       }
       
-      // write a pidfile 
-      if( vdev.config->pidfile_path != NULL ) {
-            
-         rc = vdev_pidfile_write( vdev.config->pidfile_path );
+      else {
+         
+         // send to a specific logfile 
+         rc = vdev_log_redirect( vdev.config->logfile_path );
          if( rc != 0 ) {
             
-            vdev_error("vdev_pidfile_write('%s') rc = %d\n", vdev.config->pidfile_path, rc );
+            vdev_error("vdev_log_redirect('%s') rc = %d\n", vdev.config->logfile_path, rc );
             
-            vdev_shutdown( &vdev );
-            exit(4);
+            vdev_shutdown( &vdev, false );
+            exit(2);
+         }
+      }
+      
+      if( !vdev.config->once ) {
+         
+         // will become a daemon 
+         // set up a pipe between parent and child, so the child can 
+         // signal the parent when it's device queue has been emptied 
+         // (meaning the parent can safely exit).
+         
+         rc = pipe( device_quiesce_pipe );
+         if( rc != 0 ) {
+            
+            vdev_error("pipe rc = %d\n", rc );
+            vdev_shutdown( &vdev, false );
+            
+            exit(3);
+         }
+         
+         // become a daemon
+         rc = vdev_daemonize();
+         if( rc < 0 ) {
+            
+            vdev_error("vdev_daemonize rc = %d\n", rc );
+            vdev_shutdown( &vdev, false );
+            
+            exit(3);
+         }
+         
+         if( rc == 0 ) {
+            
+            // child
+            close( device_quiesce_pipe[0] );
+            flush_fd = device_quiesce_pipe[1];
+            
+            // write a pidfile 
+            if( vdev.config->pidfile_path != NULL ) {
+                  
+               rc = vdev_pidfile_write( vdev.config->pidfile_path );
+               if( rc != 0 ) {
+                  
+                  vdev_error("vdev_pidfile_write('%s') rc = %d\n", vdev.config->pidfile_path, rc );
+                  
+                  vdev_shutdown( &vdev, false );
+                  exit(4);
+               }
+            }
+            
+            is_child = true;
+         }
+         else {
+            
+            // parent 
+            is_parent = true;
+            close( device_quiesce_pipe[1] );
          }
       }
    }
    
-   // do we need to connect to syslog?
-   if( vdev.config->logfile_path != NULL && strcmp( vdev.config->logfile_path, "syslog" ) == 0 ) {
-      
-      vdev_debug("%s", "Switching to syslog for messages\n");
-      vdev_enable_syslog();
-   }
-   
-   // start up
-   rc = vdev_start( &vdev );
-   if( rc != 0 ) {
-      
-      vdev_error("vdev_backend_init rc = %d\n", rc );
-      
-      vdev_stop( &vdev );
-      vdev_shutdown( &vdev );
-      exit(1);
-   }
-   
-   // run 
-   rc = vdev_main( &vdev );
-   if( rc != 0 ) {
-      
-      vdev_error("vdev_backend_main rc = %d\n", rc );
-   }
-
-   // flush all requests
-   vdev_stop( &vdev );
-   
-   // if running once, find and remove all devices not processed initially.
-   // use the metadata directory to figure this out
-   if( vdev.once ) {
-      
-      rc = vdev_remove_unplugged_devices( &vdev );
+   if( !is_parent || vdev.config->foreground || vdev.config->once ) {
+         
+      // child, or foreground, or running once.  start handling (initial) device events
+      rc = vdev_start( &vdev );
       if( rc != 0 ) {
          
-         vdev_error("vdev_remove_unplugged_devices() rc = %d\n", rc );
+         vdev_error("vdev_backend_init rc = %d\n", rc );
+         
+         vdev_stop( &vdev );
+         vdev_shutdown( &vdev, false );
+         
+         // if child, tell the parent to exit failure 
+         if( is_child ) {
+            
+            write( device_quiesce_pipe[1], &rc, sizeof(rc) );
+            close( device_quiesce_pipe[1] );
+         }
+         
+         exit(5);
       }
+         
+      // main loop: get events from the OS and process them.
+      // wake up the parent once we finish the initial devices
+      rc = vdev_main( &vdev, flush_fd );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_main rc = %d\n", rc );
+      }
+      
+      // quiesce requests
+      vdev_stop( &vdev );
+      
+      // if running once, find and remove all devices not processed initially.
+      // use the metadata directory to figure this out
+      if( vdev.config->once ) {
+         
+         rc = vdev_remove_unplugged_devices( &vdev );
+         if( rc != 0 ) {
+            
+            vdev_error("vdev_remove_unplugged_devices() rc = %d\n", rc );
+         }
+      }
+      
+      // clean up
+      // keep the pidfile unless we're running once (in which case, don't touch it)
+      vdev_shutdown( &vdev, !vdev.config->once );
+      
+      return rc;
+   
    }
-   
-   // clean up
-   vdev_shutdown( &vdev );
-   
-   return rc;
+   else {
+      
+      // wait for the child to finish processing the initial devices 
+      nr = read( device_quiesce_pipe[0], &rc, sizeof(rc) );
+      
+      if( nr < 0 || rc != 0 ) {
+         
+         if( nr < 0 ) {
+            
+            vdev_error("read(%d) rc = %zd\n", device_quiesce_pipe[0], nr );
+         }
+         
+         vdev_error("device quiesce failure, child rc = %d\n", rc );
+         exit(6);
+      }
+      
+      printf("parent: all initial devices processed\n");
+      
+      // clean up, but keep the pidfile
+      vdev_shutdown( &vdev, false );
+      
+      close( device_quiesce_pipe[0] );
+      
+      return 0;
+   }
 }
 

@@ -322,6 +322,48 @@ int vdev_start( struct vdev_state* vdev ) {
 }
 
 
+// run the pre-seed command, if given 
+// return 0 on success
+// return -ENOMEM on OOM 
+// return non-zero on non-zero exit status
+int vdev_preseed_run( struct vdev_state* vdev ) {
+   
+   int rc = 0;
+   int exit_status = 0;
+   char* command = NULL;
+   
+   if( vdev->config->preseed_path == NULL ) {
+      // nothing to do 
+      return 0;
+   }
+   
+   command = VDEV_CALLOC( char, strlen( vdev->config->preseed_path ) + 2 + strlen( vdev->config->mountpoint ) + 1 );
+   if( command == NULL ) {
+      
+      // OOM
+      return -ENOMEM;
+   }
+   
+   sprintf(command, "%s %s", vdev->config->preseed_path, vdev->config->mountpoint );
+   
+   rc = vdev_subprocess( command, NULL, NULL, 0, &exit_status );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_subprocess('%s') rc = %d\n", command, rc );
+   }
+   else if( exit_status != 0 ) {
+      
+      vdev_error("vdev_subprocess('%s') exit status %d\n", command, exit_status );
+      rc = exit_status;
+   }
+   
+   free( command );
+   command = NULL;
+   
+   return rc;
+}
+
+
 // global vdev initialization 
 int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
    
@@ -372,7 +414,9 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
    vdev_set_debug_level( vdev->config->debug_level );
    vdev_set_error_level( vdev->config->error_level );
    
-   vdev_info("Config file: '%s'\n", vdev->config->config_path );
+   vdev_info("Config file:      '%s'\n", vdev->config->config_path );
+   vdev_info("Log debug level:  '%s'\n", (vdev->config->debug_level == VDEV_LOGLEVEL_DEBUG ? "debug" : (vdev->config->debug_level == VDEV_LOGLEVEL_INFO ? "info" : "none")) );
+   vdev_info("Log error level:  '%s'\n", (vdev->config->error_level == VDEV_LOGLEVEL_WARN ? "warning" : (vdev->config->error_level == VDEV_LOGLEVEL_ERROR ? "error" : "none")) );
    
    // load from file...
    rc = vdev_config_load( vdev->config->config_path, vdev->config );
@@ -381,6 +425,17 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
       vdev_error("vdev_config_load('%s') rc = %d\n", vdev->config->config_path, rc );
       
       return rc;
+   }
+   
+   // if no command-line loglevel is given, then take it from the config file (if given)
+   if( vdev->config->debug_level != VDEV_LOGLEVEL_NONE ) {
+      
+      vdev_set_debug_level( vdev->config->debug_level );
+   }
+   
+   if( vdev->config->error_level != VDEV_LOGLEVEL_NONE ) {
+      
+      vdev_set_error_level( vdev->config->error_level );
    }
    
    // convert to absolute paths 
@@ -396,7 +451,10 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
    vdev_info("firmware dir:     '%s'\n", vdev->config->firmware_dir );
    vdev_info("helpers dir:      '%s'\n", vdev->config->helpers_dir );
    vdev_info("logfile path:     '%s'\n", vdev->config->logfile_path );
+   vdev_info("pidfile path:     '%s'\n", vdev->config->pidfile_path );
    vdev_info("default mode:      0%o\n", vdev->config->default_mode );
+   vdev_info("ifnames file:     '%s'\n", vdev->config->ifnames_path );
+   vdev_info("preseed script:   '%s'\n", vdev->config->preseed_path );
    
    vdev->mountpoint = vdev_strdup_or_null( vdev->config->mountpoint );
    vdev->once = vdev->config->once;
@@ -425,7 +483,7 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
    }
    
    // initialize request work queue 
-   rc = vdev_wq_init( &vdev->device_wq );
+   rc = vdev_wq_init( &vdev->device_wq, vdev );
    if( rc != 0 ) {
       
       vdev_error("vdev_wq_init rc = %d\n", rc );
@@ -440,7 +498,7 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
 // main loop for the back-end 
 // return 0 on success
 // return -errno on failure to daemonize, or abnormal OS-specific back-end failure
-int vdev_main( struct vdev_state* vdev ) {
+int vdev_main( struct vdev_state* vdev, int flush_fd ) {
    
    int rc = 0;
    
@@ -463,9 +521,29 @@ int vdev_main( struct vdev_state* vdev ) {
    
    free( metadata_dir );
    
+   vdev->flush_fd = flush_fd;
+   
    rc = vdev_os_main( vdev->os );
    
    return rc;
+}
+
+
+// signal that the device work queue has flushed all initial devices 
+// always succeeds 
+int vdev_signal_wq_flushed( struct vdev_state* state ) {
+   
+   if( state->flush_fd >= 0) {
+      
+      // wake up anyone waiting for the workqueue to be drained
+      int rc = 0;
+      write( state->flush_fd, &rc, sizeof(rc) );
+      
+      close( state->flush_fd );
+      state->flush_fd = -1;
+   }
+   
+   return 0;
 }
 
 
@@ -495,14 +573,14 @@ int vdev_stop( struct vdev_state* vdev ) {
 }
 
 // free up vdev 
-int vdev_shutdown( struct vdev_state* vdev ) {
+int vdev_shutdown( struct vdev_state* vdev, bool unlink_pidfile ) {
    
    if( vdev->running ) {
       return -EINVAL;
    }
    
    // remove the PID file, if we have one 
-   if( vdev->config->pidfile_path != NULL ) {
+   if( vdev->config->pidfile_path != NULL && unlink_pidfile ) {
       unlink( vdev->config->pidfile_path );
    }
    

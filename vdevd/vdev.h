@@ -59,6 +59,9 @@ struct vdev_state {
    
    // run once?
    bool once;
+   
+   // fd to write to to signal when the initial devices have all been processed
+   int flush_fd;
 };
 
 typedef char* cstr;
@@ -67,10 +70,14 @@ C_LINKAGE_BEGIN
 
 int vdev_init( struct vdev_state* vdev, int argc, char** argv );
 int vdev_start( struct vdev_state* vdev );
-int vdev_main( struct vdev_state* vdev );
+int vdev_main( struct vdev_state* vdev, int flush_fd );
 int vdev_stop( struct vdev_state* vdev );
-int vdev_shutdown( struct vdev_state* vdev );
+int vdev_shutdown( struct vdev_state* vdev, bool unlink_pidfile );
 
+// NOTE: this is meant to be called by the workqueue
+int vdev_signal_wq_flushed( struct vdev_state* state );
+
+int vdev_preseed_run( struct vdev_state* state );
 int vdev_remove_unplugged_devices( struct vdev_state* state );
 
 SGLIB_DEFINE_VECTOR_PROTOTYPES( cstr );
