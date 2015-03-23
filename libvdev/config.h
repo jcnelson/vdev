@@ -43,6 +43,7 @@
 #define VDEV_CONFIG_ONCE          "run_once"
 #define VDEV_CONFIG_FOREGROUND    "foreground"
 #define VDEV_CONFIG_IFNAMES       "ifnames"
+#define VDEV_CONFIG_PRESEED       "preseed"
 
 #define VDEV_CONFIG_INSTANCE_NONCE_LEN 32
 #define VDEV_CONFIG_INSTANCE_NONCE_STRLEN (2*VDEV_CONFIG_INSTANCE_NONCE_LEN + 1)
@@ -58,6 +59,9 @@ struct vdev_config {
    
    // interface names file 
    char* ifnames_path;
+   
+   // preseed script 
+   char* preseed_path;
    
    // ACLs directory 
    char* acls_dir;

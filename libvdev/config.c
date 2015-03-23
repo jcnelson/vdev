@@ -124,25 +124,25 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
       
       if( strcmp( name, VDEV_CONFIG_LOG_LEVEL ) == 0 ) {
          
-         if( strcasecmp( name, "debug" ) == 0 ) {
+         if( strcasecmp( value, "debug" ) == 0 ) {
             
-            conf->debug_level = 2;
-            conf->error_level = 2;
+            conf->debug_level = VDEV_LOGLEVEL_DEBUG;
+            conf->error_level = VDEV_LOGLEVEL_WARN;
          }
-         else if( strcasecmp( name, "info" ) == 0 ) {
+         else if( strcasecmp( value, "info" ) == 0 ) {
             
-            conf->debug_level = 1;
-            conf->error_level = 2;
+            conf->debug_level = VDEV_LOGLEVEL_INFO;
+            conf->error_level = VDEV_LOGLEVEL_WARN;
          }
-         else if( strcasecmp( name, "warn" ) == 0 || strcasecmp( name, "warning" ) == 0 ) {
+         else if( strcasecmp( value, "warn" ) == 0 || strcasecmp( value, "warning" ) == 0 ) {
             
-            conf->debug_level = 0;
-            conf->error_level = 2;
+            conf->debug_level = VDEV_LOGLEVEL_NONE;
+            conf->error_level = VDEV_LOGLEVEL_WARN;
          }
-         else if( strcasecmp( name, "error" ) == 0 || strcasecmp( name, "critical" ) == 0 ) {
+         else if( strcasecmp( value, "error" ) == 0 || strcasecmp( value, "critical" ) == 0 ) {
             
-            conf->debug_level = 0;
-            conf->error_level = 1;
+            conf->debug_level = VDEV_LOGLEVEL_NONE;
+            conf->error_level = VDEV_LOGLEVEL_ERROR;
          }
          else {
             
@@ -196,6 +196,16 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
          }
             
          return 1;  
+      }
+      
+      if( strcmp( name, VDEV_CONFIG_PRESEED ) == 0 ) {
+         
+         if( conf->preseed_path == NULL ) {
+            
+            conf->preseed_path = vdev_strdup_or_null( value );
+         }
+         
+         return 1;
       }
       
       fprintf(stderr, "Unrecognized '%s' field '%s'\n", section, name);
@@ -390,6 +400,24 @@ int vdev_config_free( struct vdev_config* conf ) {
       conf->ifnames_path = NULL;
    }
    
+   if( conf->preseed_path != NULL ) {
+      
+      free( conf->preseed_path );
+      conf->preseed_path = NULL;
+   }
+   
+   if( conf->logfile_path != NULL ) {
+      
+      free( conf->logfile_path );
+      conf->logfile_path = NULL;
+   }
+   
+   if( conf->pidfile_path != NULL ) {
+      
+      free( conf->pidfile_path );
+      conf->pidfile_path = NULL;
+   }
+   
    return 0;
 }
 
@@ -409,6 +437,8 @@ int vdev_config_fullpaths( struct vdev_config* conf ) {
       &conf->helpers_dir,
       &conf->pidfile_path,
       &conf->logfile_path,
+      &conf->preseed_path,
+      &conf->ifnames_path,
       NULL
    };
    
@@ -469,10 +499,10 @@ Options include:\n\
                   Exit once all extant devices have been processed.\n\
                   \n\
    -f, --foreground\n\
-                  Run in the foreground; do not daemonize\n\
+                  Run in the foreground; do not daemonize.\n\
                   \n\
    -p, --pidfile PATH\n\
-                  Write the PID of the daemon to PATH\n\
+                  Write the PID of the daemon to PATH.\n\
 ", progname );
   
   return 0;
