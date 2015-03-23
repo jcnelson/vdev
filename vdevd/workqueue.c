@@ -1,6 +1,6 @@
 /*
    vdev: a virtual device manager for *nix
-   Copyright (C) 2014  Jude Nelson
+   Copyright (C) 2015  Jude Nelson
 
    This program is dual-licensed: you can redistribute it and/or modify
    it under the terms of the GNU Lesser General Public License version 3 or later as
@@ -21,41 +21,40 @@
 
 #include "libvdev/util.h"
 #include "workqueue.h"
+#include "os/common.h"
+#include "vdev.h"
 
-
-// wait for the queue to be empty 
-// always succeeds
-static int vdev_wq_wait_for_empty( struct vdev_wq* wq ) {
+// wait for the queue to be drained
+static void vdev_wq_wait_for_empty( struct vdev_wq* wq ) {
    
    pthread_mutex_lock( &wq->waiter_lock );
    
-   wq->waiter_count++;
+   wq->num_waiters++;
    
    pthread_mutex_unlock( &wq->waiter_lock );
    
    sem_wait( &wq->end_sem );
-   
-   return 0;
 }
 
-// wake up all threads waiting for the queue to be empty 
-// always succeeds
-static int vdev_wq_wakeup_waiters_on_empty( struct vdev_wq* wq ) {
+
+// signal any waiting threds that the queue is empty 
+static void vdev_wq_signal_empty( struct vdev_wq* wq ) {
+   
+   volatile int num_waiters = 0;
    
    pthread_mutex_lock( &wq->waiter_lock );
    
-   int waiter_count = wq->waiter_count;
-   wq->waiter_count = 0;
+   num_waiters = wq->num_waiters;
+   wq->num_waiters = 0;
    
    pthread_mutex_unlock( &wq->waiter_lock );
    
-   for( int i = 0; i < waiter_count; i++ ) {
+   for( int i = 0; i < num_waiters; i++ ) {
       
       sem_post( &wq->end_sem );
    }
-   
-   return 0;
 }
+
 
 // work queue main method
 // always succeeds
@@ -65,6 +64,8 @@ static void* vdev_wq_main( void* cls ) {
    
    struct vdev_wreq* work_itr = NULL;
    struct vdev_wreq* next = NULL;
+   
+   struct vdev_state* state = wq->state;
    
    int rc = 0;
 
@@ -76,9 +77,6 @@ static void* vdev_wq_main( void* cls ) {
          
          rc = -errno;
          if( rc == -EAGAIN ) {
-            
-            // no work; wake up anyone waiting for us to be empty
-            vdev_wq_wakeup_waiters_on_empty( wq );
             
             // wait for work
             sem_wait( &wq->work_sem );
@@ -106,7 +104,15 @@ static void* vdev_wq_main( void* cls ) {
       pthread_mutex_unlock( &wq->work_lock );
       
       if( work_itr == NULL ) {
-         // nothing to do
+         
+         if( vdev_os_context_is_flushed( state->os ) ) {
+         
+            // no work; wake up anyone waiting for us to have finished the initial devices
+            vdev_signal_wq_flushed( state );
+         }
+         
+         vdev_wq_signal_empty( wq );
+            
          continue;
       }
 
@@ -137,7 +143,7 @@ static void* vdev_wq_main( void* cls ) {
 // return 0 on success
 // return negative on failure:
 // * -ENOMEM if OOM
-int vdev_wq_init( struct vdev_wq* wq ) {
+int vdev_wq_init( struct vdev_wq* wq, struct vdev_state* state ) {
 
    int rc = 0;
 
@@ -149,8 +155,17 @@ int vdev_wq_init( struct vdev_wq* wq ) {
       return -abs(rc);
    }
    
+   rc = pthread_mutex_init( &wq->waiter_lock, NULL );
+   if( rc != 0 ) {
+      
+      pthread_mutex_destroy( &wq->work_lock );
+      return -abs(rc);
+   }
+   
    sem_init( &wq->work_sem, 0, 0 );
    sem_init( &wq->end_sem, 0, 0 );
+   
+   wq->state = state;
    
    return rc;
 }
@@ -249,7 +264,10 @@ int vdev_wq_free( struct vdev_wq* wq ) {
    vdev_wq_queue_free( wq->work );
    
    pthread_mutex_destroy( &wq->work_lock );
+   pthread_mutex_destroy( &wq->waiter_lock );
+   
    sem_destroy( &wq->work_sem );
+   sem_destroy( &wq->end_sem );
 
    memset( wq, 0, sizeof(struct vdev_wq) );
 

@@ -25,6 +25,7 @@
 #include "libvdev/util.h"
 
 struct vdev_wreq;
+struct vdev_state;
 
 // vdev workqueue callback type
 typedef int (*vdev_wq_func_t)( struct vdev_wreq* wreq, void* cls );
@@ -64,14 +65,17 @@ struct vdev_wq {
    // semaphore to signal the end of work 
    sem_t end_sem;
    
+   // pointer to vdev global state 
+   struct vdev_state* state;
+   
    // number of threads waiting for the queue to be empty
-   volatile int waiter_count;
+   volatile int num_waiters;
    pthread_mutex_t waiter_lock;
 };
 
 C_LINKAGE_BEGIN
 
-int vdev_wq_init( struct vdev_wq* wq );
+int vdev_wq_init( struct vdev_wq* wq, struct vdev_state* state );
 int vdev_wq_start( struct vdev_wq* wq );
 int vdev_wq_stop( struct vdev_wq* wq, bool wait );
 int vdev_wq_free( struct vdev_wq* wq );
