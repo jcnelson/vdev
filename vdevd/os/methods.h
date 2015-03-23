@@ -1,6 +1,6 @@
 /*
    vdev: a virtual device manager for *nix
-//    Copyright (C) 2015  Jude Nelson
+   Copyright (C) 2015  Jude Nelson
 
    This program is dual-licensed: you can redistribute it and/or modify
    it under the terms of the GNU General Public License version 3 or later as 
@@ -42,7 +42,7 @@ int vdev_os_shutdown( void* cls );
 // yield the next device
 // return 0 on success
 // return positive to exit successfully
-// return -EAGAIN if vdev should try again 
+// return -EAGAIN if vdevd should try again 
 // return negative on fatal error (causes vdevd to exit).
 int vdev_os_next_device( struct vdev_device_request* request, void* cls );
 
