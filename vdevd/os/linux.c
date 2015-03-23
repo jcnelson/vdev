@@ -34,6 +34,9 @@ static vdev_device_request_t vdev_linux_parse_device_request_type( char const* t
    else if( strcmp(type, "remove") == 0 ) {
       return VDEV_DEVICE_REMOVE;
    }
+   else if( strcmp(type, "change") == 0 ) {
+      return VDEV_DEVICE_CHANGE;
+   }
    
    return VDEV_DEVICE_INVALID;
 }
@@ -226,7 +229,8 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
    vdev_debug("%p: uevent buffer\n", vreq );
    vdev_linux_debug_uevent( nlbuf, buflen );
    
-   // sanity check: if the first line is $action@$devpath, then skip it
+   // sanity check: if the first line is $action@$devpath, then skip it (since the information 
+   // contained in the uevent will encode the very same bits of information)
    if( strchr(buf, '@') != NULL ) { 
          
       // advance to the next line
@@ -475,7 +479,14 @@ int vdev_os_next_device( struct vdev_device_request* vreq, void* cls ) {
       free( req );
       
       pthread_mutex_unlock( &ctx->initial_requests_lock );
-   
+      
+      // was that the last of them?
+      if( ctx->initial_requests == NULL ) {
+         
+         // tell vdevd that we've flushed all pending requests 
+         vdev_os_context_signal_flushed( ctx->os_ctx );
+      }
+      
       return 0;
    }
    else if( ctx->os_ctx->state->once ) {
@@ -485,6 +496,7 @@ int vdev_os_next_device( struct vdev_device_request* vreq, void* cls ) {
       return 1;
    }
    else {
+      
       pthread_mutex_unlock( &ctx->initial_requests_lock );
    }
    
