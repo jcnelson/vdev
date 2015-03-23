@@ -39,6 +39,7 @@ typedef enum {
    VDEV_DEVICE_INVALID = 0,             // invalid request
    VDEV_DEVICE_ADD,
    VDEV_DEVICE_REMOVE,
+   VDEV_DEVICE_CHANGE,
    VDEV_DEVICE_ANY                      // only useful for actions
 } vdev_device_request_t;
 
