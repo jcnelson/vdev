@@ -115,6 +115,9 @@ int vdev_os_context_init( struct vdev_os_context* vos, struct vdev_state* state 
    if( rc != 0 ) {
       
       vdev_error("vdev_os_init rc = %d\n", rc );
+      
+      memset( vos, 0, sizeof(struct vdev_os_context) );
+      
       return rc;
    }
    
@@ -135,4 +138,18 @@ int vdev_os_context_free( struct vdev_os_context* vos ) {
    }
    
    return 0;
+}
+
+
+// backend signal to vdevd that it has processed all pending devices 
+int vdev_os_context_signal_flushed( struct vdev_os_context* vos ) {
+   
+   vos->flushed = true;
+   return 0;
+}
+
+// are we flushed?
+bool vdev_os_context_is_flushed( struct vdev_os_context* vos ) {
+   
+   return vos->flushed;
 }

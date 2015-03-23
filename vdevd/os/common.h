@@ -31,6 +31,8 @@ struct vdev_os_context {
    
    bool running;
    
+   bool flushed;        // processed all initial device requests?
+   
    // reference to global state 
    struct vdev_state* state;
 };
@@ -40,6 +42,10 @@ C_LINKAGE_BEGIN
 // context management
 int vdev_os_context_init( struct vdev_os_context* vos, struct vdev_state* state );
 int vdev_os_context_free( struct vdev_os_context* vos );
+
+// signaling from the back-end to vdevd
+int vdev_os_context_signal_flushed( struct vdev_os_context* vos );
+bool vdev_os_context_is_flushed( struct vdev_os_context* vos );
 
 int vdev_os_main( struct vdev_os_context* vos );
 
