@@ -13,6 +13,8 @@ VDEV_PROGNAME=$0
 #  $3  vdev device metadata directory
 add_link() {
 
+   local _LINK_SOURCE _LINK_TARGET _METADATA _DIRNAME
+   
    _LINK_SOURCE="$1"
    _LINK_TARGET="$2"
    _METADATA="$3"
@@ -38,6 +40,8 @@ add_link() {
 #  $1  vdev device metadata directory
 remove_links() {
 
+   local _METADATA _LINKNAME _DIRNAME 
+   
    _METADATA="$1"
 
    while read _LINKNAME; do
@@ -109,6 +113,8 @@ vdev_error() {
 #   $2 is the (optional) message
 fail() {
 
+   local _CODE _MSG 
+   
    _CODE="$1"
    _MSG="$2"
 
@@ -123,6 +129,8 @@ fail() {
 # print the list of device drivers in a sysfs device path 
 #   $1  sysfs device path
 drivers() {
+   
+   local _SYSFS_PATH
    
    _SYSFS_PATH="$1"
 
@@ -146,6 +154,8 @@ drivers() {
 # NOTE: uniqueness is not guaranteed!
 subsystems() {
 
+   local _SYSFS_PATH 
+   
    _SYSFS_PATH="$1"
 
    # strip trailing '/'
@@ -169,6 +179,8 @@ subsystems() {
 # return 0 on success
 # return 1 on error
 load_firmware() {
+   
+   local _SYSFS_PATH _FIRMWARE_PATH _SYSFS_FIRMWARE_PATH _RC
    
    _SYSFS_PATH="$1"
    _FIRMWARE_PATH="$2"
