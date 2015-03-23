@@ -117,6 +117,9 @@ vdev_device_request_t vdev_action_parse_trigger( char const* type ) {
    else if( strcmp(type, VDEV_ACTION_EVENT_REMOVE) == 0 ) {
       return VDEV_DEVICE_REMOVE;
    }
+   else if( strcmp(type, VDEV_ACTION_EVENT_CHANGE) == 0 ) {
+      return VDEV_DEVICE_CHANGE;
+   }
    else if( strcmp(type, VDEV_ACTION_EVENT_ANY) == 0 ) {
       return VDEV_DEVICE_ANY;
    }
@@ -630,7 +633,8 @@ int vdev_action_match( struct vdev_device_request* vreq, struct vdev_action* act
             char const* act_param_value = dp->value;
             
             // if the action has no value (value of length 0), then it matches any vreq value 
-            if( strlen( vreq_param_value ) == 0 ) {
+            if( act_param_value == NULL || strlen( act_param_value ) == 0 ) {
+               
                continue;
             }
             
@@ -652,6 +656,7 @@ int vdev_action_match( struct vdev_device_request* vreq, struct vdev_action* act
    // match!
    return 1;
 }
+
 
 // find the next action in a list of actions to run, given the path 
 // return the index into acts of the next match, if found 
@@ -810,7 +815,6 @@ int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_acti
          // matched! advance offset to next action
          i = act_offset + rc;
          act_offset += rc + 1;
-         
          rc = 0;
          
          if( acts[i].command == NULL ) {

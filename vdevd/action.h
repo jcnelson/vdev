@@ -41,6 +41,7 @@
 
 #define VDEV_ACTION_EVENT_ADD           "add"
 #define VDEV_ACTION_EVENT_REMOVE        "remove"
+#define VDEV_ACTION_EVENT_CHANGE        "change"
 #define VDEV_ACTION_EVENT_ANY           "any"
 
 // vdev action to take on an event 
