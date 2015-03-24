@@ -84,6 +84,17 @@ int vdev_os_main( struct vdev_os_context* vos ) {
       
       vdev_debug("Next device: %p, type=%d path=%s major=%u minor=%u mode=%o\n", vreq, vreq->type, vreq->path, major(vreq->dev), minor(vreq->dev), vreq->mode );
       
+      /*
+      struct sglib_vdev_params_iterator itr2;
+      struct vdev_param_t* dp2 = NULL;
+      
+      printf("vreq %p: params:\n", vreq);
+      for( dp2 = sglib_vdev_params_it_init_inorder( &itr2, vreq->params ); dp2 != NULL; dp2 = sglib_vdev_params_it_next( &itr2 ) ) {
+         
+         printf("   '%s' == '%s'\n", dp2->key, dp2->value );
+      }
+      */
+      
       // post the event to the device work queue
       rc = vdev_device_request_enqueue( &vos->state->device_wq, vreq );
       

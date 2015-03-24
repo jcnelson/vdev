@@ -685,9 +685,9 @@ int vdev_device_add( struct vdev_device_request* req ) {
    
    vdev_debug("ADD device: type '%s' at '%s' ('%s' %d:%d)\n", (S_ISBLK(req->mode) ? "block" : S_ISCHR(req->mode) ? "char" : "unknown"), req->renamed_path, req->path, major(req->dev), minor(req->dev) );
    
-   if( req->renamed_path != NULL && strcmp( req->renamed_path, VDEV_DEVICE_PATH_UNKNOWN ) != 0 ) {
+   if( req->renamed_path != NULL ) {
       
-      if( req->dev != 0 && req->mode != 0 ) {
+      if( req->dev != 0 && req->mode != 0 && strcmp( req->renamed_path, VDEV_DEVICE_PATH_UNKNOWN ) != 0 ) {
       
          // making a device file
          char* fp = NULL;
@@ -768,7 +768,7 @@ int vdev_device_add( struct vdev_device_request* req ) {
          
          free( fp );
       }
-      else {
+      else if( strcmp( req->renamed_path, VDEV_DEVICE_PATH_UNKNOWN ) != 0 ) {
       
          // not creating a device file, but a device-add event nevertheless.
          // creating or updating?
@@ -884,7 +884,7 @@ int vdev_device_remove( struct vdev_device_request* req ) {
    
    vdev_info("REMOVE device: type '%s' at '%s' ('%s' %d:%d)\n", (S_ISBLK(req->mode) ? "block" : S_ISCHR(req->mode) ? "char" : "unknown"), req->renamed_path, req->path, major(req->dev), minor(req->dev) );
       
-   if( req->renamed_path != NULL && strcmp( req->renamed_path, VDEV_DEVICE_PATH_UNKNOWN ) != 0 ) {
+   if( req->renamed_path != NULL ) {
       
       // call all REMOVE actions
       rc = vdev_action_run_commands( req, req->state->acts, req->state->num_acts );
@@ -895,7 +895,7 @@ int vdev_device_remove( struct vdev_device_request* req ) {
       }
       
       // only remove files from /dev if this is a device...
-      if( req->dev != 0 && req->mode != 0 ) {
+      if( req->dev != 0 && req->mode != 0 && strcmp( req->renamed_path, VDEV_DEVICE_PATH_UNKNOWN ) != 0 ) {
             
          // remove the data itself, if there is data 
          char* fp = vdev_fullpath( req->state->mountpoint, req->renamed_path, NULL );
@@ -923,13 +923,16 @@ int vdev_device_remove( struct vdev_device_request* req ) {
          free( fp );
       }
       
-      // remove metadata 
-      rc = vdev_device_remove_metadata( req );
-      
-      if( rc != 0 ) {
+      if( strcmp( req->renamed_path, VDEV_DEVICE_PATH_UNKNOWN ) != 0 ) {
          
-         vdev_warn("unable to clean up metadata for %s\n", req->renamed_path );
-         rc = 0;
+         // remove metadata 
+         rc = vdev_device_remove_metadata( req );
+         
+         if( rc != 0 ) {
+            
+            vdev_warn("unable to clean up metadata for %s\n", req->renamed_path );
+            rc = 0;
+         }
       }
    }
    
