@@ -13,6 +13,10 @@ VDEV_MOUNTPOINT=$1
 # add /dev/core 
 /bin/ln -sf /proc/kcore $VDEV_MOUNTPOINT/core
 
+# add /dev/null
+/bin/mknod /dev/null c 1 3
+/bin/chmod 0666 /dev/null
+
 # add /dev/stdin, /dev/stdout, /dev/stderr
 /bin/ln -sf /proc/self/fd/0 $VDEV_MOUNTPOINT/stdin
 /bin/ln -sf /proc/self/fd/1 $VDEV_MOUNTPOINT/stdout
