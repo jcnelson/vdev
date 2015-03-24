@@ -16,7 +16,7 @@ if [ -z "$VDEV_BIN" ]; then
 fi
 
 if [ -z "$VDEV_CONFIG" ]; then 
-   VDEV_CONFIG=/etc/vdev/vdev.conf
+   VDEV_CONFIG=/etc/vdev/vdevd.conf
 fi
 
 if [ -z "$VDEV_MOUNTPOINT" ]; then
