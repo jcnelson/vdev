@@ -1,0 +1,25 @@
+#!/bin/sh -e
+
+PREREQS=""
+
+prereqs() { echo "$PREREQS"; }
+
+case "$1" in
+    prereqs)
+    prereqs
+    exit 0
+    ;;
+esac
+
+# stop vdevd 
+if [ -f /run/vdevd.boot.pid ]; then 
+   kill -s SIGTERM $(cat /run/vdevd.boot.pid)
+fi
+
+# move the /dev tmpfs to the rootfs
+mount -n -o move /dev ${rootmnt}/dev
+
+# create a temporary symlink to the final /dev for other initramfs scripts
+nuke /dev
+ln -s ${rootmnt}/dev /dev
+

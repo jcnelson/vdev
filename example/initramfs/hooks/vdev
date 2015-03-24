@@ -1,0 +1,52 @@
+#!/bin/sh -e
+
+PREREQS=""
+
+prereqs() { echo "$PREREQS"; }
+
+case "$1" in
+    prereqs)
+    prereqs
+    exit 0
+    ;;
+esac
+
+root_over_the_network() {
+  if   egrep -qs '^/dev/(nbd|nd[a-z]|etherd/e)[^[:space:]]+[[:space:]]+/[[:space:]]' /etc/fstab; then
+    return 0
+  elif egrep -qs '^[^[:space:]#]+[[:space:]]+/[[:space:]]+nfs[234]?[[:space:]]' /etc/fstab; then
+    return 0
+  fi
+  return 1 # false
+}
+
+. /usr/share/initramfs-tools/hook-functions
+
+# helper programs
+mkdir -p $DESTDIR/lib/vdev
+for prog in /lib/vdev/*; do
+
+   # shell script or library?
+   if [ -z "${prog#*.sh}" ]; then 
+
+      cp -a $prog $DESTDIR/lib/vdev/
+   else
+
+      # binary?
+      if [ -f $prog -a -x $prog ]; then 
+
+         copy_exec $prog /lib/vdev
+      fi
+   fi
+done
+
+# config 
+mkdir -p $DESTDIR/etc/vdev
+cp -a /etc/vdev/* $DESTDIR/etc/vdev/
+
+# the daemon itself 
+copy_exec /sbin/vdevd /sbin
+
+# blkid (needed by vdevd's helpers)
+copy_exec /sbin/blkid /sbin
+
