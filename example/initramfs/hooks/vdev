@@ -50,3 +50,7 @@ copy_exec /sbin/vdevd /sbin
 # blkid (needed by vdevd's helpers)
 copy_exec /sbin/blkid /sbin
 
+# since vdevd is multi-threaded, libpthread will dynamically load libgcc_s
+# (and copy_exec won't detect this)
+copy_exec /lib/`gcc -print-multiarch`/libgcc_s.so.1 /lib/`gcc -print-multiarch`/
+
