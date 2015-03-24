@@ -28,15 +28,13 @@ libvdev: $(OBJ)
 	$(SHELL) -c "if ! test -L $(LIBVDEV_SO); then /bin/ln -s $(LIBVDEV_LIB) $(LIBVDEV_SO); fi"
 	$(SHELL) -c "if ! test -L $(LIBVDEV); then /bin/ln -s $(LIBVDEV_SO) $(LIBVDEV); fi"
 
-libvdev-install: libvdev
+install: libvdev
 	mkdir -p $(LIBDIR)
 	cp -a $(LIBVDEV) $(LIBVDEV_SO) $(LIBVDEV_LIB) $(LIBDIR)
 
-libvdev-dev-install: libvdev
+install-dev: libvdev
 	mkdir -p $(INCLUDEDIR) 
 	cp -a $(wildcard *.h) $(INCLUDEDIR)
-
-install: libvdev-install libvdev-dev-install
 
 %.o : %.c
 	$(CPP) -o $@ $(INC) -c $< $(DEFS)
