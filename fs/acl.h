@@ -23,6 +23,7 @@
 #define _VDEV_ACL_H_
 
 #include "libvdev/util.h"
+#include "pstat/libpstat.h"
 
 #include <regex.h>
 #include <dirent.h>

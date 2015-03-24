@@ -24,6 +24,8 @@
 
 #include <fcntl.h>
 
+#include <attr/xattr.h>
+
 #include "libvdev/util.h"
 #include "libvdev/config.h"
 

@@ -63,7 +63,6 @@
 #include <math.h>
 #include <sys/mman.h>
 #include <stdbool.h>
-#include <attr/xattr.h>
 
 #include <pwd.h>
 #include <sys/types.h>
@@ -71,8 +70,6 @@
 #include <grp.h>
 #include <syslog.h>
 #include <sys/resource.h>
-
-#include "pstat/libpstat.h"
 
 #define VDEV_WHERESTR "%05d:%05d: [%16s:%04u] %s: "
 #define VDEV_WHEREARG (int)getpid(), (int)pthread_self(), __FILE__, __LINE__, __func__
