@@ -1,11 +1,11 @@
 /*
    vdev: a virtual device manager for *nix
-   Copyright (C) 2014  Jude Nelson
+   Copyright (C) 2015  Jude Nelson
 
    This program is dual-licensed: you can redistribute it and/or modify
    it under the terms of the GNU General Public License version 3 or later as 
    published by the Free Software Foundation. For the terms of this 
-   license, see LICENSE.LGPLv3+ or <http://www.gnu.org/licenses/>.
+   license, see LICENSE.GPLv3+ or <http://www.gnu.org/licenses/>.
 
    You are free to use this program under the terms of the GNU General
    Public License, but WITHOUT ANY WARRANTY; without even the implied 
@@ -19,26 +19,20 @@
    <http://www.isc.org/downloads/software-support-policy/isc-license/>.
 */
 
-#ifndef _LIBUDEV_COMPAT_UDEV_H_
-#define _LIBUDEV_COMPAT_UDEV_H_
+#include "log.h"
 
-#include "util.h"
+int LIBUDEV_COMPAT_LOG_DEBUG = 0;
+int LIBUDEV_COMPAT_LOG_ERROR = 0;
+int LIBUDEV_COMPAT_LOG_TRACE = 0;
 
-struct udev;
+static int log_max_level = LOG_INFO;
 
-C_LINKAGE_BEGIN
+void log_set_max_level(int level) {
+        assert((level & LOG_PRIMASK) == level);
 
-struct udev* udev_ref( struct udev* udev );
-struct udev* udev_unref( struct udev* udev );
-struct udev* udev_new( void );
+        log_max_level = level;
+}
 
-void udev_set_log_fn( struct udev* udev, void (*log_fn)( struct udev*, int, char const*, int, char const*, char const*, va_args ) );
-int udev_get_log_priority( struct udev* udev );
-void udev_set_log_priority( struct udev* udev, int priority );
-
-void* udev_get_userdata( struct udev* udev );
-void udev_set_userdata( struct udev* udev, void* userdata );
-
-C_LINKAGE_END
-
-#endif
+int log_get_max_level(void) {
+        return log_max_level;
+}
