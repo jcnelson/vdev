@@ -45,7 +45,7 @@ To do things the fast way, with default options:
 To do things the careful way, you'll need to build and install libvdev.  To do so, use the following commands:
 
     $ make -C libvdev 
-    $ sudo make libvdev-install 
+    $ sudo make -C libvdev install
 
 To build and install vdevd, type:
 
@@ -66,7 +66,7 @@ To build vdevfs, type:
     $ sudo make -C fs install
 
 
-By default, libvdev is installed to /lib/, vdevd is installed to /sbin/vdevd, vdevd's helper programs are installed to /lib/vdev/, and vdevfs is installed to /usr/sbin/vdevfs.
+By default, libvdev is installed to /lib/, vdevd is installed to /sbin/vdevd, vdevd's helper programs are installed to /lib/vdev/, and vdevfs is installed to /usr/sbin/vdevfs.  You can override any of these directory choices by setting the "PREFIX=" variable on the command-line (e.g. `sudo make -C libvdev install PREFIX=/usr/local/lib`).
 
 FAQ
 ---
