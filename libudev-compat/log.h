@@ -26,19 +26,18 @@
 
 #include <assert.h>
 #include <syslog.h>
-
-extern int LIBUDEV_COMPAT_LOG_DEBUG;
-extern int LIBUDEV_COMPAT_LOG_TRACE;
-extern int LIBUDEV_COMPAT_LOG_ERROR;
+#include <stdio.h>
+#include <stdarg.h>
 
 #define LIBUDEV_COMPAT_WHERESTR "%05d: [%16s:%04u] %s: "
-#define LIBUDEV_COMPAT_WHEREARG (int)getpid(), __FILE__, __LINE__, __func__
 
-#define log_trace(x, ...) if( LIBUDEV_COMPAT_LOG_TRACE ) { fprintf(stderr, LIBUDEV_COMPAT_WHERESTR x "\n", LIBUDEV_COMPAT_WHEREARG, __VA_ARGS__); }
-#define log_debug(x, ...) if( LIBUDEV_COMPAT_LOG_DEBUG ) { fprintf(stderr, LIBUDEV_COMPAT_WHERESTR x "\n", LIBUDEV_COMPAT_WHEREARG, __VA_ARGS__); }
-#define log_error(x, ...) if( LIBUDEV_COMPAT_LOG_ERROR ) { fprintf(stderr, LIBUDEV_COMPAT_WHERESTR x "\n", LIBUDEV_COMPAT_WHEREARG, __VA_ARGS__); }
+#define log_trace( fmt, ... ) log_impl( -1, LIBUDEV_COMPAT_WHERESTR fmt "\n", (int)getpid(), __FILE__, __LINE__, __func__, __VA_ARGS__ )
+#define log_debug( fmt, ... ) log_impl( LOG_DEBUG, LIBUDEV_COMPAT_WHERESTR fmt "\n", (int)getpid(), __FILE__, __LINE__, __func__, __VA_ARGS__ )
+#define log_error( fmt, ... ) log_impl( LOG_ERR, LIBUDEV_COMPAT_WHERESTR fmt "\n", (int)getpid(), __FILE__, __LINE__, __func__, __VA_ARGS__ )
 
 void log_set_max_level(int level);
 int log_get_max_level(void);
+
+void log_impl( int level, char const* fmt, ... );
   
 #endif

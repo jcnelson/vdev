@@ -21,9 +21,7 @@
 
 #include "log.h"
 
-int LIBUDEV_COMPAT_LOG_DEBUG = 0;
-int LIBUDEV_COMPAT_LOG_ERROR = 0;
-int LIBUDEV_COMPAT_LOG_TRACE = 0;
+#define LIBUDEV_COMPAT_WHERESTR "%05d: [%16s:%04u] %s: "
 
 static int log_max_level = LOG_INFO;
 
@@ -35,4 +33,14 @@ void log_set_max_level(int level) {
 
 int log_get_max_level(void) {
         return log_max_level;
+}
+
+void log_impl( int level, char const* fmt, ... ) {
+   
+   if( level <= log_max_level ) {
+      va_list args;
+      va_start( args, fmt );
+      vfprintf( stderr, fmt, args );
+      va_end( args );
+   }
 }

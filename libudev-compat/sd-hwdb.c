@@ -312,7 +312,7 @@ _public_ int sd_hwdb_new(sd_hwdb **ret) {
                 else {
                    
                    int errsv = -errno;
-                   log_debug("error reading %s: %s", hwdb_bin_path, strerror(errsv))
+                   log_debug("error reading %s: %s", hwdb_bin_path, strerror(errsv));
                    return errsv;
                 }
         }
