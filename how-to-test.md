@@ -105,6 +105,7 @@ There are three parts to this:  installing vdevd fully, updating your initramfs 
 
 To fully install vdevd, you should do the following (as root):
 
+    # make -C libvdev install
     # make -C vdevd install
     # mkdir -p /etc/vdev
     # cp -a example/actions /etc/vdev/
