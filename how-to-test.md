@@ -59,6 +59,7 @@ Appendix A: A Crash-Course to vdevd
 -----------------------------------
 
 `vdevd` has a `--help` switch that prints out the directives it understands.  In particular, you can:
+
 * make it run in the foreground with `-f`.  This is great if you want to watch it process hardware events (but this requires `-v1` or `-v2`).
 * change the log verbosity with `-v $LEVEL`.  Substitute `$LEVEL` with 0 for logging only drastic errors; 1 for logging non-critical notices, and 2 for logging debug messages.
 * change the log file with `-l $PATH_TO_LOGFILE`.  If you omit this, `vdevd` logs to stdout.
@@ -67,12 +68,14 @@ Appendix A: A Crash-Course to vdevd
 `vdevd` works internally by bufferring up device events from the kernel, matching device events against "actions," and running an action's associated script if it matches.  The vdev project comes with a set of actions that are meant to make `vdevd` behave as close as possible to udev.  You can find them in `example/actions/`, and you can find the Linux-specific scripts and binaries the actions execute in `vdevd/helpers/LINUX/`.
 
 Actions are defined as ini-files.  Unless stated otherwise, all action fields are optional.  All fields must match the device event for the action's command to be executed.  The fields are:
+
 * `event`: **Required**.  Use "add" to match a device-add event, "remove" to match a device-remove event, "change" to match a device-change event (such as a battery level changing), or "any" to match any device event.
 * `path`: This is an extended POSIX regular expression that matches the kernel-given device path (such as `sda` or `input/mice`) to the action.
 * `type`: This is either "block" or "char", which will match the event only if it it is for a block or character device, respectively.  Not all devices are representable by block or character device files, however, which is why this field is optional.
 * `OS_*`: Any field prefixed with `OS_` matches an OS-specific device attribute.  On Linux, these include names of `uevent` fields.  For example, an action can match a device's subsystem using the `OS_SUBSYSTEM` field.  If an empty value is given (e.g. "`OS_SUBSYSTEM=`"), then the action will match any value as long as the device attribute is present in the device event (for example, a Linux `uevent` packet that does not have `SUBSYSTEM` defined will not match an action with `OS_SUBSTEM=`).
 
 Once a device event is encountered that matches all of an action's fields, `vdevd` runs the commands specified by the action's ini file.  The fields that describe the commands are:
+
 * `rename_command`:  This is a shell command to run to generate the path to the device file to create.  It will be evaluated after the device event matches the action, but before the device file is created.  The command must write the desired path to stdout.  Its output will be truncated at 4,096 characters (which is `PATH_MAX` on most filesystems).  Note that not all devices have paths given by the kernel.
 * `command`:  This is the shell command to run once the device file has been successfully created.  Unless specified otherwise, `vdevd` will run this as a subprocess--it will wait until the command has completed before processing the next action.
 * `async`:  If set to "True", this tells `vdevd` to continue processing the action immediately after running its `command`.  This is useful for long-running device setup tasks, where it is undesirable to block `vdevd`.
@@ -80,6 +83,7 @@ Once a device event is encountered that matches all of an action's fields, `vdev
 **Caveat**:  `vdevd` matches a device event against actions according to their files' lexographic order.  Moreover, it processes device events sequentially, in the order in which they arrive.  This is also true for the Linux port--the kernel's SEQNUM field is ignored at this time (but is passed on to actions).
 
 `vdevd` communicates device information to action commands using environment variables.  When a `command` or `rename_command` runs, the following environment variables will be set:
+
 * `$VDEV_MOUNTPOINT`:  This is the absolute path to the directory in which the device files will be created.  For example, this is usually `/dev`.
 * `$VDEV_ACTION`:  This is the `event` field of the action (i.e. "add", "remove", "change", or "any").
 * `$VDEV_PATH`:  If the device is given a path (either by the kernel or the `rename_command` output), this is the path to the device file *relative* to `$VDEV_MOUNTPOINT`.  The absolute path to the device file can be found by `$VDEV_MOUNTPOINT/$VDEV_PATH`.  Note that not all devices have device files (such as batteries, PCI buses, etc.).
@@ -128,3 +132,8 @@ The vdev project comes with a System V init script in `example/sysv-initscript.s
 
     # update-rc.d udev-finish remove
     # cp example/sysv-initscript.sh /etc/init.d/udev
+
+Misc
+----
+
+Thanks for reading!  Please send any questions, comments, and bug reports to the Devuan mailing list (`dng@lists.dyne.org`)
