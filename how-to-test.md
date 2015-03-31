@@ -37,6 +37,8 @@ From the root of the source code repository you checked out in step 1, the comma
 
 `vdevd` should print out some runtime setup information to your console, run for a few seconds, and exit normally.  If you run `ls vdev-test/`, you should see a bunch of device files.  All debugging information will have been written to `/tmp/vdev.log`.
 
+Tip: If that fails, you probably need to run `ldconfig` so that your system becomes aware of `libvdev`.  Then run this step again.
+
 Step 4: Inspect the Fake /dev and Logfile
 -----------------------------------------
 
