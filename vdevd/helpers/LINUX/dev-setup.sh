@@ -43,21 +43,24 @@ make_static_nodes_kmod() {
   /bin/kmod static-nodes --format=tmpfiles --output=/proc/self/fd/1 | \
   while read type name mode uid gid age arg; do
 
-    [ -e $name ] && continue
-   
+    # strip /dev/ from $name
+    name=${name#/dev/}
+    
+    [ -e $VDEV_MOUNTPOINT/$name ] && continue
+
     case "$type" in
 
-      c|b) mknod -m $mode $name $type $(echo $arg | sed 's/:/ /') ;;
+      c|b) /bin/mknod -m $mode $VDEV_MOUNTPOINT/$name $type $(echo $arg | sed 's/:/ /') ;;
 
-      d) mkdir $name ;;
+      d) mkdir $VDEV_MOUNTPOINT/$name ;;
 
-      *) echo "unparseable line ($type $name $mode $uid $gid $age $arg)" >&2 ;;
+      *) echo "unparseable line ($type $VDEV_MOUNTPOINT/$name $mode $uid $gid $age $arg)" >&2 ;;
 
     esac
 
     if [ -x /sbin/restorecon ]; then
 
-      /sbin/restorecon $name
+      /sbin/restorecon $VDEV_MOUNTPOINT/$name
     fi
   done
 }
