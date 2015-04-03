@@ -1,7 +1,7 @@
 #!/bin/sh
 
 
-# helper for generating dm block device paths.
+# helper for generating dm block device paths and symlinks.
 
 . $VDEV_HELPERS/subr.sh
 
@@ -34,5 +34,13 @@ if [ -n "$DM_UUID" ]; then
 
    add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/dm-uuid-$DM_UUID $VDEV_METADATA
 fi
+
+# also add by-uuid link 
+eval $(/sbin/blkid -o export $VDEV_MOUNTPOINT/$VDEV_PATH)
+
+if [ -n "$UUID" ]; then
+   add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-uuid/$UUID $VDEV_METADATA 
+fi
+
 
 exit 0

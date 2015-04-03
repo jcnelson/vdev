@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # vdev helper for setting up symlinks to disks and partitions 
-# works for ATA, SATA, and USB disks.
+# works for ATA, SATA, and USB disks
 
 . $VDEV_HELPERS/subr.sh
 
@@ -33,6 +33,7 @@ test -z "$DISK_TYPE" && exit 0
 STAT_RET=
 DISK_ID=
 DISK_WWN=
+STAT_RET=0
 
 case "$DISK_TYPE" in
 
@@ -91,10 +92,8 @@ if [ "$VDEV_OS_DEVTYPE" = "partition" ]; then
    DISK_NAME="$DISK_NAME-$PART_NAME"
 fi
 
-# get disk UUID and LABEL 
-BLKID=$(/sbin/blkid | /bin/grep "$VDEV_PATH:")
-UUID=$(echo "$BLKID" | /bin/grep "UUID=" | /bin/sed 's/[^ ]* UUID="\([^ ]*\)" .*/\1/g')
-LABEL=$(echo "$BLKID" | /bin/grep "LABEL=" | /bin/sed 's/[^ ]* LABEL="\([^ ]*\)" .*/\1/g')
+# get disk UUID and LABEL
+eval $(/sbin/blkid -o export $VDEV_MOUNTPOINT/$VDEV_PATH)
 
 # get disk WWN, if set 
 WWN=
