@@ -27,6 +27,7 @@
 #include "ini.h"
 
 // FUSE reserved options
+static const char* FUSE_OPT_S = "-s";
 static const char* FUSE_OPT_O = "-o";
 static const char* FUSE_OPT_D = "-d";
 static const char* FUSE_OPT_F = "-f";
@@ -528,6 +529,7 @@ static int vdev_config_get_mountpoint_from_fuse( int fuse_argc, char** fuse_argv
    return 0;
 }
 
+
 // parse command-line options from argv.
 // fill in fuse_argv with fuse-specific options.
 // config must be initialized; this method simply augments it 
@@ -550,7 +552,7 @@ int vdev_config_load_from_args( struct vdev_config* config, int argc, char** arg
    int c = 0;
    int fuse_optind = 0;
    
-   char const* optstr = "c:v:l:o:f1p:";
+   char const* optstr = "c:v:l:o:f1p:ds";
    
    fuse_argv[fuse_optind] = argv[0];
    fuse_optind++;
@@ -615,6 +617,13 @@ int vdev_config_load_from_args( struct vdev_config* config, int argc, char** arg
          case '1': {
             
             config->once = true;
+            break;
+         }
+         
+         case 's': {
+            // FUSE Option 
+            fuse_argv[fuse_optind] = (char*)FUSE_OPT_S;
+            fuse_optind++;
             break;
          }
          
