@@ -48,7 +48,7 @@ int vdev_action_init( struct vdev_action* act, vdev_device_request_t trigger, ch
       
       if( rc != 0 ) {
          
-         vdev_error("vdev_match_regex_init('%s') rc = %d n", path, rc );
+         vdev_error("vdev_match_regex_init('%s') rc = %d\n", path, rc );
          vdev_action_free( act );
          return rc;
       }
@@ -155,7 +155,7 @@ static int vdev_action_ini_parser( void* userdata, char const* section, char con
             
             if( rc != 0 ) {
                
-               vdev_error("vdev_match_regex_init('%s') rc = %d n", act->path, rc );
+               vdev_error("vdev_match_regex_init('%s') rc = %d\n", act->path, rc );
                return 0;
             }
          }
@@ -181,7 +181,7 @@ static int vdev_action_ini_parser( void* userdata, char const* section, char con
          
          if( act->trigger == VDEV_DEVICE_INVALID ) {
             
-            fprintf(stderr, "Invalid event type '%s' n", value);
+            fprintf(stderr, "Invalid event type '%s'\n", value);
             return 0;
          }
          else {
@@ -216,7 +216,7 @@ static int vdev_action_ini_parser( void* userdata, char const* section, char con
          }
          else {
             
-            fprintf(stderr, "Invalid async value '%s' n", value);
+            fprintf(stderr, "Invalid async value '%s'\n", value);
             return 0;
          }
       }
@@ -238,16 +238,16 @@ static int vdev_action_ini_parser( void* userdata, char const* section, char con
             return 1;
          }
          else {
-            vdev_error("vdev_action_add_param( '%s', '%s' ) rc = %d n", name, value, rc );
+            vdev_error("vdev_action_add_param( '%s', '%s' ) rc = %d\n", name, value, rc );
             return 0;
          }
       }
       
-      fprintf(stderr, "Unknown field '%s' in section '%s' n", name, section );
+      fprintf(stderr, "Unknown field '%s' in section '%s'\n", name, section );
       return 0;
    }
    
-   fprintf(stderr, "Unknown section '%s' n", section);
+   fprintf(stderr, "Unknown section '%s'\n", section);
    return 0;
 }
 
@@ -260,13 +260,13 @@ int vdev_action_sanity_check( struct vdev_action* act ) {
    
    if( act->command == NULL && act->rename_command == NULL ) {
       
-      fprintf(stderr, "Action is missing 'command=' or 'rename_command=' n");
+      fprintf(stderr, "Action is missing 'command=' or 'rename_command='\n");
       rc = -EINVAL;
    }
    
    if( act->trigger == VDEV_DEVICE_INVALID ) {
       
-      fprintf(stderr, "Action is missing 'event=' n");
+      fprintf(stderr, "Action is missing 'event='\n");
       rc = -EINVAL;
    }
    
@@ -285,7 +285,7 @@ int vdev_action_load( char const* path, struct vdev_action* act ) {
    rc = vdev_action_init( act, VDEV_DEVICE_INVALID, NULL, NULL, false );
    if( rc != 0 ) {
       
-      vdev_error("vdev_action_init('%s') rc = %d n", path, rc );
+      vdev_error("vdev_action_init('%s') rc = %d\n", path, rc );
       return rc;
    }
    
@@ -305,7 +305,7 @@ int vdev_action_load( char const* path, struct vdev_action* act ) {
    if( rc == -EINVAL ) {
       
       vdev_action_free( act );
-      vdev_error("Invalid action '%s' n", path );
+      vdev_error("Invalid action '%s'\n", path );
    }
    
    return rc;
@@ -322,7 +322,7 @@ int vdev_action_load_file( FILE* f, struct vdev_action* act ) {
    
    rc = ini_parse_file( f, vdev_action_ini_parser, act );
    if( rc != 0 ) {
-      vdev_error("ini_parse_file(action) rc = %d n", rc );
+      vdev_error("ini_parse_file(action) rc = %d\n", rc );
    }
    else {
       rc = vdev_action_sanity_check( act );
@@ -369,7 +369,7 @@ int vdev_action_loader( char const* path, void* cls ) {
    if( rc != 0 ) {
       
       rc = -errno;
-      vdev_error("stat(%s) rc = %d n", path, rc );
+      vdev_error("stat(%s) rc = %d\n", path, rc );
       return rc;
    }
    
