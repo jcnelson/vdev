@@ -391,6 +391,9 @@ static int vdev_get_mountpoint( int fuse_argc, char** fuse_argv, char** ret_moun
 
 // initialize the filesystem front-end 
 // call after vdev_init
+// return 0 on success
+// return -ENOMEM on OOM
+// return negative on error
 int vdevfs_init( struct vdevfs* vdev, int argc, char** argv ) {
    
    int rc = 0;
@@ -685,7 +688,7 @@ int vdevfs_shutdown( struct vdevfs* vdev ) {
    
    if( vdev->fs != NULL ) {
       
-      // unroute close--don't unlink
+      // stop processing unlink() requests, since the filesystem itself will unlink all files when it frees itself up.
       fskit_unroute_detach( fskit_fuse_get_core( vdev->fs ), vdev->close_rh );
       
       fskit_fuse_shutdown( vdev->fs, NULL );
