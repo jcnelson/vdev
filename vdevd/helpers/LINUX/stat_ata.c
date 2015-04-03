@@ -676,10 +676,8 @@ int main(int argc, char **argv ) {
    word = identify.wyde[108];
    if ((word & 0xf000) == 0x5000) {
       
-      // NOTE: word 108 has to come first--print this as big-endian
-      printf("VDEV_ATA_WWN=0x%" PRIx64 "\n"
-             "VDEV_ATA_WWN_WITH_EXTENSION=0x%" PRIx64 "\n",
-             htobe64( identify.octa[108/4] ), htobe64( identify.octa[108/4] ));
+      printf("VDEV_ATA_WWN=0x%04x%04x%04x%04x\n", identify.wyde[108], identify.wyde[109], identify.wyde[110], identify.wyde[111]);
+      printf("VDEV_ATA_WWN_WITH_EXTENSION=0x%04x%04x%04x%04x\n", identify.wyde[108], identify.wyde[109], identify.wyde[110], identify.wyde[111]);
    }
 
    /* from Linux's include/linux/ata.h */
