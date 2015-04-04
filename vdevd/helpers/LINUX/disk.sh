@@ -93,6 +93,8 @@ if [ "$VDEV_OS_DEVTYPE" = "partition" ]; then
 fi
 
 # get disk UUID and LABEL
+UUID=
+LABEL=
 eval $(/sbin/blkid -o export $VDEV_MOUNTPOINT/$VDEV_PATH)
 
 # get disk WWN, if set 

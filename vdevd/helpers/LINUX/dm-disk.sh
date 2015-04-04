@@ -36,6 +36,7 @@ if [ -n "$DM_UUID" ]; then
 fi
 
 # also add by-uuid link 
+UUID=
 eval $(/sbin/blkid -o export $VDEV_MOUNTPOINT/$VDEV_PATH)
 
 if [ -n "$UUID" ]; then
