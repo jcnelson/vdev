@@ -56,8 +56,12 @@ initramfs: setup
 	$(MKINITRAMFS) -t $(INITRAMFS_ROOT) -o $(CONF_ROOT)/initrd.img-`uname -r`
 
 install:
+	# This is pretty ugly...what we really need is a "generic" device manager init script
 	mkdir -p $(CONF_DIR)
-	cp -a $(BUILD_ROOT)/* $(CONF_DIR)/
+	cp -a $(BUILD_ROOT)/vdev/* $(CONF_DIR)/
+	cp -a $(INITSCRIPT) $(PREFIX)/etc/init.d/
+	rm $(PREFIX)/etc/rcS.d/S02udev $(PREFIX)/etc/rcS.d/S13udev-finish
+	ln -s $(PREFIX)/etc/init.d/vdev $(PREFIX)/etc/rcS.d/S02vdev
 
 .PHONY: clean
 clean:
