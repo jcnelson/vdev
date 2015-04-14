@@ -1,4 +1,5 @@
 CONF_ROOT := .
+CONF_ABS_ROOT := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 PREFIX ?= 
 
 BUILD_ROOT := $(CONF_ROOT)/build/etc/
@@ -12,17 +13,17 @@ IFNAMES := $(BUILD_ROOT)/vdev/ifnames.conf
 CONF_GLOBAL := $(BUILD_ROOT)/vdev/vdev.conf
 INITSCRIPT := $(BUILD_ROOT)/init.d/vdev
 
-TOOLS := ../tools/persistent-net-names/
+TOOLS := ../tools/
 
-GEN_IFNAMES := $(TOOLS)/gen-ifnames.sh
+GEN_IFNAMES := $(TOOLS)/persistent-net-names/gen-ifnames.sh
+MKINITRAMFS := $(TOOLS)/initramfs/mkinitramfs
 
 INITRAMFS_UDEV_FILES := $(INITRAMFS_ROOT)/scripts/init-top/udev \
 								$(INITRAMFS_ROOT)/scripts/init-bottom/udev \
 								$(INITRAMFS_ROOT)/hooks/udev \
 								$(INITRAMFS_ROOT)/init
 
-INITRAMFS_VDEV_FILES := 
-all: actions $(CONF_GLOBAL) $(IFNAMES) $(INITSCRIPT) initramfs
+all: actions $(CONF_GLOBAL) $(IFNAMES) $(INITSCRIPT)
 
 setup:
 	mkdir -p $(BUILD_ROOT)
@@ -46,11 +47,13 @@ actions: setup
 	cp -a $(CONF_ROOT)/actions $(BUILD_ROOT)/vdev/
 
 initramfs: setup
-	test -d /usr/share/initramfs-tools || (@echo "You must install the initramfs-tools package" && exit 1)
+	test -d /usr/share/initramfs-tools || (echo "You must install the initramfs-tools package" && exit 1)
+	test -e /sbin/vdevd || (echo "You must install vdevd first" && exit 1)
+	test -e /etc/vdev || (echo "You must install vdev's /etc files first" && exit 1)
 	cp -a /usr/share/initramfs-tools/* $(INITRAMFS_ROOT)/
 	rm $(INITRAMFS_UDEV_FILES)
 	cp -a $(VDEV_INITRAMFS)/* $(INITRAMFS_ROOT)
-
+	$(MKINITRAMFS) -t $(INITRAMFS_ROOT) -o $(CONF_ROOT)/initrd.img-`uname -r`
 
 install:
 	mkdir -p $(CONF_DIR)
