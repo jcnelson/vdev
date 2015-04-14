@@ -573,6 +573,7 @@ int vdev_os_next_device( struct vdev_device_request* vreq, void* cls ) {
    if( memcmp( buf, VDEV_LINUX_NETLINK_UDEV_HEADER, VDEV_LINUX_NETLINK_UDEV_HEADER_LEN ) == 0 ) {
       
       // message from udev; ignore 
+      vdev_warn("%s", "Ignoring libudev message\n");
       return -EAGAIN;
    }
    
@@ -580,6 +581,7 @@ int vdev_os_next_device( struct vdev_device_request* vreq, void* cls ) {
    if( cnls.nl_pid > 0 ) {
       
       // from userspace???
+      vdev_warn("Ignoring message from PID %d\n", (int)cnls.nl_pid );
       return -EAGAIN;
    }
    
@@ -1195,7 +1197,7 @@ static int vdev_linux_context_init( struct vdev_os_context* os_ctx, struct vdev_
       
       ctx->nl_addr.nl_family = AF_NETLINK;
       ctx->nl_addr.nl_pid = getpid();
-      ctx->nl_addr.nl_groups = -1;
+      ctx->nl_addr.nl_groups = NETLINK_KOBJECT_UEVENT;
       
       ctx->pfd.fd = socket( PF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT );
       if( ctx->pfd.fd < 0 ) {
