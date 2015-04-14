@@ -10,7 +10,7 @@ VDEV_INITRAMFS := $(CONF_ROOT)/initramfs/
 CONF_DIR := $(PREFIX)/etc/vdev
 
 IFNAMES := $(BUILD_ROOT)/vdev/ifnames.conf
-CONF_GLOBAL := $(BUILD_ROOT)/vdev/vdev.conf
+CONF_GLOBAL := $(BUILD_ROOT)/vdev/vdevd.conf
 INITSCRIPT := $(BUILD_ROOT)/init.d/vdev
 
 TOOLS := ../tools/
@@ -31,8 +31,8 @@ setup:
 	mkdir -p $(BUILD_ROOT)/init.d
 	mkdir -p $(CONF_ROOT)/build/initramfs/
 
-$(CONF_GLOBAL): $(CONF_ROOT)/vdev.conf.in setup
-	@cat $(CONF_ROOT)/vdev.conf.in | \
+$(CONF_GLOBAL): $(CONF_ROOT)/vdevd.conf.in setup
+	@cat $(CONF_ROOT)/vdevd.conf.in | \
 		sed -e 's~@PREFIX@~$(PREFIX)~g;' | \
 		sed -e 's~@CONF_DIR@~$(CONF_DIR)~g;' > $(CONF_GLOBAL)
 
@@ -58,9 +58,11 @@ initramfs: setup
 install:
 	# This is pretty ugly...what we really need is a "generic" device manager init script
 	mkdir -p $(CONF_DIR)
+	mkdir -p $(PREFIX)/etc/init.d/
+	mkdir -p $(PREFIX)/etc/rcS.d/
 	cp -a $(BUILD_ROOT)/vdev/* $(CONF_DIR)/
 	cp -a $(INITSCRIPT) $(PREFIX)/etc/init.d/
-	rm $(PREFIX)/etc/rcS.d/S02udev $(PREFIX)/etc/rcS.d/S13udev-finish
+	rm -f $(PREFIX)/etc/rcS.d/S02udev $(PREFIX)/etc/rcS.d/S13udev-finish
 	ln -s $(PREFIX)/etc/init.d/vdev $(PREFIX)/etc/rcS.d/S02vdev
 
 .PHONY: clean
