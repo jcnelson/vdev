@@ -1,0 +1,11 @@
+[vdev-config]
+firmware=@PREFIX@/lib/firmware
+acls=@CONF_DIR@/acls
+actions=@CONF_DIR@/actions
+helpers=@PREFIX@/lib/vdev
+ifnames=@CONF_DIR@/ifnames.conf
+pidfile=@PREFIX@/run/vdev/vdevd.pid
+default_permissions=0600
+loglevel=warn
+logfile=@PREFIX@/run/vdev/vdev.log
+preseed=@PREFIX@/lib/vdev/dev-setup.sh

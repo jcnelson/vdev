@@ -1,0 +1,14 @@
+# Format:
+# PERSISTENT_INTERFACE_NAME mac|devpath MATCH_ARGUMENT
+#   * PERSISTENT_INTERFACE_NAME is the persistent name of the network interface
+#   * If the second argument is "mac", then MATCH_ARGUMENT is the colon-separated MAC address 
+#   * If the second argument is "devpath", then MATCH_ARGUMENT is the device path to the NIC in sysfs
+#
+# Example: a wireless USB dongle, to be named "wlan-edimax"
+#
+# Using the "mac" match:
+# wlan-edimax mac 80:1F:02:D3:B2:83
+#
+# Using the "devpath" match:
+# wlan-edimax devpath /devices/pci0000:00/0000:00:1a.0/usb1/1-1/1-1.1/1-1.1:1.0
+
