@@ -8,7 +8,10 @@ The steps in this document are lightly tested.  Please report bugs to the Devuan
 Step 1: Compile and Install vdev
 --------------------------------
 
+
 The steps to check out, compile and install vdev and host-specific configuration files are as follows:
+
+**WARNING:** The final step will remove your `/etc/rcS.d/S02udev` and `/etc/rcS.d/S13udev-finish` initscript symlinks.  Proceed at your own risk, and make back-ups as needed.
 
     $ git clone https://github.com/jcnelson/vdev
     $ cd vdev
