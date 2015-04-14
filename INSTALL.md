@@ -38,4 +38,5 @@ Step 3: Install the Initramfs
 Once the initramfs image has been generated, you must configure your bootloader to use it.  The steps to do so are bootloader-specific.  For GRUB2, this can be achieved simply by copying the image file into `/boot` and running `sudo update-grub2`.
 
 **WARNING:** Be sure to back up your old initramfs image first!
+
 **WARNING:** Be sure you know how to boot from the backed-up initramfs image if this one does not work!
