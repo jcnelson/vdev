@@ -11,7 +11,7 @@ Step 1: Compile and Install vdev
 
 The steps to check out, compile and install vdev and host-specific configuration files are as follows:
 
-**WARNING:** The final step will remove your `/etc/rcS.d/S02udev` and `/etc/rcS.d/S13udev-finish` initscript symlinks.  Proceed at your own risk, and make back-ups as needed.
+**WARNING:** These steps will disable udev.
 
     $ git clone https://github.com/jcnelson/vdev
     $ cd vdev
@@ -19,6 +19,8 @@ The steps to check out, compile and install vdev and host-specific configuration
     $ sudo make -C libvdev install
     $ make -C vdevd
     $ sudo make -C vdevd install
+    $ sudo update-rc.d udev disable
+    $ sudo update-rc.d udev-finish disable
     $ make -C example
     $ sudo make -C example install
 
@@ -43,3 +45,5 @@ Once the initramfs image has been generated, you must configure your bootloader 
 **WARNING:** Be sure to back up your old initramfs image first!
 
 **WARNING:** Be sure you know how to boot from the backed-up initramfs image if this one does not work!
+
+Step 4: Add the

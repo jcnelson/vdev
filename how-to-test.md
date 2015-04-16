@@ -105,25 +105,12 @@ Appendix B: Booting with vdevd
 
 There are three parts to this:  installing vdevd fully, updating your initramfs to use `vdevd` instead of udev, and adding a System V init script for vdevd.
 
-To fully install vdevd, you should do the following (as root):
+To install vdevd fully, you should do the following (as root):
 
     # make -C libvdev install
     # make -C vdevd install
-    # mkdir -p /etc/vdev
-    # cp -a example/actions /etc/vdev/
-    # cp -a example/ifname.conf /etc/vdev/ifnames.conf
-    # echo > /etc/vdev/vdevd.conf <<EOF
-    [vdev-config]
-    firmware=/lib/firmware
-    actions=/etc/vdev/actions
-    helpers=/lib/vdev/
-    ifnames=/etc/vdev/ifnames.conf
-    pidfile=/run/vdev/vdev.pid
-    logfile=/run/vdev/vdev.log
-    loglevel=warn
-    preseed=/lib/vdev/dev-setup.sh
-    default_permissions=0600
-    EOF
+    # make -C example
+    # make -C example install
 
 Most Linux installations use an initramfs to boot.  In Debian and Devuan, the scripts that get invoked are installed to `/usr/share/initramfs-tools`, and are part of the `initramfs-tools` package.  By default, udev and its helper programs and rules get compiled into the initramfs by the hook scripts there.
 
@@ -133,8 +120,26 @@ To use `vdevd` instead, you will need to alter the initramfs scripts and regener
 
 The vdev project comes with a System V init script in `example/sysv-initscript.sh`, which is meant to be a drop-in replacement for udev (i.e. it provides the `udev` service).  To replace the udev scripts, do the following as root:
 
-    # update-rc.d udev-finish remove
+    # update-rc.d udev-finish disable
     # cp example/sysv-initscript.sh /etc/init.d/udev
+
+To do all of the above, you can run the following commands as root:
+
+    # mkdir /root/udev-saved
+    # mv /boot/initrd.img-$(uname -r) /root/udev-saved/boot--initrd.img-$(uname -r)
+    # mv /usr/share/initramfs-tools/init /root/udev-saved/usr+share+initramfs-tools+init
+    # mv /usr/share/initramfs-tools/hooks/udev /root/udev-saved/usr+share+initramfs-tools+hooks+udev
+    # mv /usr/share/initramfs-tools/scripts/init-bottom/udev /root/udev-saved/usr+share+initramfs-tools+scripts+init-bottom+udev
+    # mv /usr/share/initramfs-tools/scripts/init-top/udev /root/udev-saved/usr+share+initramfs-tools+scripts+init-top+udev
+    # cp -a example/initramfs/init /usr/share/initramfs-tools/
+    # cp -a example/initramfs/hooks/vdev /etc/initramfs-tools/
+    # cp -a example/initramfs/scripts/init-bottom/vdev /etc/initramfs-tools/scripts/init-bottom/
+    # cp -a example/initramfs/scripts/init-top/vdev /etc/initramfs-tools/scripts/init-top/
+    # cd /boot
+    # mkinitramfs -o initrd.img-$(uname -r) $(uname -r)
+    # mv /etc/init.d/udev /root/udev-saved/etc+init.d+udev
+    # update-rc.d udev-finish disable
+    # cp -a example/sysv-initscript.sh /etc/init.d/udev
 
 Misc
 ----
