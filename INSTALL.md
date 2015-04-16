@@ -45,5 +45,3 @@ Once the initramfs image has been generated, you must configure your bootloader 
 **WARNING:** Be sure to back up your old initramfs image first!
 
 **WARNING:** Be sure you know how to boot from the backed-up initramfs image if this one does not work!
-
-Step 4: Add the
