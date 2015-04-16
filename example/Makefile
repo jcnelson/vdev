@@ -62,7 +62,6 @@ install:
 	mkdir -p $(PREFIX)/etc/rcS.d/
 	cp -a $(BUILD_ROOT)/vdev/* $(CONF_DIR)/
 	cp -a $(INITSCRIPT) $(PREFIX)/etc/init.d/
-	rm -f $(PREFIX)/etc/rcS.d/S02udev $(PREFIX)/etc/rcS.d/S13udev-finish
 	ln -s $(PREFIX)/etc/init.d/vdev $(PREFIX)/etc/rcS.d/S02vdev
 
 .PHONY: clean
