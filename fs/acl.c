@@ -47,6 +47,295 @@ static int vdev_acl_parse_mode( mode_t* mode, char const* mode_str ) {
 }
 
 
+// get a passwd struct for a user.
+// on success, fill in pwd and *pwd_buf (the caller must free *pwd_buf, but not pwd).
+// return 0 on success
+// return -EINVAL if any argument is NULL 
+// return -ENOMEM on OOM 
+// return -ENOENT if the username cnanot be loaded
+int vdev_get_passwd( char const* username, struct passwd* pwd, char** pwd_buf ) {
+   
+   struct passwd* result = NULL;
+   char* buf = NULL;
+   int buf_len = 0;
+   int rc = 0;
+   
+   if( pwd == NULL || username == NULL || pwd_buf == NULL ) {
+      return -EINVAL;
+   }
+   
+   memset( pwd, 0, sizeof(struct passwd) );
+   
+   buf_len = sysconf( _SC_GETPW_R_SIZE_MAX );
+   if( buf_len <= 0 ) {
+      buf_len = 65536;
+   }
+   
+   buf = VDEV_CALLOC( char, buf_len );
+   if( buf == NULL ) {
+      return -ENOMEM;
+   }
+   
+   rc = getpwnam_r( username, pwd, buf, buf_len, &result );
+   
+   if( result == NULL ) {
+      
+      if( rc == 0 ) {
+         free( buf );
+         return -ENOENT;
+      }
+      else {
+         rc = -errno;
+         free( buf );
+         
+         vdev_error("getpwnam_r(%s) errno = %d\n", username, rc);
+         return rc;
+      }
+   }
+   
+   *pwd_buf = buf;
+   
+   // success!
+   return rc;
+}
+
+
+// get a group struct for a group.
+// on success, fill in grp and *grp_buf (the caller must free *grp_buf, but not grp).
+// return 0 on success
+// return -ENOMEM on OOM 
+// return -EINVAL if any argument is NULL 
+// return -ENOENT if the group cannot be found
+int vdev_get_group( char const* groupname, struct group* grp, char** grp_buf ) {
+   
+   struct group* result = NULL;
+   char* buf = NULL;
+   int buf_len = 0;
+   int rc = 0;
+   
+   if( grp == NULL || groupname == NULL || grp_buf == NULL ) {
+      return -EINVAL;
+   }
+   
+   memset( grp, 0, sizeof(struct group) );
+   
+   buf_len = sysconf( _SC_GETGR_R_SIZE_MAX );
+   if( buf_len <= 0 ) {
+      buf_len = 65536;
+   }
+   
+   buf = VDEV_CALLOC( char, buf_len );
+   if( buf == NULL ) {
+      return -ENOMEM;
+   }
+   
+   rc = getgrnam_r( groupname, grp, buf, buf_len, &result );
+   
+   if( result == NULL ) {
+      
+      if( rc == 0 ) {
+         free( buf );
+         return -ENOENT;
+      }
+      else {
+         rc = -errno;
+         free( buf );
+         
+         vdev_error("getgrnam_r(%s) errno = %d\n", groupname, rc);
+         return rc;
+      }
+   }
+   
+   // success!
+   return rc;
+}
+
+
+// parse a username or uid from a string.
+// translate a username into a uid, if needed
+// return 0 and set *uid on success 
+// return negative if we failed to look up the corresponding user (see vdev_get_passwd)
+// return negative on error 
+int vdev_parse_uid( char const* uid_str, uid_t* uid ) {
+   
+   bool parsed = false;
+   int rc = 0;
+   
+   if( uid_str == NULL || uid == NULL ) {
+      return -EINVAL;
+   }
+   
+   *uid = (uid_t)vdev_parse_uint64( uid_str, &parsed );
+   
+   // not a number?
+   if( !parsed ) {
+      
+      // probably a username 
+      char* pwd_buf = NULL;
+      struct passwd pwd;
+      
+      // look up the uid...
+      rc = vdev_get_passwd( uid_str, &pwd, &pwd_buf );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_get_passwd(%s) rc = %d\n", uid_str, rc );
+         return rc;
+      }
+      
+      *uid = pwd.pw_uid;
+      
+      free( pwd_buf );
+   }
+   
+   return 0;
+}
+
+
+// parse a group name or GID from a string
+// translate a group name into a gid, if needed
+// return 0 and set gid on success 
+// return negative if we failed to look up the corresponding group (see vdev_get_group)
+// return negative on error
+int vdev_parse_gid( char const* gid_str, gid_t* gid ) {
+   
+   bool parsed = false;
+   int rc = 0;
+   
+   if( gid_str == NULL || gid == NULL ) {
+      return -EINVAL;  
+   }
+   
+   *gid = (gid_t)vdev_parse_uint64( gid_str, &parsed );
+   
+   // not a number?
+   if( !parsed ) {
+      
+      // probably a username 
+      char* grp_buf = NULL;
+      struct group grp;
+      
+      // look up the gid...
+      rc = vdev_get_group( gid_str, &grp, &grp_buf );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_get_passwd(%s) rc = %d\n", gid_str, rc );
+         return rc;
+      }
+      
+      *gid = grp.gr_gid;
+      
+      free( grp_buf );
+   }
+   
+   return 0;
+}
+
+
+// verify that a UID is valid
+// return 0 on success
+// return -ENOMEM on OOM 
+// return -ENOENT on failure to look up the user
+// return negative on error
+int vdev_validate_uid( uid_t uid ) {
+   
+   struct passwd* result = NULL;
+   char* buf = NULL;
+   int buf_len = 0;
+   int rc = 0;
+   struct passwd pwd;
+   
+   memset( &pwd, 0, sizeof(struct passwd) );
+   
+   buf_len = sysconf( _SC_GETPW_R_SIZE_MAX );
+   if( buf_len <= 0 ) {
+      buf_len = 65536;
+   }
+   
+   buf = VDEV_CALLOC( char, buf_len );
+   if( buf == NULL ) {
+      return -ENOMEM;
+   }
+   
+   rc = getpwuid_r( uid, &pwd, buf, buf_len, &result );
+   
+   if( result == NULL ) {
+      
+      if( rc == 0 ) {
+         free( buf );
+         return -ENOENT;
+      }
+      else {
+         rc = -errno;
+         free( buf );
+         
+         vdev_error("getpwuid_r(%d) errno = %d\n", uid, rc);
+         return rc;
+      }
+   }
+   
+   if( uid != pwd.pw_uid ) {
+      // should *never* happen 
+      rc = -EINVAL;
+   }
+   
+   free( buf );
+   
+   return rc;
+}
+
+// verify that a GID is valid 
+// return 0 on success
+// return -ENOMEM on OOM 
+// return -ENOENT if we couldn't find the corresponding group 
+// return negative on other error
+int vdev_validate_gid( gid_t gid ) {
+   
+   struct group* result = NULL;
+   struct group grp;
+   char* buf = NULL;
+   int buf_len = 0;
+   int rc = 0;
+   
+   memset( &grp, 0, sizeof(struct group) );
+   
+   buf_len = sysconf( _SC_GETGR_R_SIZE_MAX );
+   if( buf_len <= 0 ) {
+      buf_len = 65536;
+   }
+   
+   buf = VDEV_CALLOC( char, buf_len );
+   if( buf == NULL ) {
+      return -ENOMEM;
+   }
+   
+   rc = getgrgid_r( gid, &grp, buf, buf_len, &result );
+   
+   if( result == NULL ) {
+      
+      if( rc == 0 ) {
+         free( buf );
+         return -ENOENT;
+      }
+      else {
+         rc = -errno;
+         free( buf );
+         
+         vdev_error("getgrgid_r(%d) errno = %d\n", gid, rc);
+         return rc;
+      }
+   }
+   
+   if( gid != grp.gr_gid ) {
+      rc = -EINVAL;
+   }
+   
+   free( buf );
+   
+   return rc;
+}
+
+
+
 // callback from inih to parse an acl 
 // return 1 on success
 // return 0 on failure
