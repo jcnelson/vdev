@@ -35,7 +35,7 @@
 #define VDEV_CONFIG_ACTIONS       "actions"
 #define VDEV_CONFIG_HELPERS       "helpers"
 #define VDEV_CONFIG_DEFAULT_MODE  "default_permissions"
-#define VDEV_CONFIG_DEFAULT_POLICY "default_policy"     // allow or deny
+#define VDEV_CONFIG_DEFAULT_POLICY "default_policy"     // ACL allow or deny
 #define VDEV_CONFIG_PIDFILE_PATH  "pidfile"
 #define VDEV_CONFIG_LOGFILE_PATH  "logfile"
 #define VDEV_CONFIG_LOG_LEVEL     "loglevel"
@@ -47,6 +47,11 @@
 
 #define VDEV_CONFIG_INSTANCE_NONCE_LEN 32
 #define VDEV_CONFIG_INSTANCE_NONCE_STRLEN (2*VDEV_CONFIG_INSTANCE_NONCE_LEN + 1)
+
+#define VDEV_OS_QUIRK_DEVICE_EXISTS      0x1       // set this bit if the OS already has the device file--i.e. vdevd is not expected to create it
+
+#define vdev_config_has_OS_quirk( quirk_field, quirk ) (((quirk_field) & (quirk)) != 0)
+#define vdev_config_set_OS_quirk( quirk_field, quirk ) quirk_field |= (quirk)
 
 // structure for both file configuration and command-line options
 struct vdev_config {
@@ -90,7 +95,7 @@ struct vdev_config {
    // path to where /dev lives 
    char* mountpoint;
    
-   // run once to populate /dev
+   // populate/update /dev and exit
    bool once;
    
    // run in the foreground 
@@ -104,6 +109,9 @@ struct vdev_config {
    
    // printable 256-bit instance nonce--randomly generated and unique per execution 
    char instance_str[VDEV_CONFIG_INSTANCE_NONCE_STRLEN];
+   
+   // bitfield of OS-specific quirks 
+   uint64_t OS_quirks;
 };
 
 C_LINKAGE_BEGIN
