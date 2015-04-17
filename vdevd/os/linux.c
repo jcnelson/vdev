@@ -1309,12 +1309,159 @@ static int vdev_linux_context_shutdown( struct vdev_linux_context* ctx ) {
 }
 
 
+// are we using devtmpfs on this mountpoint?
+// return 1 if so
+// return 0 if not 
+// return negative on error 
+static int vdev_linux_mountpoint_on_devtmpfs( char const* mountpoint ) {
+
+   // NOTE: You would think that we can just statfs(2) the 
+   // mountpoint and get the underlying filesystem type.
+   // However, devtmpfs and tmpfs have the same f_type value.
+   // This makes this strategy a no-go, since vdevd will need
+   // to behave differently on devtmpfs but not tmpfs.
+   // So, we have to parse /proc/mounts instead.
+   
+   int rc = 0;
+   
+   FILE* f = NULL;
+   
+   char* line_buf = NULL;
+   size_t line_len = 0;
+   ssize_t num_read = 0;
+   
+   bool found = false;
+   char devtmpfs_mountpoint[PATH_MAX+1];
+   
+   char realpath_mountpoint[PATH_MAX+1];
+   char devtmpfs_realpath_mountpoint[PATH_MAX+1];
+   
+   size_t realpath_mountpoint_len = 0;
+   size_t devtmpfs_realpath_mountpoint_len = 0;
+   
+   memset( devtmpfs_mountpoint, 0, PATH_MAX+1 );
+   
+   f = fopen( "/proc/mounts", "r" );
+   if( f == NULL ) {
+      
+      rc = -errno;
+      fprintf(stderr, "Failed to open /proc/mounts, rc = %d\n", rc );
+      return rc;
+   }
+   
+   // scan for devtmpfs 
+   while( 1 ) {
+      
+      errno = 0;
+      num_read = getline( &line_buf, &line_len, f );
+      
+      if( num_read < 0 ) {
+         
+         rc = -errno;
+         if( rc == 0 ) {
+            // EOF
+            break;
+         }
+         else {
+            // error 
+            vdev_error("getline('/proc/mounts') rc = %d\n", rc );
+            break;
+         }
+      }
+      
+      // devtmpfs?
+      if( strstr( line_buf, "devtmpfs" ) != NULL ) {
+         
+         // mountpoint?
+         char devtmpfs_buf[20];
+         rc = sscanf( line_buf, "%s %s", devtmpfs_buf, devtmpfs_mountpoint );
+         
+         if( rc != 2 ) {
+            
+            // couldn't scan 
+            vdev_error("WARN: sscanf(\"%s\") for devtmpfs mountpoint rc = %d\n", line_buf, rc );
+            continue;
+         }
+         else {
+            
+            // is the mountpoint contained in this path?
+            char* tmp = NULL;
+            
+            memset( realpath_mountpoint, 0, PATH_MAX+1 );
+            memset( devtmpfs_realpath_mountpoint, 0, PATH_MAX+1 );
+            
+            tmp = realpath( mountpoint, realpath_mountpoint );
+            if( tmp == NULL ) {
+               
+               rc = -errno;
+               fprintf(stderr, "Failed to get the real path of '%s', rc = %d\n", mountpoint, rc );
+               break;
+            }
+            
+            tmp = realpath( devtmpfs_mountpoint, devtmpfs_realpath_mountpoint );
+            if( tmp == NULL ) {
+               
+               rc = -errno;
+               fprintf(stderr, "Failed to get the real path of '%s', rc = %d\n", devtmpfs_mountpoint, rc );
+               break;
+            }
+            
+            vdev_debug("devtmpfs realpath is   '%s'\n", devtmpfs_realpath_mountpoint );
+            vdev_debug("mountpoint realpath is '%s'\n", realpath_mountpoint );
+            
+            devtmpfs_realpath_mountpoint_len = strlen(devtmpfs_realpath_mountpoint);
+            realpath_mountpoint_len = strlen(realpath_mountpoint);
+            
+            size_t min_len = MIN( devtmpfs_realpath_mountpoint_len, realpath_mountpoint_len );
+            
+            // is our mountpoint within the devtmpfs mountpoint?
+            if( strncmp( devtmpfs_realpath_mountpoint, realpath_mountpoint, min_len ) == 0 &&   // devtmpfs mountpoint path is a substring of the mountpoint path and
+                (strchr( realpath_mountpoint + min_len, '/' ) != NULL ||                        // either the mountpoint path continues at least one directory into devtmpfs path, or
+                 strcmp( devtmpfs_realpath_mountpoint, realpath_mountpoint ) == 0 ) ) {         // the devtmpfs mountpoint path *is* the mountpoint path
+                
+               // contained!
+               rc = 1;
+               found = true;
+               break;
+            }
+         }
+      }
+   }
+   
+   fclose( f );
+   
+   if( line_buf != NULL ) {
+      free( line_buf );
+   }
+   
+   return rc;
+}
+
 // set up Linux-specific vdev state.
 // this is early initialization, so don't start anything yet
 int vdev_os_init( struct vdev_os_context* os_ctx, void** cls ) {
    
    int rc = 0;
    struct vdev_linux_context* ctx = NULL;
+   
+   rc = vdev_linux_mountpoint_on_devtmpfs( os_ctx->state->mountpoint );
+   if( rc < 0 ) {
+      
+      vdev_error("vdev_linux_mountpoint_on_devtmpfs('%s') rc = %d\n", os_ctx->state->mountpoint, rc );
+      return rc;
+   }
+   
+   if( rc > 0 ) {
+      
+      // using devtmpfs 
+      vdev_info("'%s' is on devtmpfs\n", os_ctx->state->mountpoint );
+      
+      vdev_config_set_OS_quirk( os_ctx->state->config->OS_quirks, VDEV_OS_QUIRK_DEVICE_EXISTS );
+   }
+   else {
+      
+      vdev_info("'%s' is not on devtmpfs\n", os_ctx->state->mountpoint );
+   }
    
    ctx = VDEV_CALLOC( struct vdev_linux_context, 1 );
    if( ctx == NULL ) {
