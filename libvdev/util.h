@@ -154,6 +154,10 @@ extern int _VDEV_SYSLOG;
 #define MAX(x,y) ((x) > (y) ? (x) : (y))
 #endif
 
+#ifndef MIN 
+#define MIN(x,y) ((x) < (y) ? (x) : (y))
+#endif 
+
 #ifdef __cplusplus
 #define C_LINKAGE_BEGIN extern "C" {
 #define C_LINKAGE_END }
