@@ -411,6 +411,17 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
       return rc;
    }
    
+   // if we didn't get a config file, use the default one
+   if( vdev->config->config_path == NULL ) {
+      
+      vdev->config->config_path = vdev_strdup_or_null( VDEV_CONFIG_FILE );
+      if( vdev->config->config_path == NULL ) {
+
+         // OOM 
+         return -ENOMEM;
+      }
+   }
+   
    vdev_set_debug_level( vdev->config->debug_level );
    vdev_set_error_level( vdev->config->error_level );
    

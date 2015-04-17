@@ -28,6 +28,10 @@
 #include "device.h"
 #include "workqueue.h"
 
+#ifndef VDEV_CONFIG_FILE
+#define VDEV_CONFIG_FILE "/etc/vdev/vdevd.conf"
+#endif
+
 // global vdev state 
 struct vdev_state {
    
