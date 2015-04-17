@@ -124,7 +124,7 @@ static void* vdev_wq_main( void* cls ) {
          
          if( rc != 0 ) {
             
-            vdev_error("WARN: work %p rc = %d\n", work_itr->work, rc );
+            vdev_warn("work %p rc = %d\n", work_itr->work, rc );
          }
          
          next = work_itr->next;
