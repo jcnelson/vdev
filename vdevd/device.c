@@ -295,7 +295,7 @@ int vdev_device_request_to_env( struct vdev_device_request* req, char*** ret_env
    
    if( req->state->config->ifnames_path != NULL ) {
       
-      rc = vdev_device_request_make_env_str( "VDEV_IFNAMES_PATH", req->state->config->firmware_dir, &env[i] );
+      rc = vdev_device_request_make_env_str( "VDEV_IFNAMES_PATH", req->state->config->ifnames_path, &env[i] );
       if( rc != 0 ) {
       
          VDEV_FREE_LIST( env );
@@ -645,6 +645,75 @@ static int vdev_device_remove_metadata( struct vdev_device_request* req ) {
 }
 
 
+// do we have metadata logged for a device?
+// return 0 on success
+// return negative on error 
+static int vdev_device_has_metadata( struct vdev_device_request* req ) {
+   
+   int rc = 0;
+   struct stat sb;
+   char* md_fp = vdev_device_metadata_fullpath( req->state->mountpoint, req->renamed_path );
+   if( md_fp == NULL ) {
+      
+      rc = -ENOMEM;
+   }
+   else {
+      
+      rc = stat( md_fp, &sb );
+
+      if( rc != 0 ) {
+         rc = -errno;
+      }
+      
+      free( md_fp );
+   }
+   
+   return rc;
+}
+
+
+// create all directories leading up to a device 
+// return 0 on success
+// return negative on error 
+static int vdev_device_mkdirs( struct vdev_device_request* req, char** dev_fullpath ) {
+   
+   int rc = 0;
+   char* fp = NULL;
+   char* fp_dir = NULL;
+   
+   fp = vdev_fullpath( req->state->mountpoint, req->renamed_path, NULL );
+   if( fp == NULL ) {
+      
+      rc = -ENOMEM;
+      return rc;
+   }
+   
+   if( strchr(req->renamed_path, '/') != NULL ) {
+      
+      fp_dir = vdev_dirname( fp, NULL );
+      if( fp_dir == NULL ) {
+         
+         rc = -ENOMEM;
+         free( fp );
+         return rc;
+      }
+   
+      // make sure the directories leading to this path exist
+      rc = vdev_mkdirs( fp_dir, strlen(req->state->mountpoint), 0755 );
+      if( rc != 0 ) {
+      
+         vdev_error("vdev_mkdirs('%s') rc = %d\n", fp_dir, rc );
+      }
+      
+      free( fp_dir );
+   }
+   
+   *dev_fullpath = fp;
+   
+   return rc;
+}
+
+
 // handler to add a device
 // rename the device, and if it succeeds, mknod the device (if it exists), 
 // return 0 on success, masking failure to write metadata or failure to run a specific command.
@@ -655,6 +724,7 @@ int vdev_device_add( struct vdev_device_request* req ) {
    
    int rc = 0;
    int update_only = 0;         // if 1, only update metadata; don't run actions.
+   int do_mknod = 1;            // if 1, issue mknod.  Otherwise, check to see if the device exists by checking for metadata.
    
    // do the rename, possibly generating it
    rc = vdev_action_create_path( req, req->state->acts, req->state->num_acts, &req->renamed_path );
@@ -687,150 +757,106 @@ int vdev_device_add( struct vdev_device_request* req ) {
    
    if( req->renamed_path != NULL ) {
       
-      if( req->dev != 0 && req->mode != 0 && strcmp( req->renamed_path, VDEV_DEVICE_PATH_UNKNOWN ) != 0 ) {
-      
-         // making a device file
-         char* fp = NULL;
-         char* fp_dir = NULL;
+      // device has a name (i.e. something for us to add)?
+      if( strcmp( req->renamed_path, VDEV_DEVICE_PATH_UNKNOWN ) != 0 ) {
          
-         fp = vdev_fullpath( req->state->mountpoint, req->renamed_path, NULL );
-         if( fp == NULL ) {
+         // device has major/minor/mode?
+         if( req->dev != 0 && req->mode != 0 ) {
             
-            rc = -ENOMEM;
-                  
-            // done with this request
-            vdev_device_request_free( req );
-            free( req );
-            return rc;
-         }
-         
-         fp_dir = vdev_dirname( fp, NULL );
-         if( fp_dir == NULL ) {
+            char* fp = NULL;       // full path to the device 
             
-            rc = -ENOMEM;
-            
-            // done with this request
-            vdev_device_request_free( req );
-            free( req );
-            free( fp );
-            return rc;
-         }
-         
-         if( strchr(req->renamed_path, '/') != NULL ) {
-         
-            // make sure the directories leading to this path exist
-            rc = vdev_mkdirs( fp_dir, strlen(req->state->mountpoint), 0755 );
+            rc = vdev_device_mkdirs( req, &fp );
             if( rc != 0 ) {
-            
-               vdev_error("vdev_mkdirs('%s') rc = %d\n", fp_dir, rc );
+               
+               vdev_error("vdev_device_mkdirs('%s/%s') rc = %d\n", req->state->mountpoint, req->renamed_path, rc );
+               
+               // done with this request 
+               vdev_device_request_free( req );
+               free( req );
+               return rc;
             }
-         }
-         
-         free( fp_dir );
-         
-         if( rc == 0 ) {
             
-            // make the device
-            rc = mknod( fp, req->mode | req->state->config->default_mode, req->dev );
-            if( rc != 0 ) {
+            // do we need to make the device?
+            if( vdev_config_has_OS_quirk( req->state->config->OS_quirks, VDEV_OS_QUIRK_DEVICE_EXISTS ) ) {
                
-               rc = -errno;
-               
-               // if we're running once, and we failed due to EEXIST, don't log this--this is how we test that a device does not exist 
-               if( rc != -EEXIST || req->state->once ) {
-               
-                  // NOTE: this can happen when the host OS puts a device in multiple places
-                  vdev_error("mknod('%s', dev=(%u, %u)) rc = %d\n", fp, major(req->dev), minor(req->dev), rc );
-               }
-               
-               if( rc == -EEXIST ) {
+               // nope, but did we process it already?
+               if( vdev_device_has_metadata( req ) ) {
                   
-                  // update metadata, but don't run actions
-                  rc = 0;
-                  update_only = 1;
+                  // already processed :(
+                  rc = -EEXIST;
                }
             }
             
-            if( rc == 0 ) {
+            else {
                
-               // put/update metadata 
-               rc = vdev_device_add_metadata( req );
+               // file is not expected to exist
+               rc = mknod( fp, req->mode | req->state->config->default_mode, req->dev );
                
                if( rc != 0 ) {
                   
-                  vdev_warn("vdev_device_add_metadata('%s') rc = %d\n", fp, rc );
-                  
-                  // technically not an error, but a problem we should log
-                  rc = 0;
+                  rc = -errno;
                }
-            }  
+            }
+            
+            free( fp );
          }
          
-         free( fp );
-      }
-      else if( strcmp( req->renamed_path, VDEV_DEVICE_PATH_UNKNOWN ) != 0 ) {
-      
-         // not creating a device file, but a device-add event nevertheless.
-         // creating or updating?
-         struct stat sb;
-         char* md_fp = vdev_device_metadata_fullpath( req->state->mountpoint, req->renamed_path );
-         if( md_fp == NULL ) {
-            
-            rc = -ENOMEM;
-         }
+         // no major/minor/mode
          else {
-            
-            rc = stat( md_fp, &sb );
+         
+            // not creating a device file, but a device-add event nevertheless.
+            // creating or updating?
+            rc = vdev_device_has_metadata( req );
             if( rc != 0 ) {
-               
-               rc = -errno;
                
                if( rc == -ENOENT ) {
                   
-                  // add metadata!
+                  // add metadata, since none exists!
                   rc = 0;
-               }
-               
-               // if running once, only update
-               // if not running once, fail on EEXIST
-               else if( rc != -EEXIST || req->state->once ) {
-                  
-                  vdev_error("stat('%s') rc = %d\n", md_fp, rc );
-               }
-               
-               else if( rc == -EEXIST ) {
-                  
-                  // update metadata only--don't run actions
-                  rc = 0;
-                  update_only = 1;
                }
             }
+            else {
+               
+               // already present
+               rc = -EEXIST;
+            }
+         }
+         
+         if( rc == -EEXIST && req->state->once ) {
             
-            if( rc == 0 ) {
+            // this is fine--"once" semantics verifies whether or not a device exists in order to know whether or not to run action scripts 
+            rc = 0;
+            update_only = 1;
+         }
+         else if( rc != 0 ) {
+            
+            vdev_error("Add device '%s/%s', rc = %d\n", req->state->mountpoint, req->renamed_path, rc );
+         }
+            
+         if( rc == 0 ) {
+
+            // put/update metadata 
+            rc = vdev_device_add_metadata( req );
+            
+            if( rc != 0 ) {
                
-               // put/update metadata 
-               rc = vdev_device_add_metadata( req );
+               vdev_warn("vdev_device_add_metadata('%s/%s') rc = %d\n", req->state->mountpoint, req->renamed_path, rc );
                
-               if( rc != 0 ) {
-                  
-                  vdev_warn("vdev_device_add_metadata('%s') rc = %d\n", md_fp, rc );
-                  
-                  // technically not an error, but a problem we should log
-                  rc = 0;
-               }
+               // technically not an error, but a problem we should log
+               rc = 0;
             }
          }
       }
       
       if( rc == 0 && !update_only ) {
 
-         // successfully added the device!  call all ADD actions if we actually added the device
+         // no problems yet.  call all ADD actions if we actually added the device
          rc = vdev_action_run_commands( req, req->state->acts, req->state->num_acts );
          if( rc != 0 ) {
             
             vdev_error("vdev_action_run_commands(ADD %s, dev=(%u, %u)) rc = %d\n", req->renamed_path, major(req->dev), minor(req->dev), rc );
             rc = 0;
-         }
+         }  
       }
    }
    
@@ -894,8 +920,8 @@ int vdev_device_remove( struct vdev_device_request* req ) {
          rc = 0;
       }
       
-      // only remove files from /dev if this is a device...
-      if( req->dev != 0 && req->mode != 0 && strcmp( req->renamed_path, VDEV_DEVICE_PATH_UNKNOWN ) != 0 ) {
+      // only remove files from /dev if this is a device, and we created it
+      if( req->dev != 0 && req->mode != 0 && strcmp( req->renamed_path, VDEV_DEVICE_PATH_UNKNOWN ) != 0 && vdev_config_has_OS_quirk( req->state->config->OS_quirks, VDEV_OS_QUIRK_DEVICE_EXISTS ) ) {
             
          // remove the data itself, if there is data 
          char* fp = vdev_fullpath( req->state->mountpoint, req->renamed_path, NULL );
@@ -912,7 +938,7 @@ int vdev_device_remove( struct vdev_device_request* req ) {
             rc = 0;
          }
             
-         // try to clean up directories 
+         // try to clean up directories
          rc = vdev_rmdirs( fp );
          if( rc != 0 && rc != -ENOTEMPTY && rc != -ENOENT ) {
             
