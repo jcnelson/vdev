@@ -30,14 +30,14 @@ eval $($VDEV_HELPERS/stat_input $VDEV_MOUNTPOINT/$VDEV_PATH)
 STAT_RC=$?
 
 # succeeded?
-test 0 -ne $STAT_RC && fail 2 "stat_input exit code $STAT_RC"
+test 0 -ne $STAT_RC && fail 2 "stat_input $VDEV_PATH exit code $STAT_RC"
 
 # get the persistent path for this device 
 eval $($VDEV_HELPERS/stat_path $VDEV_MOUNTPOINT/$VDEV_PATH)
 STAT_RC=$?
 
 # succeeded?
-test 0 -ne $STAT_RC && fail 2 "stat_path exit code $STAT_RC" 
+test 0 -ne $STAT_RC && fail 2 "stat_path $VDEV_PATH exit code $STAT_RC" 
 
 # no path?
 test -z "$VDEV_PERSISTENT_PATH" && exit 0
