@@ -1,9 +1,11 @@
 #!/bin/sh
 
-# Pre-vdev initialization script.
-# usage: dev-setup.sh PATH_TO_DEV
-# Populate /dev with extra files that vdev won't create, but are 
+# Pre-seed initialization script to vdevd.
+# usage: dev-setup.sh /path/to/dev
+# Populate /dev with extra files that vdevd won't create, but are 
 # necessary for correct operation.
+# Write to stdout any "$type $name $PARAM=$VALUE..." strings for
+# devices that vdevd should process before creating.
 
 VDEV_MOUNTPOINT=$1
 
@@ -32,10 +34,26 @@ fi
 # add /dev/shm
 test -d $VDEV_MOUNTPOINT/shm || /bin/ln -sf /run/shm $VDEV_MOUNTPOINT/shm
 
-# add static device files
-# use kmod to create all device files for modules for the currently-running kernel version.
+
+# guess the subsystem if /sys/dev/{block,char}/$major:$minor isn't helpful.
+# print it to stdout
+# $1  type of device (c for char, b for block)
+# $2  name of device relative to /dev
+guess_subsystem() {
+
+   local devtype=$1
+   local devname=$2
+
+   if [ "$devname" == "snd/seq" ]; then 
+      echo "sound"
+   fi
+}
+
+
+# feed static device nodes into vdevd.
+# use kmod to query all device files for modules for the currently-running kernel version.
 # see kmod(8)
-make_static_nodes_kmod() {
+feed_static_nodes_kmod() {
 
   [ -e /lib/modules/$(uname -r)/modules.devname ] || return 0
   [ -x /bin/kmod ] || return 0
@@ -48,16 +66,65 @@ make_static_nodes_kmod() {
     
     [ -e $VDEV_MOUNTPOINT/$name ] && continue
 
+    # skip directories--vdevd can make them 
+    if [ "$type" == "d" ]; then 
+       continue
+    fi
+
+    # only process character and block devices 
+    if [ "$type" != "c" -a "$type" != "b" ]; then 
+       echo "Invalid device type $type" >/proc/self/fd/2
+       continue
+    fi
+
+    # look up major/minor 
+    major=$(echo $arg | /bin/sed -r 's/^([^:]+):.*/\1/g')
+    minor=$(echo $arg | /bin/sed -r 's/^[^:]+:(.*)/\1/g')
+
+    # look up devpath and subsystem
+    sys_link=
+    devpath=
+    params=
     case "$type" in
+      "c")
 
-      c|b) /bin/mknod -m $mode $VDEV_MOUNTPOINT/$name $type $(echo $arg | sed 's/:/ /') ;;
+         sys_link="/sys/dev/char/$major:$minor"
+         ;;
 
-      d) mkdir $VDEV_MOUNTPOINT/$name ;;
-
-      *) echo "unparseable line ($type $VDEV_MOUNTPOINT/$name $mode $uid $gid $age $arg)" >&2 ;;
-
+      "b")
+         
+         sys_link="/sys/dev/block/$major:$minor"
+         ;;
     esac
 
+    # is there a sysfs entry for this device?  there might not be...
+    if ! [ -L $sys_link ]; then 
+
+      subsystem=$(guess_subsystem $type $name)
+    
+    else
+
+      devpath=$(/bin/readlink $sys_link | /bin/sed -r 's/\.\.\///g')
+      devpath="/$devpath"
+
+      subsystem=$(/bin/readlink /sys/$devpath/subsystem | /bin/sed -r "s/[^/]*\///g")
+    fi
+
+    # build up params list 
+    if [ -n "$devpath" ]; then 
+
+       params="$params DEVPATH=$devpath"
+    fi 
+
+    if [ -n "$subsystem" ]; then 
+
+       params="$params SUBSYSTEM=$subsystem"
+    fi
+
+    # feed into vdevd via stdout
+    echo "$type $name $major $minor $params"
+    
+    # keep SELinux happy
     if [ -x /sbin/restorecon ]; then
 
       /sbin/restorecon $VDEV_MOUNTPOINT/$name
@@ -65,7 +132,7 @@ make_static_nodes_kmod() {
   done
 }
 
-make_static_nodes_kmod
+feed_static_nodes_kmod
 
 exit 0
 
