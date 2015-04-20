@@ -43,5 +43,8 @@ if [ -n "$UUID" ]; then
    add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-uuid/$UUID $VDEV_METADATA 
 fi
 
+# set ownership and bits 
+/bin/chown root.disk $VDEV_MOUNTPOINT/$VDEV_PATH
+/bin/chmod 0660 $VDEV_MOUNTPOINT/$VDEV_PATH
 
 exit 0

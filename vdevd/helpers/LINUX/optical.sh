@@ -49,4 +49,8 @@ add_capability_link $VDEV_PATH $VDEV_OPTICAL_DVD "dvd"
 add_capability_link $VDEV_PATH $VDEV_OPTICAL_DVD_R "dvdrw"
 add_capability_link $VDEV_PATH $VDEV_OPTICAL_DVD_RAM "dvdrw"
 
+# set ownership and bits 
+/bin/chown root.cdrom $VDEV_MOUNTPOINT/$VDEV_PATH
+/bin/chmod 0660 $VDEV_MOUNTPOINT/$VDEV_PATH
+
 exit 0

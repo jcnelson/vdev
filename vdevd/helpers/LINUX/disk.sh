@@ -123,4 +123,9 @@ if [ -n "$WWN" ]; then
    add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$WWN $VDEV_METADATA
 fi
 
+
+# set ownership and bits 
+/bin/chown root.disk $VDEV_MOUNTPOINT/$VDEV_PATH
+/bin/chmod 0660 $VDEV_MOUNTPOINT/$VDEV_PATH
+
 exit 0
