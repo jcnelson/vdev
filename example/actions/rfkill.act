@@ -1,0 +1,4 @@
+[vdev-action]
+event=add
+path=^rfkill$
+command=/bin/chmod 0664 $VDEV_MOUNTPOINT/$VDEV_PATH

@@ -1,0 +1,4 @@
+[vdev-action]
+event=add
+path=^fb[0-9]+$
+command=/bin/chown root.video $VDEV_MOUNTPOINT/$VDEV_PATH && /bin/chmod 0660 $VDEV_MOUNTPOINT/$VDEV_PATH

@@ -1,0 +1,4 @@
+[vdev-action]
+event=add
+path=^nvram$
+command=/bin/chown root.kmem $VDEV_MOUNTPOINT/$VDEV_PATH && /bin/chmod 0640 $VDEV_MOUNTPOINT/$VDEV_PATH
