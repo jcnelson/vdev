@@ -296,16 +296,11 @@ int vdev_wreq_free( struct vdev_wreq* wreq ) {
 
 // enqueue work
 // return 0 on success
-// return -EINVAL if the work queue thread isn't running
 // return -ENOMEM if OOM
 int vdev_wq_add( struct vdev_wq* wq, struct vdev_wreq* wreq ) {
 
    int rc = 0;
    struct vdev_wreq* next = NULL;
-   
-   if( !wq->running ) {
-      return -EINVAL;
-   }
 
    // duplicate this work item 
    next = VDEV_CALLOC( struct vdev_wreq, 1 );
