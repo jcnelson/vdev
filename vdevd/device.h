@@ -28,7 +28,7 @@
 
 #define VDEV_NAME_MAX 256
 
-#define VDEV_METADATA_PREFIX            "vdev/"
+#define VDEV_METADATA_PREFIX            "metadata/"
 
 #define VDEV_DEVICE_PATH_UNKNOWN        "UNKNOWN"
 
