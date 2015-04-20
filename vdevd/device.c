@@ -479,6 +479,7 @@ static int vdev_device_add_metadata_item( char* base_dir, char const* param_name
    return rc;
 }
 
+
 // record extra metadata (i.e. vdev and OS parameters) for a device node
 // overwrite existing metadata if it already exists for this device.
 // store it as $VDEV_MOUNTPOINT/$VDEV_METADATA_PREFIX/$VDEV_PATH/$PARAM_KEY (set to the contents of $PARAM_VALUE)
@@ -979,6 +980,10 @@ static int vdev_device_remove_wq( struct vdev_wreq* wreq, void* cls ) {
 
 
 // enqueue a device request
+// NOTE: the workqueue takes ownership of the request.  The caller should not free it.
+// return 0 on success
+// return -EINVAL if the device request is missing required fields 
+// return -ENOMEM on OOM 
 int vdev_device_request_enqueue( struct vdev_wq* wq, struct vdev_device_request* req ) {
    
    int rc = 0;
