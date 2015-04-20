@@ -331,7 +331,16 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
       if( !not_param ) {
          
          // add to OS params 
-         vdev_device_request_add_param( vreq, key, value );
+         rc = vdev_device_request_add_param( vreq, key, value );
+         if( rc != 0 ) {
+            
+            // could be OOM 
+            if( subsystem != NULL ) {
+               free( subsystem );
+            }
+            
+            return rc;
+         }
       }
    }
    
@@ -405,6 +414,12 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
             
             // yup!
             rc = vdev_device_request_add_param( vreq, "SUBSYSTEM", subsystem );
+            if( rc != 0 ) {
+               
+               // OOM
+               free( subsystem );
+               return rc;
+            }
          }
          else if( rc != -ENOMEM ) {
             
@@ -439,7 +454,7 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
    }
    
    // tell helpers where /sys is mounted 
-   vdev_device_request_add_param( vreq, "SYSFS_MOUNTPOINT", ctx->sysfs_mountpoint );
+   rc = vdev_device_request_add_param( vreq, "SYSFS_MOUNTPOINT", ctx->sysfs_mountpoint );
    
    return rc;
 }
