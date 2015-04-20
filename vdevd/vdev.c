@@ -322,6 +322,277 @@ int vdev_start( struct vdev_state* vdev ) {
 }
 
 
+// process a single line of text into a device request
+// 
+// line format is:
+//    type name PARAM=VALUE...
+// $type is "c", "b", or "u" for character, block, or unknown device;
+// $name is the path to the device relative to the /dev mountpoint (or the string "None")
+// $uid is the user ID that shall own the device (if we'll mknod it)
+// $gid is the group ID that shall own the device (if we'll mknod it)
+// PARAM=VALUE... is a list of $PARAM and $VALUE pairs that shall be the OS-specific parameters.
+// NOTE: currently, we do not tolerate spaces in any of these fields.  Sorry.
+//
+// fill in the given vdev_device_request structure.
+// return 0 on success 
+// return -ENOENT if we're missing a parameter
+// return -EINVAL if the parameter is malformed
+// return -ENOMEM on OOM 
+int vdev_parse_device_request( struct vdev_state* state, struct vdev_device_request* vreq, char* line ) {
+   
+   int rc = 0;
+   char* tok = NULL;
+   char* tokstr = line;
+   char* tok_ctx = NULL;
+   char* tmp = NULL;
+   
+   mode_t mode = 0;
+   dev_t major = 0;
+   dev_t minor = 0;
+   char name[4097];
+   char keyvalue_buf[4097];
+   char* key = NULL;
+   char* value = NULL;
+   
+   // type 
+   tok = strtok_r( tokstr, " \t", &tok_ctx );
+   tokstr = NULL;
+   
+   if( tok == NULL ) {
+      
+      // no type 
+      fprintf(stderr, "Missing type\n");
+      return -ENOENT;
+   }
+   
+   if( strlen(tok) != 1 ) {
+      
+      // invalid type 
+      fprintf(stderr, "Unrecognized type '%s'.  Expected 'c', 'b', or 'u'\n", tok );
+      return -EINVAL;
+   }
+   
+   if( tok[0] != 'c' && tok[0] != 'b' && tok[0] != 'u' ) {
+      
+      // invalid type 
+      fprintf(stderr, "Unrecognized type '%s'.  Expected 'c', 'b', or 'u'\n", tok );
+      return -EINVAL;
+   }
+   
+   if( tok[0] == 'c' ) {
+      mode = S_IFCHR;
+   }
+   else if( tok[0] == 'b' ) {
+      mode = S_IFBLK;
+   }
+   
+   // name 
+   tok = strtok_r( tokstr, " \t", &tok_ctx );
+   if( tok == NULL ) {
+      
+      // no name 
+      fprintf(stderr, "Missing name\n");
+      return -ENOENT;
+   }
+   
+   strcpy( name, tok );
+   
+   // major 
+   tok = strtok_r( tokstr, " \t", &tok_ctx );
+   if( tok == NULL ) {
+      
+      // no major 
+      fprintf(stderr, "Missing major device number\n");
+      return -ENOENT;
+   }
+   
+   major = (dev_t)strtoul( tok, &tmp, 10 );
+   if( tmp == tok || *tmp != '\0' ) {
+      
+      // invalid major 
+      fprintf(stderr, "Invalid major device number '%s'\n", tok );
+      return -EINVAL;
+   }
+   
+   // minor 
+   tok = strtok_r( tokstr, " \t", &tok_ctx );
+   if( tok == NULL ) {
+      
+      // no minor 
+      fprintf(stderr, "Missing minor device number\n");
+      return -ENOENT;
+   }
+   
+   minor = (dev_t)strtoul( tok, &tmp, 10 );
+   if( tmp == tok || *tmp != '\0' ) {
+      
+      // invalid minor 
+      fprintf(stderr, "Invalid minor device number '%s'\n", tok );
+      return -EINVAL;
+   }
+   
+   // set up the device... 
+   rc = vdev_device_request_init( vreq, state, VDEV_DEVICE_ADD, name );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_device_request_init('%s') rc = %d\n", name, rc );
+      return rc;
+   }
+   
+   vdev_device_request_set_type( vreq, VDEV_DEVICE_ADD );
+   vdev_device_request_set_mode( vreq, mode );
+   vdev_device_request_set_dev( vreq, makedev( major, minor ) );
+   
+   // parameters 
+   while( tok != NULL ) {
+      
+      tok = strtok_r( tokstr, " \t", &tok_ctx );
+      if( tok == NULL ) {
+         break;
+      }
+      
+      if( strlen(tok) > 4096 ) {
+         
+         // too big 
+         fprintf(stderr, "OS parameter too long: '%s'\n", tok );
+         vdev_device_request_free( vreq );
+         return -EINVAL;
+      }
+      
+      strcpy( keyvalue_buf, tok );
+      
+      rc = vdev_keyvalue_next( keyvalue_buf, &key, &value );
+      if( rc < 0 ) {
+         
+         // could not parse 
+         fprintf(stderr, "Unparsible OS parameter: '%s'\n", tok );
+         vdev_device_request_free( vreq );
+         return -EINVAL;
+      }
+      
+      rc = vdev_device_request_add_param( vreq, key, value );
+      if( rc != 0 ) {
+         
+         vdev_device_request_free( vreq );
+         return rc;
+      }
+   }
+   
+   return rc;
+}
+
+
+// process a newline-delimited textual list of device events.
+// 
+// line format is:
+//    type name major minor PARAM=VALUE...
+// $type is "c", "b", or "u" for character, block, or unknown device
+// $name is the path to the device relative to the /dev mountpoint (or the string "None")
+// $major is the major device number (ignored if $type == 'u')
+// $minor is the minor device number (ignored if $type == 'u')
+// PARAM=VALUE... is a list of $PARAM and $VALUE pairs that shall be the OS-specific parameters.
+//
+// convert each line into a device request and enqueue it.
+// NOTE: each line should be less than 4096 characters.
+// NOTE: currently, we do not tolerate spaces in any of these fields.  Sorry.
+// return 0 on success 
+// return -ERANGE if a line exceeded 4096 characters
+int vdev_load_device_requests( struct vdev_state* state, char* text_buf, size_t text_buflen ) {
+   
+   int rc = 0;
+   char* cur_line = NULL;
+   char* next_line = NULL;
+   
+   struct vdev_device_request* vreq = NULL;
+   
+   size_t consumed = 0;
+   size_t line_len = 0;
+   char line_buf[4097];
+   char line_buf_dbg[4097];     // for debugging
+   
+   dev_t major = 0;
+   dev_t minor = 0;
+   
+   cur_line = text_buf;
+   while( consumed < text_buflen && cur_line != NULL ) {
+      
+      next_line = strchr( cur_line, '\n' );
+      if( next_line == NULL ) {
+         
+         line_len = strlen( cur_line );
+         
+         if( line_len == 0 ) {
+            // done 
+            break;
+         }
+         
+         // last line
+         if( line_len < 4096 ) {
+            
+            strcpy( line_buf, cur_line );
+         }
+         else {
+            
+            // too big
+            return -ERANGE;
+         }
+      }
+      else {
+         
+         // copy until '\n'
+         line_len = (size_t)(next_line - cur_line) / sizeof(char);
+         memcpy( line_buf, cur_line, line_len );
+         
+         line_buf[ line_len ] = '\0';
+      }
+      
+      vdev_debug("Preseed device: '%s'\n", line_buf );
+      
+      strcpy( line_buf_dbg, line_buf );
+      
+      vreq = VDEV_CALLOC( struct vdev_device_request, 1 );
+      if( vreq == NULL ) {
+         
+         // OOM 
+         return -ENOMEM;
+      }
+      
+      // consume the line 
+      rc = vdev_parse_device_request( state, vreq, line_buf );
+      if( rc != 0 ) {
+         
+         fprintf(stderr, "Could not parse line '%s' (rc = %d)\n", line_buf_dbg, rc );
+         vdev_error("vdev_parse_device_request('%s') rc = %d\n", line_buf_dbg, rc );
+         
+         free( vreq );
+         return rc;
+      }
+      
+      // enqueue the device!
+      rc = vdev_device_request_enqueue( &state->device_wq, vreq );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_device_request_enqueue('%s') rc = %d\n", line_buf_dbg, rc );
+         
+         free( vreq );
+         return rc;
+      }
+      
+      // next line 
+      cur_line = next_line;
+      consumed += strlen(next_line);
+      
+      while( consumed < text_buflen && *cur_line == '\n' ) {
+         
+         cur_line++;
+         consumed++;
+      }
+   }
+   
+   return rc;
+}
+
+
 // run the pre-seed command, if given 
 // return 0 on success
 // return -ENOMEM on OOM 
@@ -332,21 +603,32 @@ int vdev_preseed_run( struct vdev_state* vdev ) {
    int exit_status = 0;
    char* command = NULL;
    
+   size_t output_len = 1024 * 1024;         // 1MB buffer for initial devices, just in case
+   char* output = NULL;
+   
    if( vdev->config->preseed_path == NULL ) {
       // nothing to do 
       return 0;
+   }
+   
+   output = VDEV_CALLOC( char, output_len );
+   if( output == NULL ) {
+      
+      // OOM 
+      return -ENOMEM;
    }
    
    command = VDEV_CALLOC( char, strlen( vdev->config->preseed_path ) + 2 + strlen( vdev->config->mountpoint ) + 1 );
    if( command == NULL ) {
       
       // OOM
+      free( output );
       return -ENOMEM;
    }
    
    sprintf(command, "%s %s", vdev->config->preseed_path, vdev->config->mountpoint );
    
-   rc = vdev_subprocess( command, NULL, NULL, 0, &exit_status );
+   rc = vdev_subprocess( command, NULL, &output, output_len, &exit_status );
    if( rc != 0 ) {
       
       vdev_error("vdev_subprocess('%s') rc = %d\n", command, rc );
@@ -359,6 +641,22 @@ int vdev_preseed_run( struct vdev_state* vdev ) {
    
    free( command );
    command = NULL;
+   
+   if( rc != 0 ) {
+      
+      free( output );
+      return rc;
+   }
+   
+   // process the preseed devices...
+   rc = vdev_load_device_requests( vdev, output, output_len );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_load_device_requests rc = %d\n", rc);
+   }
+   
+   free( output );
+   output = NULL;
    
    return rc;
 }
