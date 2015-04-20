@@ -200,14 +200,6 @@ int vdev_load_all_at( int dirfd, vdev_dirent_loader_at_t loader_at, void* cls );
 int vdev_mkdirs( char const* dirp, int start, mode_t mode );
 int vdev_rmdirs( char const* dirp );
 
-// passwd/group query
-int vdev_get_passwd( char const* username, struct passwd* pwd, char** pwd_buf );
-int vdev_get_group( char const* groupname, struct group* grp, char** grp_buf );
-int vdev_parse_uid( char const* uid_str, uid_t* uid );
-int vdev_parse_gid( char const* gid_str, gid_t* gid );
-int vdev_validate_uid( uid_t uid );
-int vdev_validate_gid( gid_t gid );
-
 // misc 
 char* vdev_fullpath( char const* root, char const* path, char* dest );
 char* vdev_dirname( char const* path, char* dest );
