@@ -6,7 +6,7 @@
 . $VDEV_HELPERS/subr.sh
 
 # if removing, just blow away the links
-if [ "$VDEV_ACTION" == "remove" ]; then
+if [ "$VDEV_ACTION" = "remove" ]; then
 
    remove_links $VDEV_METADATA
    exit 0

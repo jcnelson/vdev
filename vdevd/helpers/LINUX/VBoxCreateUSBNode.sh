@@ -23,7 +23,7 @@ usb_class_hub=09
 action=$VDEV_ACTION
 do_remove=0
 
-if [ "$action" == "remove" ]; then 
+if [ "$action" = "remove" ]; then 
    do_remove=1;
 else
    do_remove=0;

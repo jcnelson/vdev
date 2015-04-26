@@ -5,7 +5,7 @@
 . $VDEV_HELPERS/subr.sh
 
 # if removing, just remove symlinks
-if [ "$VDEV_ACTION" == "remove" ]; then 
+if [ "$VDEV_ACTION" = "remove" ]; then 
    
    remove_links $VDEV_METADATA
 fi

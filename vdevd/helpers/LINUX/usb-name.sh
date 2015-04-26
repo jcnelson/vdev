@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # only deal with devices we know exist
-if [ "$VDEV_PATH" == "UNKNOWN" ]; then 
+if [ "$VDEV_PATH" = "UNKNOWN" ]; then 
    exit 0
 fi
 

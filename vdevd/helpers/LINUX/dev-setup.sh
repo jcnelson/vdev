@@ -44,7 +44,7 @@ guess_subsystem() {
    local devtype=$1
    local devname=$2
 
-   if [ "$devname" == "snd/seq" ]; then 
+   if [ "$devname" = "snd/seq" ]; then 
       echo "sound"
    fi
 }
@@ -63,11 +63,14 @@ feed_static_nodes_kmod() {
 
     # strip /dev/ from $name
     name=${name#/dev/}
-    
+   
+    # strip bang from $type 
+    type=${type%%\!}
+     
     [ -e $VDEV_MOUNTPOINT/$name ] && continue
 
     # skip directories--vdevd can make them 
-    if [ "$type" == "d" ]; then 
+    if [ "$type" = "d" ]; then 
        continue
     fi
 

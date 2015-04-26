@@ -5,7 +5,7 @@
 . $VDEV_HELPERS/subr.sh
 
 # removing? blow away the symlinks 
-if [ "$VDEV_ACTION" == "remove" ]; then 
+if [ "$VDEV_ACTION" = "remove" ]; then 
 
    remove_links $VDEV_METADATA
    exit 0
@@ -32,7 +32,7 @@ add_capability_link() {
    CAPABILITY=$2
    TARGET=$3
 
-   if [ $CAPABILITY == "1" ]; then
+   if [ $CAPABILITY = "1" ]; then
 
       add_link $VDEV_PATH $VDEV_MOUNTPOINT/$TARGET $VDEV_METADATA
    fi

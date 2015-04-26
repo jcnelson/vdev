@@ -13,7 +13,7 @@
 test -e $VDEV_IFNAMES_PATH || exit 0
 
 # only bother with adding 
-if [ "$VDEV_ACTION" == "remove" ]; then 
+if [ "$VDEV_ACTION" = "remove" ]; then 
    exit 0
 fi
 
@@ -107,7 +107,7 @@ if_devpath() {
       _IF_DEVPATH=$(/bin/readlink $VDEV_OS_SYSFS_MOUNTPOINT/class/net/$_SYSFS_IFNAME | /bin/sed -r 's/^(..\/)+//g')
       _IF_DEVPATH="/$_IF_DEVPATH"
       
-      if [ "$_IF_DEVPATH" == "$_DEVPATH/net/$_SYSFS_IFNAME" ]; then 
+      if [ "$_IF_DEVPATH" = "$_DEVPATH/net/$_SYSFS_IFNAME" ]; then 
          
          # found!
          echo "$_SYSFS_IFNAME"

@@ -8,12 +8,12 @@
 SYSFS_PATH=$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH
 
 # if we don't know the device path, then there's not much we can do...
-if [ "$VDEV_PATH" == "UNKNOWN" ]; then 
+if [ "$VDEV_PATH" = "UNKNOWN" ]; then 
    exit 0
 fi
 
 # if removing, just blow away the symlinks
-if [ "$VDEV_ACTION" == "remove" ]; then 
+if [ "$VDEV_ACTION" = "remove" ]; then 
    
    remove_links $VDEV_METADATA
    exit 0
