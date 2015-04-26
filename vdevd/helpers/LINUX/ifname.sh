@@ -133,6 +133,11 @@ while read IFNAME ID_TYPE ID_ARG; do
       continue 
    fi 
 
+   # skip blank lines 
+   if [ -z "$IFNAME" ]; then 
+      continue 
+   fi
+
    # skip invalid 
    if [ -z "$IFNAME" -o -z "$ID_TYPE" -o -z "$ID_ARG" ]; then 
       vdev_warn "Failed to parse line $LINECNT of $VDEV_IFNAMES_PATH"
