@@ -53,8 +53,7 @@ while read lvs_vars; do
    LVM2_VG_NAME=
    LVM2_VG_FULL_NAME=
    LVM2_VG_FMT=
-
-   echo $lvs_vars >> /tmp/vdev-lvm.log 
+   
    eval $lvs_vars
 
    # find this mapped device's LVM info...   
