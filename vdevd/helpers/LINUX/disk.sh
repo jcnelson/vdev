@@ -123,6 +123,17 @@ if [ -n "$WWN" ]; then
    add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$WWN $VDEV_METADATA
 fi
 
+# is this a physical volume?
+PVS="/sbin/pvs --nameprefixes --noheadings $VDEV_MOUNTPOINT/$VDEV_PATH"
+eval $($PVS -o pv_uuid)
+PVS_RC=$?
+
+if [ $PVS_RC -eq 0 -a -n "$LVM2_PV_UUID" ]; then 
+   
+   # this is a PV
+   add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/lvm-pv-uuid-$LVM2_PV_UUID $VDEV_METADATA
+
+fi
 
 # set ownership and bits 
 /bin/chown root.disk $VDEV_MOUNTPOINT/$VDEV_PATH
