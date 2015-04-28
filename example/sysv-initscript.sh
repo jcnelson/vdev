@@ -145,10 +145,6 @@ vdevd_stop() {
 }
 
 
-# When modifying this script, do not forget that between the time that the
-# new /dev has been mounted and udevadm trigger has been run there will be
-# no /dev/null. This also means that you cannot use the "&" shell command.
-
 case "$1" in
    start)
       
