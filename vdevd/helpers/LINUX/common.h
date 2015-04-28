@@ -54,6 +54,8 @@
 #define log_debug(x, ...) if( DEBUG ) { fprintf(stderr, VDEV_WHERESTR x "\n", VDEV_WHEREARG, __VA_ARGS__); }
 #define log_error(x, ...) if( DEBUG ) { fprintf(stderr,VDEV_WHERESTR x "\n", VDEV_WHEREARG, __VA_ARGS__); }
 
+// hold-overs from udev 
+
 #ifndef memzero 
 #define memzero(b, z) memset( b, 0, z )
 #endif
@@ -89,7 +91,7 @@ struct vdev_property {
    struct vdev_property* next;
 };
 
-// string methods
+// string methods (hold-overs from udev)
 int vdev_util_replace_whitespace(const char *str, char *to, size_t len);
 int vdev_whitelisted_char_for_devnode(char c, const char *white);
 int vdev_utf8_encoded_to_unichar(const char *str);

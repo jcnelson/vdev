@@ -420,8 +420,8 @@ int vdev_property_add( char const* name, char const* value ) {
    return 0;
 }
 
-
 // print all properties as sourceable environmet variables
+// always succeeds
 int vdev_property_print( void ) {
    
    if( vdev_property_head != NULL ) {
@@ -436,6 +436,7 @@ int vdev_property_print( void ) {
 
 
 // free all properties 
+// always succeeds
 int vdev_property_free_all( void ) {
    
    if( vdev_property_head != NULL ) {
