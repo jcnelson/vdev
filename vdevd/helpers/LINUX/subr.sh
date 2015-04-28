@@ -11,7 +11,7 @@ VDEV_PROGNAME=$0
 #  $1  link source 
 #  $2  link target
 #  $3  vdev device metadata directory
-add_link() {
+vdev_symlink() {
 
    local _LINK_SOURCE _LINK_TARGET _METADATA _DIRNAME
    
@@ -35,10 +35,10 @@ add_link() {
    return 0
 }
 
-# remove all of a device's symlinks, stored by add_link.
+# remove all of a device's symlinks, stored by vdev_symlink.
 # arguments: 
 #  $1  vdev device metadata directory
-remove_links() {
+vdev_rmlinks() {
 
    local _METADATA _LINKNAME _DIRNAME 
    
@@ -111,7 +111,7 @@ vdev_error() {
 # log a message to vdev's log and exit 
 #   $1 is the exit code 
 #   $2 is the (optional) message
-fail() {
+vdev_fail() {
 
    local _CODE _MSG 
    
@@ -128,7 +128,7 @@ fail() {
 
 # print the list of device drivers in a sysfs device path 
 #   $1  sysfs device path
-drivers() {
+vdev_drivers() {
    
    local _SYSFS_PATH
    
@@ -152,7 +152,7 @@ drivers() {
 # print the list of subsystems in a sysfs device path 
 #  $1   sysfs device path 
 # NOTE: uniqueness is not guaranteed!
-subsystems() {
+vdev_subsystems() {
 
    local _SYSFS_PATH 
    
@@ -178,7 +178,7 @@ subsystems() {
 # $2   the path to the firmware 
 # return 0 on success
 # return 1 on error
-load_firmware() {
+vdev_firmware_load() {
    
    local _SYSFS_PATH _FIRMWARE_PATH _SYSFS_FIRMWARE_PATH _RC
    
@@ -197,9 +197,93 @@ load_firmware() {
       # abort 
       echo -1 > $_SYSFS_FIRMWARE_PATH/loading
    else 
-      # succes
+      # success
       echo 0 > $_SYSFS_FIRMWARE_PATH/loading
    fi
 
    return $_RC
 }
+
+
+# store a key/value pair into metadata.
+# it will be placed as a top-level file--key cannot have '/' in the name.
+# $1    the key 
+# $2    the value 
+# $3    the metadata directory (will use $VDEV_METADATA if not given)
+# return 0 on success 
+# return nonzero on error 
+vdev_metadata_put() {
+   
+   local _KEY _VALUE _METADATA
+
+   _KEY="$1"
+   _VALUE="$2"
+   _METADATA="$3"
+
+   if [ -z $_METADATA ]; then 
+      _METADATA="$VDEV_METADATA"
+   fi
+
+   echo $_VALUE > $_METADATA/$_KEY
+   return $?
+}
+
+
+# get a key/value metadata pair 
+# write the value to stdout
+# $1   the key 
+# $2   the metadata directory (defaults to $VDEV_METADATA)
+# return 0 on success
+# return 1 on error 
+vdev_metadata_get() {
+
+   local _KEY _VALUE _METADATA _RC
+
+   _KEY="$1"
+   _METADATA="$2"
+
+   if [ -z $_METADATA ]; then 
+      _METADATA="$VDEV_METADATA"
+   fi
+
+   _VALUE=$(/bin/cat $_METADATA/$_KEY)
+   _RC=$?
+
+   if [ $_RC -ne 0 ]; then 
+      return $_RC
+   fi
+
+   echo $_VALUE
+   return 0
+}
+
+
+# set permissions and ownership on a device 
+# do not change permissions if the owner/group isn't defined 
+# $1    the "owner.group" string, to be fed into chmod 
+# $2    the (octal) permissions, to be fed into chown
+# $3    the device path 
+# return 0 on success
+# return 1 on failure 
+vdev_permissions() {
+
+   local _OWNER _MODE _PATH _RC
+   
+   _OWNER="$1"
+   _MODE="$2"
+   _PATH="$3"
+
+   /bin/chown $_OWNER $_PATH
+   _RC=$?
+
+   if [ $_RC -ne 0 ]; then 
+      return $_RC
+   fi
+
+   /bin/chmod $_MODE $_PATH 
+   _RC=$?
+
+   return $_RC
+}
+
+
