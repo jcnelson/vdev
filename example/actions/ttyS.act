@@ -1,4 +1,4 @@
 [vdev-action]
 event=add
 path=^ttyS[0-9]+$
-command=/bin/chown root.dialout $VDEV_MOUNTPOINT/$VDEV_PATH && /bin/chmod 0660 $VDEV_MOUNTPOINT/$VDEV_PATH
+command=. $VDEV_HELPERS/subr.sh; vdev_permissions root.dialout 0660 $VDEV_MOUNTPOINT/$VDEV_PATH

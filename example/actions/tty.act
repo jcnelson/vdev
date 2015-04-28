@@ -1,4 +1,4 @@
 [vdev-action]
 event=add
 path=^tty$
-command=/bin/chown root.tty $VDEV_MOUNTPOINT/$VDEV_PATH && /bin/chmod 0666 $VDEV_MOUNTPOINT/$VDEV_PATH
+command=. $VDEV_HELPERS/subr.sh; vdev_permissions root.tty 0666 $VDEV_MOUNTPOINT/$VDEV_PATH
