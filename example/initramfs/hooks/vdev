@@ -11,15 +11,6 @@ case "$1" in
     ;;
 esac
 
-root_over_the_network() {
-  if   egrep -qs '^/dev/(nbd|nd[a-z]|etherd/e)[^[:space:]]+[[:space:]]+/[[:space:]]' /etc/fstab; then
-    return 0
-  elif egrep -qs '^[^[:space:]#]+[[:space:]]+/[[:space:]]+nfs[234]?[[:space:]]' /etc/fstab; then
-    return 0
-  fi
-  return 1 # false
-}
-
 . /usr/share/initramfs-tools/hook-functions
 
 # helper programs
@@ -45,12 +36,44 @@ mkdir -p $DESTDIR/etc/vdev
 cp -a /etc/vdev/* $DESTDIR/etc/vdev/
 
 # the daemon itself 
-copy_exec /sbin/vdevd /sbin
+copy_exec /sbin/vdevd
 
 # blkid (needed by vdevd's helpers)
-copy_exec /sbin/blkid /sbin
+copy_exec /sbin/blkid
+
+# lvm tools (needed by vdevd's helpers)
+copy_exec /sbin/lvs
+copy_exec /sbin/pvs
+copy_exec /sbin/lvm
+
+# network tools (needed by vdevd's helpers)
+copy_exec /bin/ip
+copy_exec /sbin/ip
+
+# SELinux tools
+copy_exec /sbin/restorecon || true
+
+# device tools
+copy_exec /sbin/MAKEDEV || true
+
+# device mapper tools
+copy_exec /sbin/dmsetup 
+
+# GNU tools (not the busybox equivalents)
+copy_exec /bin/sed
+copy_exec /bin/grep 
+copy_exec /bin/fgrep
+copy_exec /bin/egrep 
+copy_exec /bin/chown /bin/vdev-chown 
+copy_exec /bin/chmod /bin/vdev-chmod
+
+# Linux tools
+copy_exec /bin/kmod 
+
+# users and groups databases
+cp -a /etc/passwd $DESTDIR/etc/passwd
+cp -a /etc/group $DESTDIR/etc/group
 
 # since vdevd is multi-threaded, libpthread will dynamically load libgcc_s
 # (and copy_exec won't detect this)
-copy_exec /lib/`gcc -print-multiarch`/libgcc_s.so.1 /lib/`gcc -print-multiarch`/
-
+copy_exec /lib/`gcc -print-multiarch`/libgcc_s.so.1
