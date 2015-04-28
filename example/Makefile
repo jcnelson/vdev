@@ -51,8 +51,10 @@ initramfs: setup
 	test -e /sbin/vdevd || (echo "You must install vdevd first" && exit 1)
 	test -e /etc/vdev || (echo "You must install vdev's /etc files first" && exit 1)
 	cp -a /usr/share/initramfs-tools/* $(INITRAMFS_ROOT)/
+	cp -a $(VDEV_INITRAMFS)/scripts/* $(PREFIX)/etc/initramfs-tools/scripts/
+	cp -a $(VDEV_INITRAMFS)/hooks/* $(PREFIX)/etc/initramfs-tools/hooks/
 	rm $(INITRAMFS_UDEV_FILES)
-	cp -a $(VDEV_INITRAMFS)/* $(INITRAMFS_ROOT)
+	cp -a $(VDEV_INITRAMFS)/init $(INITRAMFS_ROOT)/
 	$(MKINITRAMFS) -t $(INITRAMFS_ROOT) -o $(CONF_ROOT)/initrd.img-`uname -r`
 
 install:
@@ -62,7 +64,11 @@ install:
 	mkdir -p $(PREFIX)/etc/rcS.d/
 	cp -a $(BUILD_ROOT)/vdev/* $(CONF_DIR)/
 	cp -a $(INITSCRIPT) $(PREFIX)/etc/init.d/
+	update-rc.d udev disable || true
+	update-rc.d udev-finish disable || true
+	[ -f $(PREFIX)/etc/init.d/.udev.disabled ] || mv $(PREFIX)/etc/init.d/udev $(PREFIX)/etc/init.d/.udev.disabled
 	ln -s $(PREFIX)/etc/init.d/vdev $(PREFIX)/etc/rcS.d/S02vdev
+	insserv
 
 .PHONY: clean
 clean:
