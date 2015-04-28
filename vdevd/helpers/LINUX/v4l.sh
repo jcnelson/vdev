@@ -1,19 +1,20 @@
 #!/bin/sh
 
+# video4linux helper 
 
 source $VDEV_HELPERS/subr.sh
 
 # removing? just blow the links away 
 if [ "$VDEV_ACTION" = "remove" ]; then 
 
-   remove_links $VDEV_METADATA
+   vdev_rmlinks $VDEV_METADATA
    exit 0
 fi
 
 # must be adding...
 if [ "$VDEV_ACTION" != "add" ]; then 
 
-   fail 10 "Unknown action \'$VDEV_ACTION\'"
+   vdev_fail 10 "Unknown action \'$VDEV_ACTION\'"
 fi
 
 BUS=
@@ -46,11 +47,14 @@ fi
 
 # did we get everything to make an ID?
 if [ -n "$BUS" -a -n "$INDEX" -a -n "$VENDOR" -a -n "$MODEL" -a -n "$TYPE" ]; then
+   
    ID="$BUS-${VENDOR}_${MODEL}-$TYPE-index${INDEX}"
+   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/v4l/by-id/$ID $VDEV_METADATA
 fi
 
 # TODO: by-path
 
-add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/v4l/by-id/$ID $VDEV_METADATA
+# set up permissions...
+vdev_permissions root.video 0660 $VDEV_MOUNTPOINT/$VDEV_PATH
 
 exit 0

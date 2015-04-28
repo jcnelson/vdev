@@ -7,13 +7,13 @@
 # if removing, just remove symlinks
 if [ "$VDEV_ACTION" = "remove" ]; then 
    
-   remove_links $VDEV_METADATA
+   vdev_rmlinks $VDEV_METADATA
 fi
 
 # make sure we're adding 
 if [ "$VDEV_ACTION" != "add" ]; then 
    
-   fail 10 "Unknown action '$VDEV_ACTION'"
+   vdev_fail 10 "Unknown action '$VDEV_ACTION'"
 fi
 
 # if we're dealing with ALSA controlC[0-9] files, set up persistent paths 
@@ -27,7 +27,10 @@ if [ -n "$(echo $VDEV_PATH | /bin/egrep "controlC[0-9]+")" ]; then
    test -z "$VDEV_PERSISTENT_PATH" && exit 0
 
    # install the path 
-   add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/snd/by-path/$VDEV_PERSISTENT_PATH $VDEV_METADATA
+   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/snd/by-path/$VDEV_PERSISTENT_PATH $VDEV_METADATA
 fi
+
+# set up permissions...
+vdev_permissions root.audio 0660 $VDEV_MOUNTPOINT/$VDEV_PATH
 
 exit 0

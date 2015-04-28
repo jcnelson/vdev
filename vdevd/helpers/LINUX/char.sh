@@ -8,18 +8,17 @@ case "$VDEV_ACTION" in
 
    add)
 
-      add_link ../$VDEV_PATH $VDEV_MOUNTPOINT/char/$VDEV_MAJOR:$VDEV_MINOR $VDEV_METADATA
+      vdev_symlink ../$VDEV_PATH $VDEV_MOUNTPOINT/char/$VDEV_MAJOR:$VDEV_MINOR $VDEV_METADATA
       ;;
 
    remove)
 
-      remove_links $VDEV_METADATA
+      vdev_rmlinks $VDEV_METADATA
       ;;
 
    *)
-      fail 1 "Unknown action '$VDEV_ACTION'"
+      vdev_fail 1 "Unknown action '$VDEV_ACTION'"
       ;;
-
 esac
 
 exit 0

@@ -8,14 +8,14 @@
 # if removing, just blow away the links
 if [ "$VDEV_ACTION" = "remove" ]; then
 
-   remove_links $VDEV_METADATA
+   vdev_rmlinks $VDEV_METADATA
    exit 0
 fi
 
 # make sure we're adding... 
 if [ "$VDEV_ACTION" != "add" ]; then 
 
-   fail 10 "Unknown action '$VDEV_ACTION'"
+   vdev_fail 10 "Unknown action '$VDEV_ACTION'"
 fi
 
 DM_QUERY="/sbin/dmsetup -j $VDEV_MAJOR -m $VDEV_MINOR --noudevrules --noudevsync --noheadings --columns info"
@@ -26,13 +26,13 @@ DM_UUID=$($DM_QUERY -oUUID)
 
 if [ -n "$DM_NAME" ]; then
 
-   add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/dm-name-$DM_NAME $VDEV_METADATA
-   add_link ../$VDEV_PATH $VDEV_MOUNTPOINT/mapper/$DM_NAME $VDEV_METADATA
+   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/dm-name-$DM_NAME $VDEV_METADATA
+   vdev_symlink ../$VDEV_PATH $VDEV_MOUNTPOINT/mapper/$DM_NAME $VDEV_METADATA
 fi
 
 if [ -n "$DM_UUID" ]; then
 
-   add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/dm-uuid-$DM_UUID $VDEV_METADATA
+   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/dm-uuid-$DM_UUID $VDEV_METADATA
 fi
 
 # also add by-uuid link 
@@ -40,7 +40,7 @@ UUID=
 eval $(/sbin/blkid -o export $VDEV_MOUNTPOINT/$VDEV_PATH)
 
 if [ -n "$UUID" ]; then
-   add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-uuid/$UUID $VDEV_METADATA 
+   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-uuid/$UUID $VDEV_METADATA 
 fi
 
 # create all logical volume links
@@ -73,12 +73,11 @@ while read lvs_vars; do
 
    # create the LVM link for this mapped device
    /bin/mkdir -p $VDEV_MOUNTPOINT/$LVM2_VG_NAME
-   add_link ../$VDEV_PATH $VDEV_MOUNTPOINT/$LVM2_VG_NAME/$LVM2_LV_NAME $VDEV_METADATA
+   vdev_symlink ../$VDEV_PATH $VDEV_MOUNTPOINT/$LVM2_VG_NAME/$LVM2_LV_NAME $VDEV_METADATA
 
 done
 
 # set ownership and bits 
-/bin/chown root.disk $VDEV_MOUNTPOINT/$VDEV_PATH
-/bin/chmod 0660 $VDEV_MOUNTPOINT/$VDEV_PATH
+vdev_permissions root.disk 0660 $VDEV_MOUNTPOINT/$VDEV_PATH
 
 exit 0

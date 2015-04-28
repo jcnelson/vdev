@@ -8,14 +8,14 @@
 # if we're removing this disk, just blow away its symlinks
 if [ "$VDEV_ACTION" = "remove" ]; then 
 
-   remove_links $VDEV_METADATA
+   vdev_rmlinks $VDEV_METADATA
    exit 0
 fi
 
 # otherwise, we're adding links.  Make sure...
 if [ "$VDEV_ACTION" != "add" ]; then 
 
-   fail 10 "Unknown action '$VDEV_ACTION'"
+   vdev_fail 10 "Unknown action '$VDEV_ACTION'"
 fi
 
 # is this an ATA disk?
@@ -65,16 +65,16 @@ case "$DISK_TYPE" in
    *)
       
       # unknown type
-      fail 2 "Unknown disk type '$DISK_TYPE'"
+      vdev_fail 2 "Unknown disk type '$DISK_TYPE'"
       ;;
 
 esac
 
 # verify stat'ing succeeded; otherwise we're done (can't label by id)
-test 0 -ne $STAT_RET && fail 3 "stat_${DISK_TYPE} exited with $STAT_RET"
+test 0 -ne $STAT_RET && vdev_fail 3 "stat_${DISK_TYPE} exited with $STAT_RET"
 
 # verify that we got a disk ID; otherwise we're done (no label to set)
-test -z "$DISK_ID" && fail 4 "unknown disk ID"
+test -z "$DISK_ID" && vdev_fail 4 "unknown disk ID"
 
 # put label into place
 DISK_NAME="$DISK_TYPE-$DISK_ID"
@@ -85,7 +85,7 @@ if [ "$VDEV_OS_DEVTYPE" = "partition" ]; then
 
    PART=$(/bin/cat $VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH/partition)
 
-   test -z $PART && fail 5 "unknown partition"
+   test -z $PART && vdev_fail 5 "unknown partition"
 
    # include partition ID in the disk name
    PART_NAME="part${PART}"
@@ -110,17 +110,17 @@ fi
   
 # add the disk
 if [ -n "$UUID" ]; then
-   add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-uuid/$UUID $VDEV_METADATA 
+   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-uuid/$UUID $VDEV_METADATA 
 fi
 
-add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$DISK_NAME $VDEV_METADATA
+vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$DISK_NAME $VDEV_METADATA
 
 if [ -n "$LABEL" ]; then 
-   add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-label/$LABEL $VDEV_METADATA
+   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-label/$LABEL $VDEV_METADATA
 fi
 
 if [ -n "$WWN" ]; then
-   add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$WWN $VDEV_METADATA
+   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$WWN $VDEV_METADATA
 fi
 
 # is this a physical volume?
@@ -131,12 +131,11 @@ PVS_RC=$?
 if [ $PVS_RC -eq 0 -a -n "$LVM2_PV_UUID" ]; then 
    
    # this is a PV
-   add_link ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/lvm-pv-uuid-$LVM2_PV_UUID $VDEV_METADATA
+   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/lvm-pv-uuid-$LVM2_PV_UUID $VDEV_METADATA
 
 fi
 
 # set ownership and bits 
-/bin/chown root.disk $VDEV_MOUNTPOINT/$VDEV_PATH
-/bin/chmod 0660 $VDEV_MOUNTPOINT/$VDEV_PATH
+vdev_permissions root.disk 0660 $VDEV_MOUNTPOINT/$VDEV_PATH
 
 exit 0
