@@ -36,6 +36,8 @@
 #include <sys/ioctl.h>
 #include <linux/cdrom.h>
 
+#include "common.h"
+
 // get drive capabilities from an open device node, using the Linux-specific CDROM_GET_CAPABILITY ioctl.
 // return 0 on success
 // return negative errno on error
@@ -60,11 +62,14 @@ static int stat_optical_get_caps( int fd ) {
 // print out optical capabilities as environment variables 
 static int stat_optical_print_caps( int capabilities ) {
    
-   printf("VDEV_OPTICAL_CD_R=%d\n", (capabilities & CDC_CD_R) == 0 ? 0 : 1 );
-   printf("VDEV_OPTICAL_CD_RW=%d\n", (capabilities & CDC_CD_RW) == 0 ? 0 : 1 );
-   printf("VDEV_OPTICAL_DVD=%d\n", (capabilities & CDC_DVD) == 0 ? 0 : 1 );
-   printf("VDEV_OPTICAL_DVD_R=%d\n", (capabilities & CDC_DVD_R) == 0 ? 0 : 1 );
-   printf("VDEV_OPTICAL_DVD_RAM=%d\n", (capabilities & CDC_DVD_RAM) == 0 ? 0 : 1 );
+   vdev_property_add( "VDEV_OPTICAL_CD_R", (capabilities & CDC_CD_R) == 0 ? "0" : "1" );
+   vdev_property_add( "VDEV_OPTICAL_CD_RW", (capabilities & CDC_CD_R) == 0 ? "0" : "1" );
+   vdev_property_add( "VDEV_OPTICAL_DVD", (capabilities & CDC_DVD) == 0 ? "0" : "1" );
+   vdev_property_add( "VDEV_OPTICAL_DVD_R", (capabilities & CDC_DVD_R) == 0 ? "0" : "1" );
+   vdev_property_add( "VDEV_OPTICAL_DVD_RAM", (capabilities & CDC_DVD_RAM) == 0 ? "0" : "1" );
+   
+   vdev_property_print();
+   vdev_property_free_all();
    
    return 0;
 }

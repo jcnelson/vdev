@@ -37,6 +37,8 @@
 #include <sys/ioctl.h>
 #include <linux/videodev2.h>
 
+#include "common.h"
+
 int main(int argc, char *argv[]) {
    static const struct option options[] = {
       { "help", no_argument, NULL, 'h' },
@@ -46,6 +48,9 @@ int main(int argc, char *argv[]) {
    int fd = 0;
    char *device;
    struct v4l2_capability v2cap;
+   char cap_str[4097];
+   
+   memset( cap_str, 0, 4097 );
 
    for (;;) {
       int option;
@@ -79,30 +84,44 @@ int main(int argc, char *argv[]) {
    }
 
    if (ioctl(fd, VIDIOC_QUERYCAP, &v2cap) == 0) {
-      printf("VDEV_V4L_VERSION=2\n");
-      printf("VDEV_V4L_PRODUCT=%s\n", v2cap.card);
-      printf("VDEV_V4L_CAPABILITIES=:");
+      
+      vdev_property_add("VDEV_V4L_VERSION", "2");
+      vdev_property_add("VDEV_V4L_PRODUCT", (char*)v2cap.card );
+      
+      strcat( cap_str, ":" );
+      
       if ((v2cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) > 0) {
-            printf("capture:");
+         
+         strcat( cap_str, "capture:" );
       }
       if ((v2cap.capabilities & V4L2_CAP_VIDEO_OUTPUT) > 0) {
-            printf("video_output:");
+         
+         strcat( cap_str, "video_output:" );
       }
       if ((v2cap.capabilities & V4L2_CAP_VIDEO_OVERLAY) > 0) {
-            printf("video_overlay:");
+         
+         strcat( cap_str, "video_overlay:" );
       }
       if ((v2cap.capabilities & V4L2_CAP_AUDIO) > 0) {
-            printf("audio:");
+         
+         strcat( cap_str, "audio:" );
       }
       if ((v2cap.capabilities & V4L2_CAP_TUNER) > 0) {
-            printf("tuner:");
+         
+         strcat( cap_str, "tuner:" );
       }
       if ((v2cap.capabilities & V4L2_CAP_RADIO) > 0) {
-            printf("radio:");
+         
+         strcat( cap_str, "radio:" );
       }
-      printf("\n");
+      
+      vdev_property_add( "VDEV_V4L_CAPABILITIES", cap_str );
    }
 
    close( fd );
+   
+   vdev_property_print();
+   vdev_property_free_all();
+   
    return 0;
 }

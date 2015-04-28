@@ -533,105 +533,168 @@ int main(int argc, char **argv ) {
 
 
    /* Set this to convey the disk speaks the ATA protocol */
-   printf("VDEV_ATA=1\n");
+   vdev_property_add( "VDEV_ATA", "1" );
 
    if ((id.config >> 8) & 0x80) {
       /* This is an ATAPI device */
       switch ((id.config >> 8) & 0x1f) {
       case 0:
-         printf("VDEV_ATA_TYPE=cd\n");
+         
+         vdev_property_add( "VDEV_ATA_TYPE", "cd" );
          break;
+         
       case 1:
-         printf("VDEV_ATA_TYPE=tape\n");
+         
+         vdev_property_add("VDEV_ATA_TYPE", "tape" );
          break;
+         
       case 5:
-         printf("VDEV_ATA_TYPE=cd\n");
+         
+         vdev_property_add("VDEV_ATA_TYPE", "cd" );
          break;
+         
       case 7:
-         printf("VDEV_ATA_TYPE=optical\n");
+         
+         vdev_property_add("VDEV_ATA_TYPE", "optical" );
          break;
+         
       default:
-         printf("VDEV_ATA_TYPE=generic\n");
+         
+         vdev_property_add("VDEV_ATA_TYPE", "generic" );
          break;
       }
-   } else {
-      printf("VDEV_ATA_TYPE=disk\n");
    }
-   printf("VDEV_ATA_MODEL=%s\n", model);
-   printf("VDEV_ATA_MODEL_ENC=%s\n", model_enc);
-   printf("VDEV_ATA_REVISION=%s\n", revision);
+   else {
+      
+      vdev_property_add("VDEV_ATA_TYPE", "disk" );
+   }
+   
+   vdev_property_add("VDEV_ATA_MODEL", model );
+   vdev_property_add("VDEV_ATA_MODEL_ENC", model_enc );
+   vdev_property_add("VDEV_ATA_REVISION", revision );
+   
    if (serial[0] != '\0') {
-      printf("VDEV_ATA_SERIAL=%s_%s\n", model, serial);
-      printf("VDEV_ATA_SERIAL_SHORT=%s\n", serial);
-   } else {
-      printf("VDEV_ATA_SERIAL=%s\n", model);
+      
+      char serial_buf[100];
+      memset( serial_buf, 0, 100 );
+      
+      snprintf( serial_buf, 99, "%s_%s", model, serial );
+      
+      vdev_property_add("VDEV_ATA_SERIAL", serial_buf );
+      vdev_property_add("VDEV_ATA_SERIAL_SHORT", serial );
+      
+   }
+   else {
+      
+      vdev_property_add("VDEV_ATA_SERIAL", model );
    }
 
    if (id.command_set_1 & (1<<5)) {
-      printf("VDEV_ATA_WRITE_CACHE=1\n");
-      printf("VDEV_ATA_WRITE_CACHE_ENABLED=%d\n", (id.cfs_enable_1 & (1<<5)) ? 1 : 0);
+      
+      vdev_property_add("VDEV_ATA_WRITE_CACHE", "1" );
+      vdev_property_add("VDEV_ATA_WRITE_CACHE_ENABLED", (id.cfs_enable_1 & (1<<5)) ? "1" : "0" );
    }
    if (id.command_set_1 & (1<<10)) {
-      printf("VDEV_ATA_FEATURE_SET_HPA=1\n");
-      printf("VDEV_ATA_FEATURE_SET_HPA_ENABLED=%d\n", (id.cfs_enable_1 & (1<<10)) ? 1 : 0);
-
+      
+      vdev_property_add("VDEV_ATA_FEATURE_SET_HPA", "1" );
+      vdev_property_add("VDEV_ATA_FEATURE_SET_HPA_ENABLED", (id.cfs_enable_1 & (1<<10)) ? "1" : "0");
+      
       /*
          * TODO: use the READ NATIVE MAX ADDRESS command to get the native max address
          * so it is easy to check whether the protected area is in use.
          */
    }
    if (id.command_set_1 & (1<<3)) {
-      printf("VDEV_ATA_FEATURE_SET_PM=1\n");
-      printf("VDEV_ATA_FEATURE_SET_PM_ENABLED=%d\n", (id.cfs_enable_1 & (1<<3)) ? 1 : 0);
+      
+      vdev_property_add("VDEV_ATA_FEATURE_SET_PM", "1" );
+      vdev_property_add("VDEV_ATA_FEATURE_SET_PM_ENABLED", (id.cfs_enable_1 & (1<<3)) ? "1" : "0");
    }
    if (id.command_set_1 & (1<<1)) {
-      printf("VDEV_ATA_FEATURE_SET_SECURITY=1\n");
-      printf("VDEV_ATA_FEATURE_SET_SECURITY_ENABLED=%d\n", (id.cfs_enable_1 & (1<<1)) ? 1 : 0);
-      printf("VDEV_ATA_FEATURE_SET_SECURITY_ERASE_UNIT_MIN=%d\n", id.trseuc * 2);
+      
+      char buf[100];
+      memset( buf, 0, 100 );
+      snprintf( buf, 99, "%d", id.trseuc * 2 );
+      
+      vdev_property_add("VDEV_ATA_FEATURE_SET_SECURITY", "1" );
+      vdev_property_add("VDEV_ATA_FEATURE_SET_SECURITY_ENABLED", (id.cfs_enable_1 & (1<<1)) ? "1" : "0");
+      vdev_property_add("VDEV_ATA_FEATURE_SET_SECURITY_ERASE_UNIT_MIN", buf );
+      
       if ((id.cfs_enable_1 & (1<<1))) /* enabled */ {
+         
          if (id.dlf & (1<<8)) {
-            printf("VDEV_ATA_FEATURE_SET_SECURITY_LEVEL=maximum\n");
+            
+            vdev_property_add( "VDEV_ATA_FEATURE_SET_SECURITY_LEVEL", "maximum" );
          }
          else {
-            printf("VDEV_ATA_FEATURE_SET_SECURITY_LEVEL=high\n");
+            
+            vdev_property_add("VDEV_ATA_FEATURE_SET_SECURITY_LEVEL", "high" );
          }
       }
       if (id.dlf & (1<<5)) {
-         printf("VDEV_ATA_FEATURE_SET_SECURITY_ENHANCED_ERASE_UNIT_MIN=%d\n", id.trsEuc * 2);
+         
+         memset( buf, 0, 100 );
+         snprintf( buf, 99, "%d", id.trsEuc * 2 );
+         
+         vdev_property_add("VDEV_ATA_FEATURE_SET_SECURITY_ENHANCED_ERASE_UNIT_MIN", buf );
       }
       if (id.dlf & (1<<4)) {
-         printf("VDEV_ATA_FEATURE_SET_SECURITY_EXPIRE=1\n");
+         
+         vdev_property_add("VDEV_ATA_FEATURE_SET_SECURITY_EXPIRE", "1" );
       }
       if (id.dlf & (1<<3)) {
-         printf("VDEV_ATA_FEATURE_SET_SECURITY_FROZEN=1\n");
+         
+         vdev_property_add("VDEV_ATA_FEATURE_SET_SECURITY_FROZEN", "1" );
       }
       if (id.dlf & (1<<2)) {
-         printf("VDEV_ATA_FEATURE_SET_SECURITY_LOCKED=1\n");
+         
+         vdev_property_add("VDEV_ATA_FEATURE_SET_SECURITY_LEVEL", "1" );
       }
    }
    if (id.command_set_1 & (1<<0)) {
-      printf("VDEV_ATA_FEATURE_SET_SMART=1\n");
-      printf("VDEV_ATA_FEATURE_SET_SMART_ENABLED=%d\n", (id.cfs_enable_1 & (1<<0)) ? 1 : 0);
+      
+      vdev_property_add("VDEV_ATA_FEATURE_SET_SMART", "1" );
+      vdev_property_add("VDEV_ATA_FEATURE_SET_SMART_ENABLED", (id.cfs_enable_1 & (1<<0)) ? "1" : "0");
    }
    if (id.command_set_2 & (1<<9)) {
-      printf("VDEV_ATA_FEATURE_SET_AAM=1\n");
-      printf("VDEV_ATA_FEATURE_SET_AAM_ENABLED=%d\n", (id.cfs_enable_2 & (1<<9)) ? 1 : 0);
-      printf("VDEV_ATA_FEATURE_SET_AAM_VENDOR_RECOMMENDED_VALUE=%d\n", id.acoustic >> 8);
-      printf("VDEV_ATA_FEATURE_SET_AAM_CURRENT_VALUE=%d\n", id.acoustic & 0xff);
+      
+      char aam_buf[100];
+      char aam_cur_buf[100];
+      
+      memset( aam_buf, 0, 100 );
+      memset( aam_cur_buf, 0, 100 );
+      
+      snprintf( aam_buf, 99, "%d", id.acoustic >> 8 );
+      snprintf( aam_cur_buf, 99, "%d", id.acoustic & 0xff );
+      
+      vdev_property_add("VDEV_ATA_FEATURE_SET_AAM", "1" );
+      vdev_property_add("VDEV_ATA_FEATURE_SET_AAM_ENABLED", (id.cfs_enable_2 & (1<<9)) ? "1" : "0");
+      vdev_property_add("VDEV_ATA_FEATURE_SET_AAM_VENDOR_RECOMMENDED_VALUE", aam_buf );
+      vdev_property_add("VDEV_ATA_FEATURE_SET_AAM_CURRENT_VALUE", aam_cur_buf );
    }
    if (id.command_set_2 & (1<<5)) {
-      printf("VDEV_ATA_FEATURE_SET_PUIS=1\n");
-      printf("VDEV_ATA_FEATURE_SET_PUIS_ENABLED=%d\n", (id.cfs_enable_2 & (1<<5)) ? 1 : 0);
+      
+      vdev_property_add("VDEV_ATA_FEATURE_SET_PUIS", "1" );
+      vdev_property_add("VDEV_ATA_FEATURE_SET_PUIS_ENABLED", (id.cfs_enable_2 & (1<<5)) ? "1" : "0");
    }
    if (id.command_set_2 & (1<<3)) {
-      printf("VDEV_ATA_FEATURE_SET_APM=1\n");
-      printf("VDEV_ATA_FEATURE_SET_APM_ENABLED=%d\n", (id.cfs_enable_2 & (1<<3)) ? 1 : 0);
+      
+      vdev_property_add("VDEV_ATA_FEATURE_SET_APM", "1" );
+      vdev_property_add("VDEV_ATA_FEATURE_SET_APM_ENABLED", (id.cfs_enable_2 & (1<<3)) ? "1" : "0");
+      
       if ((id.cfs_enable_2 & (1<<3))) {
-         printf("VDEV_ATA_FEATURE_SET_APM_CURRENT_VALUE=%d\n", id.CurAPMvalues & 0xff);
+         
+         char apm_cur_buf[100];
+         
+         memset( apm_cur_buf, 0, 100 );
+         
+         snprintf( apm_cur_buf, 99, "%d", id.CurAPMvalues & 0xff );
+         
+         vdev_property_add("VDEV_ATA_FEATURE_SET_APM_CURRENT_VALUE", apm_cur_buf );
       }
    }
    if (id.command_set_2 & (1<<0)) {
-      printf("VDEV_ATA_DOWNLOAD_MICROCODE=1\n");
+      
+      vdev_property_add("VDEV_ATA_DOWNLOAD_MICROCODE", "1" );
    }
 
    /*
@@ -643,7 +706,8 @@ int main(int argc, char **argv ) {
 
    word = identify.wyde[76];
    if (word != 0x0000 && word != 0xffff) {
-      printf("VDEV_ATA_SATA=1\n");
+      
+      vdev_property_add("VDEV_ATA_SATA", "1" );
       /*
          * If bit 2 of word 76 is set to one, then the device supports the Gen2
          * signaling rate of 3.0 Gb/s (see SATA 2.6).
@@ -652,20 +716,30 @@ int main(int argc, char **argv ) {
          * signaling rate of 1.5 Gb/s (see SATA 2.6).
          */
       if (word & (1<<2)) {
-         printf("VDEV_ATA_SATA_SIGNAL_RATE_GEN2=1\n");
+         
+         vdev_property_add("VDEV_ATA_SATA_SIGNAL_RATE_GEN2", "1" );
       }
       if (word & (1<<1)) {
-         printf("VDEV_ATA_SATA_SIGNAL_RATE_GEN1=1\n");
+         
+         vdev_property_add("VDEV_ATA_SATA_SIGNAL_RATE_GEN1", "1" );
       }
    }
 
    /* Word 217 indicates the nominal media rotation rate of the device */
    word = identify.wyde[217];
    if (word == 0x0001) {
-      printf ("VDEV_ATA_ROTATION_RATE_RPM=0\n"); /* non-rotating e.g. SSD */
+      
+      vdev_property_add("VDEV_ATA_ROTATION_RATE_RPM", "0" );
    }
    else if (word >= 0x0401 && word <= 0xfffe) {
-      printf ("VDEV_ATA_ROTATION_RATE_RPM=%d\n", word);
+      
+      char rpm_buf[100];
+      
+      memset( rpm_buf, 0, 100 );
+      
+      snprintf( rpm_buf, 99, "%d", word );
+      
+      vdev_property_add("VDEV_ATA_ROTATION_RATE_RPM", rpm_buf );
    }
 
    /*
@@ -676,16 +750,26 @@ int main(int argc, char **argv ) {
    word = identify.wyde[108];
    if ((word & 0xf000) == 0x5000) {
       
-      printf("VDEV_ATA_WWN=0x%04x%04x%04x%04x\n", identify.wyde[108], identify.wyde[109], identify.wyde[110], identify.wyde[111]);
-      printf("VDEV_ATA_WWN_WITH_EXTENSION=0x%04x%04x%04x%04x\n", identify.wyde[108], identify.wyde[109], identify.wyde[110], identify.wyde[111]);
+      char wwn_buf[100];
+      
+      memset( wwn_buf, 0, 100 );
+      
+      snprintf( wwn_buf, 99, "0x%04x%04x%04x%04x\n", identify.wyde[108], identify.wyde[109], identify.wyde[110], identify.wyde[111]);
+      
+      vdev_property_add("VDEV_ATA_WWN", wwn_buf );
+      vdev_property_add("VDEV_ATA_WWN_WITH_EXTENSION", wwn_buf );
    }
 
    /* from Linux's include/linux/ata.h */
    if (identify.wyde[0] == 0x848a ||
       identify.wyde[0] == 0x844a ||
       (identify.wyde[83] & 0xc004) == 0x4004) {
-         printf("VDEV_ATA_CFA=1\n");
+      
+      vdev_property_add("VDEV_ATA_CFA", "1" );
    }
+   
+   vdev_property_print();
+   vdev_property_free_all();
    
    return 0;
 }

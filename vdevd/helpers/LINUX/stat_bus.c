@@ -56,6 +56,7 @@ int main( int argc, char** argv ) {
    
    char* next_bus = NULL;
    char subsystem_list[ 4097 ];
+   char subsystem_list_uniq[ 4097 ];
    char* delim = NULL;
    char* subsystem_buf = (char*)calloc( strlen(argv[1]) + strlen("/subsystem") + 1, 1 );
    char readlink_buf[ 4097 ];
@@ -68,6 +69,7 @@ int main( int argc, char** argv ) {
    
    next_bus = argv[1];
    memset( subsystem_list, 0, 4097 );
+   memset( subsystem_list_uniq, 0, 4097 );
    
    // directory must exist 
    rc = stat( next_bus, &sb );
@@ -135,6 +137,15 @@ int main( int argc, char** argv ) {
       }
       strncat( subsystem_list, delim + 1, 4096 - strlen(subsystem_list) - 1 );
       
+      if( strstr( subsystem_list_uniq, delim + 1 ) == NULL ) {
+         
+         // haven't seen this subsystem name before...
+         if( subsystem_list_uniq[0] != 0 ) {
+            strncat( subsystem_list_uniq, ",", 4096 - strlen(subsystem_list_uniq) - 1 );
+         }
+         strncat( subsystem_list_uniq, delim + 1, 4096 - strlen(subsystem_list_uniq) - 1 );
+      }
+      
       rc = remove_child( next_bus );
       if( rc != 0 ) {
          break;
@@ -147,6 +158,7 @@ int main( int argc, char** argv ) {
    free( subsystem_buf );
    
    vdev_property_add( "VDEV_BUS_SUBSYSTEMS", subsystem_list );
+   vdev_property_add( "VDEV_BUS_SUBSYSTEMS_UNIQ", subsystem_list_uniq );
    
    vdev_property_print();
    vdev_property_free_all();

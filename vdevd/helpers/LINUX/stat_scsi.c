@@ -1584,42 +1584,59 @@ static int scsi_id( char *maj_min_dev) {
 
    char serial_str[MAX_SERIAL_LEN];
 
-   printf("VDEV_SCSI=1\n");
-   printf("VDEV_SCSI_VENDOR=%s\n", vendor_str);
-   printf("VDEV_SCSI_VENDOR_ENC=%s\n", vendor_enc_str);
-   printf("VDEV_SCSI_MODEL=%s\n", model_str);
-   printf("VDEV_SCSI_MODEL_ENC=%s\n", model_enc_str);
-   printf("VDEV_SCSI_REVISION=%s\n", revision_str);
-   printf("VDEV_SCSI_TYPE=%s\n", type_str);
+   vdev_property_add("VDEV_SCSI", "1" );
+   vdev_property_add("VDEV_SCSI_VENDOR", vendor_str );
+   vdev_property_add("VDEV_SCSI_VENDOR_ENC", vendor_enc_str );
+   vdev_property_add("VDEV_SCSI_MODEL", model_str );
+   vdev_property_add("VDEV_SCSI_MODEL_ENC", model_enc_str );
+   vdev_property_add("VDEV_SCSI_REVISION", revision_str );
+   vdev_property_add("VDEV_SCSI_TYPE", type_str );
    
    if (dev_scsi.serial[0] != '\0') {
       
       vdev_util_replace_whitespace(dev_scsi.serial, serial_str, sizeof(serial_str));
       vdev_util_replace_chars(serial_str, NULL);
-      printf("VDEV_SCSI_SERIAL=%s\n", serial_str);
+      
+      vdev_property_add("VDEV_SCSI_SERIAL", serial_str );
       
       vdev_util_replace_whitespace(dev_scsi.serial_short, serial_str, sizeof(serial_str));
       vdev_util_replace_chars(serial_str, NULL);
-      printf("VDEV_SCSI_SERIAL_SHORT=%s\n", serial_str);
+      
+      vdev_property_add("VDEV_SCSI_SERIAL_SHORT", serial_str );
    }
    if (dev_scsi.wwn[0] != '\0') {
       
-      printf("VDEV_SCSI_WWN=0x%s\n", dev_scsi.wwn);
+      char wwn_buf[100];
+      char wwn_vendor_buf[100];
+      
+      memset( wwn_buf, 0, 100 );
+      memset( wwn_vendor_buf, 0, 100 );
+      
+      vdev_property_add("VDEV_SCSI_WWN", dev_scsi.wwn );
       
       if (dev_scsi.wwn_vendor_extension[0] != '\0') {
          
-         printf("VDEV_SCSI_WWN_VENDOR_EXTENSION=0x%s\n", dev_scsi.wwn_vendor_extension);
-         printf("VDEV_SCSI_WWN_WITH_EXTENSION=0x%s%s\n", dev_scsi.wwn, dev_scsi.wwn_vendor_extension);
+         snprintf( wwn_buf, 99, "0x%s%s", dev_scsi.wwn, dev_scsi.wwn_vendor_extension );
+         snprintf( wwn_vendor_buf, 99, "0x%s", dev_scsi.wwn_vendor_extension );
+         
+         vdev_property_add("VDEV_SCSI_WWN_VENDOR_EXTENSION", wwn_vendor_buf );
+         vdev_property_add("VDEV_SCSI_WWN_WITH_EXTENSION", wwn_buf );
       }
+      
       else {
-         printf("VDEV_SCSI_WWN_WITH_EXTENSION=0x%s\n", dev_scsi.wwn);
+         
+         snprintf( wwn_buf, 99, "0x%s", dev_scsi.wwn );
+         
+         vdev_property_add("VDEV_SCSI_WWN_WITH_EXTENSION", wwn_buf );
       }
    }
    if (dev_scsi.tgpt_group[0] != '\0') {
-      printf("VDEV_SCSI_TARGET_PORT=%s\n", dev_scsi.tgpt_group);
+      
+      vdev_property_add("VDEV_SCSI_TARGET_PORT", dev_scsi.tgpt_group );
    }
    if (dev_scsi.unit_serial_number[0] != '\0') {
-      printf("VDEV_SCSI_UNIT_SERIAL=%s\n", dev_scsi.unit_serial_number);
+      
+      vdev_property_add("VDEV_SCSI_UNIT_SERIAL", dev_scsi.unit_serial_number );
    }
 
    return retval;
@@ -1675,6 +1692,9 @@ exit:
       free(newargv[0]);
       free(newargv);
    }
+   
+   vdev_property_print();
+   vdev_property_free_all();
    
    return retval;
 }
