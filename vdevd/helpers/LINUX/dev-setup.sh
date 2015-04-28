@@ -15,6 +15,8 @@
 
 VDEV_MOUNTPOINT=$1
 
+umask 022
+
 # add /dev/fd
 /bin/ln -sf /proc/self/fd $VDEV_MOUNTPOINT/fd
 
@@ -38,7 +40,6 @@ fi
 
 # add /dev/shm
 test -d $VDEV_MOUNTPOINT/shm || /bin/ln -sf /run/shm $VDEV_MOUNTPOINT/shm
-
 
 # guess the subsystem if /sys/dev/{block,char}/$major:$minor isn't helpful.
 # print it to stdout
