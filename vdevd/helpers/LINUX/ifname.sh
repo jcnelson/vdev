@@ -23,6 +23,11 @@ fi
 # $2    original interface name 
 rename_if() {
    
+   local _IFNAME
+   local _IFNAME_ORIG 
+   local _IF_IS_DOWN 
+   local _RC 
+   
    _IFNAME="$1"
    _IFNAME_ORIG="$2"
 
@@ -82,6 +87,9 @@ rename_if() {
 # print out the name of the interface
 if_mac() {
    
+   local _MAC 
+   local _IFNAME 
+   
    _MAC="$1"
 
    /bin/ip link | /bin/grep -B 1 -i "$_MAC" | \
@@ -99,6 +107,10 @@ if_mac() {
 # $1    device path (starts with /devices)
 # print out the name of the interface, if found 
 if_devpath() {
+   
+   local _DEVPATH 
+   local _IF_DEVPATH
+   local _SYSFS_IFNAME
    
    _DEVPATH="$1"
    
