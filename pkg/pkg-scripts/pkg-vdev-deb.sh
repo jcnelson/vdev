@@ -5,11 +5,16 @@ if ! [ $1 ]; then
    exit 1
 fi
 
+which fpm || (echo "Could not find the fpm tool in your PATH."; exit 1)
+
 ROOT=$1
 NAME="vdev"
 VERSION="0.$(date +%Y\%m\%d\%H\%M\%S)"
+MAINTAINER="judecn@devuan.org"
+URL="https://git.devuan.org/pkgs-utopia-substitution/vdev"
+DESC="A virtual device manager, alpha unstable build.  DO NOT INSTALL ON A PRODUCTION SYSTEM.  DO NOT INSTALL UNLESS YOU KNOW HOW TO FIX A BROKEN SYSTEM."
 
-DEPS="libpstat libfskit-fuse"
+DEPS=$(cat ../dependencies.txt)
 
 DEPARGS=""
 for pkg in $DEPS; do
@@ -18,7 +23,7 @@ done
 
 source /usr/local/rvm/scripts/rvm
 
-rm -f $NAME-0*.deb
+#rm -f $NAME-0*.deb
 
-fpm --force -s dir -t deb -a $(uname -m) -v $VERSION -n $NAME $DEPARGS -C $ROOT --license "GPLv3+/ISC" --maintainer "Jude Nelson <judecn@gmail.com>" --url "https://github.com/jcnelson/runfs" --description "Virtual device filesystem." $(ls $ROOT)
+echo "fpm --force -s dir -t deb -a $(uname -m) -v $VERSION -n $NAME $DEPARGS -C $ROOT --license "GPLv3+/ISC" --maintainer $MAINTAINER --url $URL --description $DESC $(ls $ROOT)"
 

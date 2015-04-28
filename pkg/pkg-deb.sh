@@ -32,7 +32,7 @@ build_package() {
 
 rm -rf $BUILD
 
-# build runfs 
+# build vdev 
 build_package ../ vdev install pkg-vdev-deb.sh /usr/local
 
 rm -rf $BUILD
