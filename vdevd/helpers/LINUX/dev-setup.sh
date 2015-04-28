@@ -4,8 +4,14 @@
 # usage: dev-setup.sh /path/to/dev
 # Populate /dev with extra files that vdevd won't create, but are 
 # necessary for correct operation.
-# Write to stdout any "$type $name $PARAM=$VALUE..." strings for
-# devices that vdevd should process before creating.
+# Write to stdout any "$type $name $major $minor $PARAM=$VALUE..." strings for
+# devices that vdevd should create.
+#   $type is "c" or "b" for char or block devices, respectively 
+#   $name is the relative path to the device 
+#   $major is the major device number (pass 0 if not needed)
+#   $minor is the minor device number (pass 0 if not needed)
+#   $PARAM=$VALUE is an OS-specific parameter to be passed as a
+#      VDEV_OS_${PARAM} environment variable to vdev helpers
 
 VDEV_MOUNTPOINT=$1
 
@@ -15,9 +21,8 @@ VDEV_MOUNTPOINT=$1
 # add /dev/core 
 /bin/ln -sf /proc/kcore $VDEV_MOUNTPOINT/core
 
-# add /dev/null
-/bin/mknod /dev/null c 1 3
-/bin/chmod 0666 /dev/null
+# feed /dev/null into vdev
+echo "c null 1 3"
 
 # add /dev/stdin, /dev/stdout, /dev/stderr
 /bin/ln -sf /proc/self/fd/0 $VDEV_MOUNTPOINT/stdin
@@ -66,7 +71,7 @@ feed_static_nodes_kmod() {
    
     # strip bang from $type 
     type=${type%%\!}
-     
+    
     [ -e $VDEV_MOUNTPOINT/$name ] && continue
 
     # skip directories--vdevd can make them 
