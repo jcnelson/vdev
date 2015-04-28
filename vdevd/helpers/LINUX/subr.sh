@@ -258,6 +258,42 @@ vdev_metadata_get() {
 }
 
 
+# set owner and group of a device.
+# Apparently, busybox's chown is inconsolable in an initramfs.
+# You can put /etc/passwd, /etc/passwd-, /etc/group, and /etc/group-
+# in the right places, but for whatever reason, busybox's chown
+# seems to ignore them.  This method exists as a temporary work-around
+# until I can find out why this is.
+# $1    the "owner.group" string
+# $2    the device path 
+# return 0 on success
+# return 1 on failure
+vdev_chown() {
+
+   local _UID _GID _USTR _GSTR _CHOWN_STR _DEVICE_PATH
+
+   _CHOWN_STR=$1
+   _DEVICE_PATH=$2
+   
+   _USTR=$(echo $_CHOWN_STR | /bin/sed -r 's/(^[^\.]+)\..*/\1/g')
+   _GSTR=$(echo $_CHOWN_STR | /bin/sed -r 's/^[^\.]+\.(.*)/\1/g')
+
+   if [ -z "$_USTR" -o -z "$_GSTR" ]; then 
+      return 1
+   fi
+   
+   # look the user and group IDs up in /etc/passwd and /etc/group
+   _UID=$(cat /etc/passwd | grep $_USTR | sed -r 's/^[^:]+:[^:]+:([^:]+):.*/\1/g')
+   _GID=$(cat /etc/group | grep $_GSTR | sed -r 's/^[^:]+:[^:]+:([^:]+):.*/\1/g')
+
+   if [ -z "$_UID" -o -z "$_GID" ]; then 
+      return 1
+   fi 
+   
+   /bin/chown $_UID.$_GID $_DEVICE_PATH
+   return $?
+}
+
 # set permissions and ownership on a device 
 # do not change permissions if the owner/group isn't defined 
 # $1    the "owner.group" string, to be fed into chmod 
@@ -267,20 +303,23 @@ vdev_metadata_get() {
 # return 1 on failure 
 vdev_permissions() {
 
-   local _OWNER _MODE _PATH _RC
+   local _OWNER _MODE _PATH _RC _CHOWN _CHMOD
    
    _OWNER="$1"
    _MODE="$2"
    _PATH="$3"
 
-   /bin/chown $_OWNER $_PATH
+   _CHOWN=vdev_chown
+   _CHMOD=/bin/chmod
+
+   $_CHOWN $_OWNER $_PATH
    _RC=$?
 
    if [ $_RC -ne 0 ]; then 
       return $_RC
    fi
 
-   /bin/chmod $_MODE $_PATH 
+   $_CHMOD $_MODE $_PATH 
    _RC=$?
 
    return $_RC
