@@ -92,9 +92,11 @@ if [ "$VDEV_OS_DEVTYPE" = "partition" ]; then
    DISK_NAME="$DISK_NAME-$PART_NAME"
 fi
 
-# get disk UUID and LABEL
+# get disk UUID, LABEL, PARTUUID
 UUID=
 LABEL=
+PARTUUID=
+PARTLABEL=
 eval $(/sbin/blkid -o export $VDEV_MOUNTPOINT/$VDEV_PATH)
 
 # get disk WWN, if set 
@@ -109,11 +111,11 @@ fi
 
   
 # add the disk
+vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$DISK_NAME $VDEV_METADATA
+
 if [ -n "$UUID" ]; then
    vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-uuid/$UUID $VDEV_METADATA 
 fi
-
-vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$DISK_NAME $VDEV_METADATA
 
 if [ -n "$LABEL" ]; then 
    vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-label/$LABEL $VDEV_METADATA
@@ -121,6 +123,14 @@ fi
 
 if [ -n "$WWN" ]; then
    vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$WWN $VDEV_METADATA
+fi
+
+if [ -n "$PARTUUID" ]; then 
+   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-partuuid/$PARTUUID $VDEV_METADATA
+fi
+
+if [ -n "$PARTLABEL" ]; then 
+   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-partlabel/$PARTLABEL $VDEV_METADATA
 fi
 
 # is this a physical volume?
