@@ -74,7 +74,6 @@ if [ -n "$(echo $VDEV_PATH | /bin/egrep "video|vbi")" ]; then
    
    # video v4l device 
    vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/v4l/by-path/$VDEV_PERSISTENT_PATH-video-index${INDEX} $VDEV_METADATA
-fi
 
 elif [ -n "$(echo $VDEV_PATH | /bin/egrep "audio")" ]; then 
 
