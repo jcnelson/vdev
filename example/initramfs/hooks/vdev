@@ -39,25 +39,46 @@ cp -a /etc/vdev/* $DESTDIR/etc/vdev/
 copy_exec /sbin/vdevd
 
 # blkid (needed by vdevd's helpers)
-copy_exec /sbin/blkid
+if [ -f /sbin/blkid ]; then 
+   copy_exec /sbin/blkid
+fi
 
 # lvm tools (needed by vdevd's helpers)
-copy_exec /sbin/lvs
-copy_exec /sbin/pvs
-copy_exec /sbin/lvm
+if [ -f /sbin/lvs ]; then
+   copy_exec /sbin/lvs
+fi
+
+if [ -f /sbin/pvs ]; then 
+   copy_exec /sbin/pvs
+fi
+
+if [ -f /sbin/lvm ]; then 
+   copy_exec /sbin/lvm
+fi
 
 # network tools (needed by vdevd's helpers)
-copy_exec /bin/ip
-copy_exec /sbin/ip
+if [ -f /bin/ip ]; then
+   copy_exec /bin/ip
+fi
+
+if [ -f /sbin/ip ]; then 
+   copy_exec /sbin/ip
+fi
 
 # SELinux tools
-copy_exec /sbin/restorecon || true
+if [ -f /sbin/restorecon ]; then 
+   copy_exec /sbin/restorecon || true
+fi
 
 # device tools
-copy_exec /sbin/MAKEDEV || true
+if [ -f /sbin/MAKEDEV ]; then 
+   copy_exec /sbin/MAKEDEV || true
+fi
 
 # device mapper tools
-copy_exec /sbin/dmsetup 
+if [ -f /sbin/dmsetup ]; then 
+   copy_exec /sbin/dmsetup 
+fi
 
 # GNU tools (not the busybox equivalents)
 copy_exec /bin/sed

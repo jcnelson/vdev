@@ -97,7 +97,12 @@ UUID=
 LABEL=
 PARTUUID=
 PARTLABEL=
-eval $(/sbin/blkid -o export $VDEV_MOUNTPOINT/$VDEV_PATH)
+
+if [ -x /sbin/blkid ]; then 
+   eval $(/sbin/blkid -o export $VDEV_MOUNTPOINT/$VDEV_PATH)
+else
+   vdev_warn "Could not find blkid in /sbin/blkid.  $VDEV_MOUNTPOINT/disk/by-*/ symlinks will not be added."
+fi
 
 # get disk WWN, if set 
 WWN=
@@ -134,9 +139,16 @@ if [ -n "$PARTLABEL" ]; then
 fi
 
 # is this a physical volume?
-PVS="/sbin/pvs --nameprefixes --noheadings $VDEV_MOUNTPOINT/$VDEV_PATH"
-eval $($PVS -o pv_uuid)
-PVS_RC=$?
+PVS_RC=
+LVM2_PV_UUID=
+
+if [ -x /sbin/pvs ]; then 
+   PVS="/sbin/pvs --nameprefixes --noheadings $VDEV_MOUNTPOINT/$VDEV_PATH"
+   eval $($PVS -o pv_uuid)
+   PVS_RC=$?
+else
+   vdev_warn "Could not find pvs in /sbin/pvs.  LVM physical volume symlinks in $VDEV_MOUNTPOINT/disk/by-id will not be created."
+fi
 
 if [ $PVS_RC -eq 0 -a -n "$LVM2_PV_UUID" ]; then 
    

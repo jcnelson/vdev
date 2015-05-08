@@ -17,6 +17,17 @@ if [ "$VDEV_ACTION" = "remove" ]; then
    exit 0
 fi
 
+IP=
+
+if [ -x /sbin/ip ]; then 
+   IP=/sbin/ip
+elif [ -x /bin/ip ]; then 
+   IP=/bin/ip
+fi
+
+if [ -z "$IP" ]; then 
+   vdev_fail 0 "Could not find iproute2.  Network interfaces will not be configured."
+fi
 
 # rename an interface 
 # $1    desired interface name 
@@ -34,13 +45,13 @@ rename_if() {
    _IF_IS_DOWN=0
 
    # is the interface up?
-   if [ -n "$(/bin/ip link show $_IFNAME_ORIG | /bin/grep "state UP")" ]; then 
+   if [ -n "$($IP link show $_IFNAME_ORIG | /bin/grep "state UP")" ]; then 
       _IF_IS_DOWN=1
    fi
 
    # bring the interface down, if we must
    if [ $_IF_IS_DOWN -ne 0 ]; then 
-      /bin/ip link set $_IFNAME_ORIG down 
+      $IP link set $_IFNAME_ORIG down 
       _RC=$?
 
       if [ $_RC -ne 0 ]; then 
@@ -49,14 +60,14 @@ rename_if() {
       fi
    fi
 
-   /bin/ip link set $_IFNAME_ORIG name $_IFNAME 
+   $IP link set $_IFNAME_ORIG name $_IFNAME 
    _RC=$?
 
    if [ $_RC -ne 0 ]; then 
       
       # try to recover: bring it back up, if it was up originally 
       if [ $_IF_IS_DOWN -ne 0 ]; then 
-         /bin/ip link set $_IFNAME_ORIG up
+         $IP link set $_IFNAME_ORIG up
       fi
       
       return $_RC
@@ -65,14 +76,14 @@ rename_if() {
    # bring the link back up, if it was up originally 
    if [ $_IF_IS_DOWN -ne 0 ]; then 
       
-      /bin/ip link set $_IFNAME up
+      $IP link set $_IFNAME up
       _RC=$?
       
       if [ $_RC -ne 0 ]; then 
       
          # try to recover 
-         /bin/ip link set $_IFNAME name $_IFNAME_ORIG
-         /bin/ip link set $_IFNAME_ORIG up
+         $IP link set $_IFNAME name $_IFNAME_ORIG
+         $IP link set $_IFNAME_ORIG up
 
          return $_RC
       fi
@@ -92,7 +103,7 @@ if_mac() {
    
    _MAC="$1"
 
-   /bin/ip link | /bin/grep -B 1 -i "$_MAC" | \
+   $IP link | /bin/grep -B 1 -i "$_MAC" | \
    while read _IGNORED1 _IFNAME _IGNORED2; do
       
       echo $_IFNAME | /bin/sed -r 's/://g'
