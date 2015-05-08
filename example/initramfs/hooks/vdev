@@ -41,19 +41,27 @@ copy_exec /sbin/vdevd
 # blkid (needed by vdevd's helpers)
 if [ -f /sbin/blkid ]; then 
    copy_exec /sbin/blkid
+else
+   echo "WARN: could not find blkid in /sbin/blkid.  /dev/disk symlinks will not be created."
 fi
 
 # lvm tools (needed by vdevd's helpers)
 if [ -f /sbin/lvs ]; then
    copy_exec /sbin/lvs
+else
+   echo "WARN: could not find lvs in /sbin/lvs.  Logical volume symlinks will not be created."
 fi
 
 if [ -f /sbin/pvs ]; then 
    copy_exec /sbin/pvs
+else
+   echo "WARN: could not find pvs in /sbin/pvs.  Physical volume symlinks will not be created."
 fi
 
 if [ -f /sbin/lvm ]; then 
    copy_exec /sbin/lvm
+else
+   echo "WARN: could not find lvm in /sbin/lvm.  Logical volume symlinks will not be created."
 fi
 
 # network tools (needed by vdevd's helpers)
@@ -63,6 +71,10 @@ fi
 
 if [ -f /sbin/ip ]; then 
    copy_exec /sbin/ip
+fi
+
+if ! [ -f /sbin/ip ] && ! [ -f /bin/ip ]; then 
+   echo "WARN: could not find iproute2 in /bin/ip or /sbin/ip.  Network interfaces will not be configured."
 fi
 
 # SELinux tools
@@ -78,6 +90,8 @@ fi
 # device mapper tools
 if [ -f /sbin/dmsetup ]; then 
    copy_exec /sbin/dmsetup 
+else
+   echo "WARN: could not find dmsetup in /sbin/dmsetup.  Device mapper symlinks will not be created."
 fi
 
 # GNU tools (not the busybox equivalents)
