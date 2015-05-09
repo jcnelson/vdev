@@ -99,8 +99,6 @@ copy_exec /bin/sed
 copy_exec /bin/grep 
 copy_exec /bin/fgrep
 copy_exec /bin/egrep 
-copy_exec /bin/chown /bin/vdev-chown 
-copy_exec /bin/chmod /bin/vdev-chmod
 
 # Linux tools
 copy_exec /bin/kmod 
@@ -108,6 +106,13 @@ copy_exec /bin/kmod
 # users and groups databases
 cp -a /etc/passwd $DESTDIR/etc/passwd
 cp -a /etc/group $DESTDIR/etc/group
+
+# extra libc goodies 
+copy_exec /lib/x86_64-linux-gnu/libc.so.6
+copy_exec /lib/x86_64-linux-gnu/libnss_compat.so.2
+copy_exec /lib/x86_64-linux-gnu/libnsl.so.1
+copy_exec /lib/x86_64-linux-gnu/libnss_nis.so.2
+copy_exec /lib/x86_64-linux-gnu/libnss_files.so.2
 
 # since vdevd is multi-threaded, libpthread will dynamically load libgcc_s
 # (and copy_exec won't detect this)
