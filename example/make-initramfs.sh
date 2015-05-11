@@ -40,5 +40,15 @@ cp -a $VDEV_INITRAMFS_FILES/* $BUILD_INITRAMFS/
 echo "Generating initrd.img-`uname -r`"
 $MKINITRAMFS -t $BUILD_INITRAMFS -o initrd.img-`uname -r`
 
+if [ $? -eq 0 ]; then 
+   echo "Generated initrd.img-`uname -r`"
+   echo ""
+   echo "You must install initrd.img-`uname -r` via your"
+   echo "bootloader.  GRUB2 users can simply overwrite the"
+   echo "original initramfs image."
+   echo ""
+   echo "BE SURE TO BACK UP YOUR ORIGINAL INITRAMFS."
+fi
+
 exit 0
 
