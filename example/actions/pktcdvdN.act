@@ -1,0 +1,4 @@
+[vdev-action]
+event=add
+path=^pktcdvd[0-9]+$
+command=/bin/chgrp cdrom $VDEV_MOUNTPOINT/$VDEV_PATH

@@ -1,0 +1,4 @@
+[vdev-action]
+event=add
+path=^mmtimer$
+command=/bin/chmod 0644 $VDEV_MOUNTPOINT/$VDEV_PATH

@@ -1,0 +1,5 @@
+[vdev-action]
+event=add
+path=^ttysclp[0-9]*$
+OS_SUBSYSTEM=tty
+command=. $VDEV_HELPERS/subr.sh; vdev_permissions root.tty 0620 $VDEV_MOUNTPOINT/$VDEV_PATH

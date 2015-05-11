@@ -1,0 +1,5 @@
+[vdev-action]
+event=add
+path=^agpgart$
+OS_SUBSYSTEM=misc
+command=/bin/chgrp video $VDEV_MOUNTPOINT/$VDEV_PATH

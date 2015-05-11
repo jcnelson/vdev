@@ -1,0 +1,4 @@
+[vdev-action]
+event=add
+path=^sgi_.*$
+command=/bin/chmod 0666 $VDEV_MOUNTPOINT/$VDEV_PATH

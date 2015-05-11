@@ -1,0 +1,4 @@
+[vdev-action]
+event=add
+path=^mISDNtimer$
+command=/bin/chgrp dialout $VDEV_MOUNTPOINT/$VDEV_PATH
