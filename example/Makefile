@@ -2,62 +2,63 @@ CONF_ROOT := .
 CONF_ABS_ROOT := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 PREFIX ?= 
 
-BUILD_ROOT := $(CONF_ROOT)/build/etc/
+BUILD_ROOT := $(CONF_ROOT)/build/
 
 INITRAMFS_ROOT := $(CONF_ROOT)/build/initramfs/
 VDEV_INITRAMFS := $(CONF_ROOT)/initramfs/
 
 CONF_DIR := $(PREFIX)/etc/vdev
+ACTIONS_DIR := $(CONF_DIR)/actions
 
-IFNAMES := $(BUILD_ROOT)/vdev/ifnames.conf
-CONF_GLOBAL := $(BUILD_ROOT)/vdev/vdevd.conf
-INITSCRIPT := $(BUILD_ROOT)/init.d/vdev
+ACTIONS := $(wildcard actions/*.act)
+ACTIONS_BUILD := $(patsubst actions/%.act,$(BUILD_ROOT)/etc/vdev/actions/%.act,$(ACTIONS))
+ACTIONS_INSTALL := $(patsubst actions/%.act,$(CONF_DIR)/actions/%.act,$(ACTIONS))
+
+IFNAMES_BUILD := $(BUILD_ROOT)/etc/vdev/ifnames.conf
+CONF_BUILD := $(BUILD_ROOT)/etc/vdev/vdevd.conf
+INITSCRIPT_BUILD := $(BUILD_ROOT)/etc/init.d/vdev
+
+VDEV_BUILD := $(CONF_BUILD) $(ACTIONS_BUILD) $(IFNAMES_BUILD) $(INITSCRIPT_BUILD)
+VDEV_INSTALL := $(patsubst $(BUILD_ROOT)/%,$(PREFIX)/%,$(VDEV_BUILD))
 
 TOOLS := ../tools/
 
 GEN_IFNAMES := $(TOOLS)/persistent-net-names/gen-ifnames.sh
-MKINITRAMFS := $(TOOLS)/initramfs/mkinitramfs
+MKINITRAMFS := make-initramfs.sh
 
-INITRAMFS_UDEV_FILES := $(INITRAMFS_ROOT)/scripts/init-top/udev \
-								$(INITRAMFS_ROOT)/scripts/init-bottom/udev \
-								$(INITRAMFS_ROOT)/hooks/udev \
-								$(INITRAMFS_ROOT)/init
-
-all: actions $(CONF_GLOBAL) $(IFNAMES) $(INITSCRIPT)
-
-setup:
-	mkdir -p $(BUILD_ROOT)
-	mkdir -p $(BUILD_ROOT)/vdev
-	mkdir -p $(BUILD_ROOT)/init.d
-	mkdir -p $(CONF_ROOT)/build/initramfs/
-
-$(CONF_GLOBAL): $(CONF_ROOT)/vdevd.conf.in setup
-	@cat $(CONF_ROOT)/vdevd.conf.in | \
+all: $(VDEV_BUILD)
+print-%: ; @echo $*=$($*)
+$(CONF_BUILD): $(CONF_ROOT)/vdevd.conf.in
+	@mkdir -p $(shell dirname $@)
+	@cat $< | \
 		sed -e 's~@PREFIX@~$(PREFIX)~g;' | \
-		sed -e 's~@CONF_DIR@~$(CONF_DIR)~g;' > $(CONF_GLOBAL)
+		sed -e 's~@CONF_DIR@~$(CONF_DIR)~g;' > $@
 
-$(IFNAMES): $(CONF_ROOT)/ifnames.conf.in setup
-	cp $(CONF_ROOT)/ifnames.conf.in $(IFNAMES)
-	$(GEN_IFNAMES) >> $(IFNAMES)
+$(IFNAMES_BUILD): $(CONF_ROOT)/ifnames.conf.in 
+	@mkdir -p $(shell dirname $@)
+	@cat $< > $@
+	$(GEN_IFNAMES) >> $@
 
-$(INITSCRIPT): $(CONF_ROOT)/sysv-initscript.sh setup
-	cp -a $(CONF_ROOT)/sysv-initscript.sh $(INITSCRIPT)
+$(INITSCRIPT_BUILD): $(CONF_ROOT)/sysv-initscript.sh 
+	@mkdir -p $(shell dirname $@)
+	@cat $< > $@
 
-actions: setup
-	cp -a $(CONF_ROOT)/actions $(BUILD_ROOT)/vdev/
+actions: $(ACTIONS_BUILD)
+$(BUILD_ROOT)/etc/vdev/actions/%.act: actions/%.act
+	@mkdir -p $(shell dirname $@)
+	@cat $< > $@
 
-initramfs: setup
-	test -d /usr/share/initramfs-tools || (echo "You must install the initramfs-tools package" && exit 1)
-	test -e /sbin/vdevd || (echo "You must install vdevd first" && exit 1)
-	test -e /etc/vdev || (echo "You must install vdev's /etc files first" && exit 1)
-	cp -a /usr/share/initramfs-tools/* $(INITRAMFS_ROOT)/
-	cp -a $(VDEV_INITRAMFS)/scripts/* $(PREFIX)/etc/initramfs-tools/scripts/
-	cp -a $(VDEV_INITRAMFS)/hooks/* $(PREFIX)/etc/initramfs-tools/hooks/
-	rm $(INITRAMFS_UDEV_FILES)
-	cp -a $(VDEV_INITRAMFS)/init $(INITRAMFS_ROOT)/
-	$(MKINITRAMFS) -t $(INITRAMFS_ROOT) -o $(CONF_ROOT)/initrd.img-`uname -r`
+install-files: $(VDEV_INSTALL)
+$(PREFIX)/%: $(BUILD_ROOT)/%
+	@mkdir -p $(shell dirname $@)
+	@cat $< > $@
 
-install:
+.PHONY: initramfs
+initramfs: $(VDEV_INSTALL) 
+	$(SHELL) ./$(MKINITRAMFS)
+
+.PHONY: install
+install: install-files
 	# This is pretty ugly...what we really need is a "generic" device manager init script
 	mkdir -p $(CONF_DIR)
 	mkdir -p $(PREFIX)/etc/init.d/
