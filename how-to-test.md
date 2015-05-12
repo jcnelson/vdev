@@ -103,43 +103,20 @@ Once a device event is encountered that matches all of an action's fields, `vdev
 Appendix B: Booting with vdevd
 -------------------------------
 
-There are three parts to this:  installing vdevd fully, updating your initramfs to use `vdevd` instead of udev, and adding a System V init script for vdevd.
+To boot with vdevd, you must not only install vdevd, but also build an initramfs image with it.  You must install the initramfs image manually, and back up the original initramfs so you can use it to boot in case the vdevd-based one fails for some reason.  **Proceed at your own risk.  You are expected to know how to fix your initramfs, init system, and bootloader if something goes wrong.**
 
-To install vdevd fully, you should do the following (as root):
+You can install vdevd with the following commands:
+    
+    $ sudo make -C vdevd install
+    $ sudo make -C example install
 
-    # make -C libvdev install
-    # make -C vdevd install
-    # make -C example
-    # make -C example install
+Please note that the "install" target in example/ will **disable udev** on your system, using update-rc.d(8).
 
-Most Linux installations use an initramfs to boot.  In Debian and Devuan, the scripts that get invoked are installed to `/usr/share/initramfs-tools`, and are part of the `initramfs-tools` package.  By default, udev and its helper programs and rules get compiled into the initramfs by the hook scripts there.
+To build the initramfs, run:
 
-To use `vdevd` instead, you will need to alter the initramfs scripts and regenerate your initramfs.  To do so, you will need to remove the udev scripts from `/usr/share/initramfs-tools/hooks/`, `/usr/share/initramfs-tools/init-top/` and `/usr/share/initramfs-tools/init-bottom/`, and replace them with the equivalent `vdevd` scripts (in `example/initramfs/hooks/`, `example/initramfs/scripts/init-top/` and `example/initramfs/scripts/init-bottom/`).  You will also either need to replace or alter the `init` script in `/usr/share/initramfs-tools/init` so it does the same things as `example/initramfs/init`.  Once you have done so, you can regenerate your initramfs with `sudo update-initramfs -v`.  See `initramfs-tools(8)` for more background on how the initramfs boot scheme works.
+    $ make -C example initramfs
 
-**Caveat**: Be sure to back up your old initramfs first!
-
-The vdev project comes with a System V init script in `example/sysv-initscript.sh`, which is meant to be a drop-in replacement for udev (i.e. it provides the `udev` service).  To replace the udev scripts, do the following as root:
-
-    # update-rc.d udev-finish disable
-    # cp example/sysv-initscript.sh /etc/init.d/udev
-
-To do all of the above, you can run the following commands as root:
-
-    # mkdir /root/udev-saved
-    # mv /boot/initrd.img-$(uname -r) /root/udev-saved/boot--initrd.img-$(uname -r)
-    # mv /usr/share/initramfs-tools/init /root/udev-saved/usr+share+initramfs-tools+init
-    # mv /usr/share/initramfs-tools/hooks/udev /root/udev-saved/usr+share+initramfs-tools+hooks+udev
-    # mv /usr/share/initramfs-tools/scripts/init-bottom/udev /root/udev-saved/usr+share+initramfs-tools+scripts+init-bottom+udev
-    # mv /usr/share/initramfs-tools/scripts/init-top/udev /root/udev-saved/usr+share+initramfs-tools+scripts+init-top+udev
-    # cp -a example/initramfs/init /usr/share/initramfs-tools/
-    # cp -a example/initramfs/hooks/vdev /etc/initramfs-tools/
-    # cp -a example/initramfs/scripts/init-bottom/vdev /etc/initramfs-tools/scripts/init-bottom/
-    # cp -a example/initramfs/scripts/init-top/vdev /etc/initramfs-tools/scripts/init-top/
-    # cd /boot
-    # mkinitramfs -o initrd.img-$(uname -r) $(uname -r)
-    # mv /etc/init.d/udev /root/udev-saved/etc+init.d+udev
-    # update-rc.d udev-finish disable
-    # cp -a example/sysv-initscript.sh /etc/init.d/udev
+This will generate an initramfs with vdev at example/initrd-`uname -r`.  You are responsible for installing it via your bootloader of choice.
 
 Misc
 ----
