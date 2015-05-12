@@ -97,6 +97,16 @@ vdevd_start() {
    
    log_daemon_msg "Starting the system device event dispatcher" "vdevd"
    
+   # make sure log directory exists...
+   if [ -n "$vdev_config_logfile" ]; then 
+      
+      vdev_log_dir=$(echo "$vdev_config_logfile" | sed -r 's/[^/]+$//g')
+
+      if [ -n "$vdev_log_dir" ]; then 
+         mkdir -p "$vdev_log_dir"
+      fi
+   fi
+   
    # start vdev
    if $VDEV_BIN -c $VDEV_CONFIG $@ $VDEV_MOUNTPOINT; then
       log_end_msg $?
