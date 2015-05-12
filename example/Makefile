@@ -18,6 +18,8 @@ IFNAMES_BUILD := $(BUILD_ROOT)/etc/vdev/ifnames.conf
 CONF_BUILD := $(BUILD_ROOT)/etc/vdev/vdevd.conf
 INITSCRIPT_BUILD := $(BUILD_ROOT)/etc/init.d/vdev
 
+INITSCRIPT_INSTALL := $(PREFIX)/etc/init.d/vdev
+
 VDEV_BUILD := $(CONF_BUILD) $(ACTIONS_BUILD) $(IFNAMES_BUILD) $(INITSCRIPT_BUILD)
 VDEV_INSTALL := $(patsubst $(BUILD_ROOT)/%,$(PREFIX)/%,$(VDEV_BUILD))
 
@@ -25,6 +27,7 @@ TOOLS := ../tools/
 
 GEN_IFNAMES := $(TOOLS)/persistent-net-names/gen-ifnames.sh
 MKINITRAMFS := make-initramfs.sh
+VDEV_INSTALL_SCRIPT := vdev-install.sh
 
 all: $(VDEV_BUILD)
 print-%: ; @echo $*=$($*)
@@ -43,12 +46,18 @@ $(INITSCRIPT_BUILD): $(CONF_ROOT)/sysv-initscript.sh
 	@mkdir -p $(shell dirname $@)
 	@cat $< > $@
 
+initscript_install: $(INITSCRIPT_INSTALL)
+$(INITSCRIPT_INSTALL): $(INITSCRIPT_BUILD)
+	@mkdir -p $(shell dirname $@)
+	@cat $< > $@
+	@chmod +x $@
+
 actions: $(ACTIONS_BUILD)
 $(BUILD_ROOT)/etc/vdev/actions/%.act: actions/%.act
 	@mkdir -p $(shell dirname $@)
 	@cat $< > $@
 
-install-files: $(VDEV_INSTALL)
+install-files: $(VDEV_INSTALL) initscript_install
 $(PREFIX)/%: $(BUILD_ROOT)/%
 	@mkdir -p $(shell dirname $@)
 	@cat $< > $@
@@ -59,18 +68,15 @@ initramfs: $(VDEV_INSTALL)
 
 .PHONY: install
 install: install-files
-	# This is pretty ugly...what we really need is a "generic" device manager init script
-	mkdir -p $(CONF_DIR)
-	mkdir -p $(PREFIX)/etc/init.d/
-	mkdir -p $(PREFIX)/etc/rcS.d/
-	cp -a $(BUILD_ROOT)/vdev/* $(CONF_DIR)/
-	cp -a $(INITSCRIPT) $(PREFIX)/etc/init.d/
-	update-rc.d udev disable || true
-	update-rc.d udev-finish disable || true
-	[ -f $(PREFIX)/etc/init.d/.udev.disabled ] || mv $(PREFIX)/etc/init.d/udev $(PREFIX)/etc/init.d/.udev.disabled
-	ln -s $(PREFIX)/etc/init.d/vdev $(PREFIX)/etc/rcS.d/S02vdev
-	insserv
+	$(SHELL) ./$(VDEV_INSTALL_SCRIPT) $(PREFIX)
 
 .PHONY: clean
 clean:
-	rm -rf $(CONF_ROOT)/build
+	@rm -rf $(CONF_ROOT)/build
+
+.PHONY: uninstall
+uninstall:
+	@rm -f $(VDEV_INSTALL)
+	update-rc.d -f vdev remove
+	@echo "vdev configuration and init scripts have been removed."
+	@echo "You will need to re-enable your previous device manager."
