@@ -661,6 +661,8 @@ static int vdev_linux_find_sysfs_mountpoint( char* mountpoint, size_t mountpoint
          rc = 0;
          break;
       }
+      
+      ent_count++;
    }
    
    fclose( f );
