@@ -1317,10 +1317,7 @@ static int vdev_linux_mountpoint_on_devtmpfs( char const* mountpoint ) {
    int rc = 0;
    
    FILE* f = NULL;
-   
-   char* line_buf = NULL;
-   size_t line_len = 0;
-   ssize_t num_read = 0;
+   int ent_count = 1;
    
    bool found = false;
    char devtmpfs_mountpoint[PATH_MAX+1];
@@ -1328,10 +1325,12 @@ static int vdev_linux_mountpoint_on_devtmpfs( char const* mountpoint ) {
    char realpath_mountpoint[PATH_MAX+1];
    char devtmpfs_realpath_mountpoint[PATH_MAX+1];
    
-   size_t realpath_mountpoint_len = 0;
    size_t devtmpfs_realpath_mountpoint_len = 0;
+   size_t realpath_mountpoint_len = 0;
    
-   memset( devtmpfs_mountpoint, 0, PATH_MAX+1 );
+   char mntbuf[4096];
+   struct mntent ment_buf;
+   struct mntent* ment_ptr = NULL;
    
    f = fopen( "/proc/mounts", "r" );
    if( f == NULL ) {
@@ -1341,90 +1340,66 @@ static int vdev_linux_mountpoint_on_devtmpfs( char const* mountpoint ) {
       return rc;
    }
    
-   // scan for devtmpfs 
+   // scan for sysfs mount type
    while( 1 ) {
       
-      errno = 0;
-      num_read = getline( &line_buf, &line_len, f );
-      
-      if( num_read < 0 ) {
+      ment_ptr = getmntent_r( f, &ment_buf, mntbuf, 4096 );
+      if( ment_ptr == NULL ) {
          
-         rc = -errno;
-         if( rc == 0 ) {
-            // EOF
+         break;
+      }
+      
+      if( strcmp( ment_ptr->mnt_type, "devtmpfs" ) == 0 ) {
+         
+         // found!
+         strncpy( devtmpfs_mountpoint, ment_ptr->mnt_dir, PATH_MAX );
+         
+         // is the mountpoint contained in devtmpfs_mountpoint?
+         char* tmp = NULL;
+         
+         memset( realpath_mountpoint, 0, PATH_MAX+1 );
+         memset( devtmpfs_realpath_mountpoint, 0, PATH_MAX+1 );
+         
+         tmp = realpath( mountpoint, realpath_mountpoint );
+         if( tmp == NULL ) {
+            
+            rc = -errno;
+            fprintf(stderr, "Failed to get the real path of '%s', rc = %d\n", mountpoint, rc );
             break;
          }
-         else {
-            // error 
-            vdev_error("getline('/proc/mounts') rc = %d\n", rc );
+         
+         tmp = realpath( devtmpfs_mountpoint, devtmpfs_realpath_mountpoint );
+         if( tmp == NULL ) {
+            
+            rc = -errno;
+            fprintf(stderr, "Failed to get the real path of '%s', rc = %d\n", devtmpfs_mountpoint, rc );
+            break;
+         }
+         
+         vdev_debug("devtmpfs realpath is   '%s'\n", devtmpfs_realpath_mountpoint );
+         vdev_debug("mountpoint realpath is '%s'\n", realpath_mountpoint );
+         
+         devtmpfs_realpath_mountpoint_len = strlen(devtmpfs_realpath_mountpoint);
+         realpath_mountpoint_len = strlen(realpath_mountpoint);
+         
+         size_t min_len = MIN( devtmpfs_realpath_mountpoint_len, realpath_mountpoint_len );
+         
+         // is our mountpoint within the devtmpfs mountpoint?
+         if( strncmp( devtmpfs_realpath_mountpoint, realpath_mountpoint, min_len ) == 0 &&   // devtmpfs mountpoint path is a substring of the mountpoint path and
+            (strchr( realpath_mountpoint + min_len, '/' ) != NULL ||                         // either the mountpoint path continues at least one directory into devtmpfs path, or
+             strcmp( devtmpfs_realpath_mountpoint, realpath_mountpoint ) == 0 ) ) {          // the devtmpfs mountpoint path *is* the mountpoint path
+               
+            // contained!
+            rc = 1;
+            found = true;
             break;
          }
       }
       
-      // devtmpfs?
-      if( strstr( line_buf, "devtmpfs" ) != NULL ) {
-         
-         // mountpoint?
-         char devtmpfs_buf[20];
-         rc = sscanf( line_buf, "%s %s", devtmpfs_buf, devtmpfs_mountpoint );
-         
-         if( rc != 2 ) {
-            
-            // couldn't scan 
-            vdev_error("WARN: sscanf(\"%s\") for devtmpfs mountpoint rc = %d\n", line_buf, rc );
-            continue;
-         }
-         else {
-            
-            // is the mountpoint contained in this path?
-            char* tmp = NULL;
-            
-            memset( realpath_mountpoint, 0, PATH_MAX+1 );
-            memset( devtmpfs_realpath_mountpoint, 0, PATH_MAX+1 );
-            
-            tmp = realpath( mountpoint, realpath_mountpoint );
-            if( tmp == NULL ) {
-               
-               rc = -errno;
-               fprintf(stderr, "Failed to get the real path of '%s', rc = %d\n", mountpoint, rc );
-               break;
-            }
-            
-            tmp = realpath( devtmpfs_mountpoint, devtmpfs_realpath_mountpoint );
-            if( tmp == NULL ) {
-               
-               rc = -errno;
-               fprintf(stderr, "Failed to get the real path of '%s', rc = %d\n", devtmpfs_mountpoint, rc );
-               break;
-            }
-            
-            vdev_debug("devtmpfs realpath is   '%s'\n", devtmpfs_realpath_mountpoint );
-            vdev_debug("mountpoint realpath is '%s'\n", realpath_mountpoint );
-            
-            devtmpfs_realpath_mountpoint_len = strlen(devtmpfs_realpath_mountpoint);
-            realpath_mountpoint_len = strlen(realpath_mountpoint);
-            
-            size_t min_len = MIN( devtmpfs_realpath_mountpoint_len, realpath_mountpoint_len );
-            
-            // is our mountpoint within the devtmpfs mountpoint?
-            if( strncmp( devtmpfs_realpath_mountpoint, realpath_mountpoint, min_len ) == 0 &&   // devtmpfs mountpoint path is a substring of the mountpoint path and
-                (strchr( realpath_mountpoint + min_len, '/' ) != NULL ||                        // either the mountpoint path continues at least one directory into devtmpfs path, or
-                 strcmp( devtmpfs_realpath_mountpoint, realpath_mountpoint ) == 0 ) ) {         // the devtmpfs mountpoint path *is* the mountpoint path
-                
-               // contained!
-               rc = 1;
-               found = true;
-               break;
-            }
-         }
-      }
+      ent_count++;
    }
    
    fclose( f );
-   
-   if( line_buf != NULL ) {
-      free( line_buf );
-   }
    
    return rc;
 }
