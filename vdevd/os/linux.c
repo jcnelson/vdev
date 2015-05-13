@@ -621,16 +621,17 @@ int vdev_os_next_device( struct vdev_device_request* vreq, void* cls ) {
 // return 0 on success
 // return -ENOSYS if sysfs is not mounted
 // return -ENOMEM if the buffer isn't big enough 
+// return -EINVAL if somehow we failed to parse a mount entry
 // return negative for some other errors (like access permission failures, or /proc not mounted)
 static int vdev_linux_find_sysfs_mountpoint( char* mountpoint, size_t mountpoint_len ) {
    
    FILE* f = NULL;
    int rc = 0;
    
-   char* line_buf = NULL;
-   size_t line_len = 0;
-   ssize_t num_read = 0;
-   
+   char mntbuf[4096];
+   struct mntent ment_buf;
+   struct mntent* ment_ptr = NULL;
+   int ent_count = 1;
    bool found = false;
    
    f = fopen( "/proc/mounts", "r" );
@@ -641,57 +642,31 @@ static int vdev_linux_find_sysfs_mountpoint( char* mountpoint, size_t mountpoint
       return rc;
    }
    
-   // scan for sysfs 
+   // scan for sysfs mount type
    while( 1 ) {
       
-      errno = 0;
-      num_read = getline( &line_buf, &line_len, f );
-      
-      if( num_read < 0 ) {
+      ment_ptr = getmntent_r( f, &ment_buf, mntbuf, 4096 );
+      if( ment_ptr == NULL ) {
          
-         rc = -errno;
-         if( rc == 0 ) {
-            // EOF
-            break;
-         }
-         else {
-            // error 
-            vdev_error("getline('/proc/mounts') rc = %d\n", rc );
-            break;
-         }
+         vdev_error("Failed on processing entry #%d of /proc/mounts\n", ent_count );
+         rc = -EINVAL;
+         break;
       }
       
-      // sysfs?
-      if( strncmp( line_buf, "sysfs ", 6 ) == 0 ) {
+      if( strcmp( ment_ptr->mnt_type, "sysfs" ) == 0 ) {
          
-         // mountpoint?
-         char sysfs_buf[10];
-         rc = sscanf( line_buf, "%s %s", sysfs_buf, mountpoint );
-         
-         if( rc != 2 ) {
-            
-            // couldn't scan 
-            vdev_error("WARN: sscanf(\"%s\") for sysfs mountpoint rc = %d\n", line_buf, rc );
-            continue;
-         }
-         else {
-            
-            // got it!
-            rc = 0;
-            found = true;
-            break;
-         }
+         // found!
+         strncpy( mountpoint, ment_ptr->mnt_dir, mountpoint_len - 1 );
+         found = true;
+         rc = 0;
+         break;
       }
    }
    
    fclose( f );
    
-   if( line_buf != NULL ) {
-      free( line_buf );
-   }
-   
-   if( !found ) {
-      fprintf(stderr, "Failed to find mounted sysfs\n");
+   if( rc == 0 && !found ) {
+      fprintf(stderr, "Failed to find mounted sysfs filesystem\n");
       return -ENOSYS;
    }
    

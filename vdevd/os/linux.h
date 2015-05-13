@@ -34,6 +34,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <glob.h>
+#include <mntent.h>
 
 #include <linux/types.h>
 #include <linux/netlink.h>
