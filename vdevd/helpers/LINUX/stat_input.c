@@ -145,7 +145,7 @@ static void get_cap_mask( char const* sysfs_cap_path, unsigned long *bitmask, si
    }
    
    log_debug("Bitmask path: %s, length: %zu, Text: '%s'", sysfs_cap_path, bitmask_len, text );
-   for( int i = 0; i < bitmask_len; i++ ) {
+   for( unsigned int i = 0; i < bitmask_len; i++ ) {
       log_debug("Bitmask[%d] = %lX", i, bitmask[i]);
    }
 }
@@ -332,7 +332,7 @@ int main( int argc, char** argv ) {
    sprintf( major, "%u", major(sb.st_rdev) );
    sprintf( minor, "%u", minor(sb.st_rdev) );
    
-   static char* caps[] = {
+   static char const* caps[] = {
       "ev",
       "abs",
       "key",
