@@ -103,6 +103,8 @@ Once a device event is encountered that matches all of an action's fields, `vdev
 Appendix B: Booting with vdevd
 -------------------------------
 
+**CURRENTLY BROKEN.  DO NOT ATTEMPT.  WE ARE MIGRATING TO .DEB PACKAGES.**
+
 To boot with vdevd, you must not only install vdevd, but also build an initramfs image with it.  You must install the initramfs image manually, and back up the original initramfs so you can use it to boot in case the vdevd-based one fails for some reason.  **Proceed at your own risk.  You are expected to know how to fix your initramfs, init system, and bootloader if something goes wrong.**
 
 You can install vdevd with the following commands:
