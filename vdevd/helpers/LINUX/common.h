@@ -23,9 +23,17 @@
 #ifndef _VDEV_LINUX_HELPERS_COMMON_H_
 #define _VDEV_LINUX_HELPERS_COMMON_H_
 
+#ifndef _BSD_SOURCE
 #define _BSD_SOURCE
+#endif
+
+#ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 200809L
+#endif
+
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
