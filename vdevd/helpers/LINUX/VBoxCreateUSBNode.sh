@@ -42,9 +42,9 @@ case "$do_remove" in
       exit 0
   fi
   case "$group" in "") group="vboxusers";; esac
-  mkdir $VDEV_MOUNTPOINT/vboxusb -m 0750 2>/dev/null
+  mkdir -p $VDEV_MOUNTPOINT/vboxusb -m 0750 2>/dev/null
   chown root:$group $VDEV_MOUNTPOINT/vboxusb 2>/dev/null
-  mkdir "$devdir" -m 0750 2>/dev/null
+  mkdir -p "$devdir" -m 0750 2>/dev/null
   chown root:$group "$devdir" 2>/dev/null
   mknod "$devpath" c $1 $2 -m 0660 2>/dev/null
   chown root:$group "$devpath" 2>/dev/null
