@@ -1,32 +1,40 @@
-CPP    := g++ -Wall -g -fstack-protector -fstack-protector-all -Wno-unused-but-set-variable -Wno-unused-variable
-LIB   := -lpthread -lrt -lpstat -lvdev -lfskit -lfskit_fuse -lfuse
-LIBINC := -L../libvdev
-INC   := -I. -I.. -I/usr/include -I/usr/local/include
-C_SRCS:= $(wildcard *.c) 
-CXSRCS:= $(wildcard *.cpp)
-OBJ   := $(patsubst %.c,%.o,$(C_SRCS)) $(patsubst %.cpp,%.o,$(CXSRCS))
-DEFS  := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS -D_FILE_OFFSET_BITS=64
+include ../buildconf.mk
 
-VDEVFS := vdevfs
+C_SRCS:= $(wildcard *.c)
+CPP_SRCS := $(wildcard *.cpp)
 
-PREFIX ?= /usr
-BINDIR ?= $(PREFIX)/sbin
+DEF   := -D_FILE_OFFSET_BITS=64
+LIB   := -lvdev -lfuse -lfskit_fuse -lfskit -lpstat
+OBJ   := $(patsubst %.c,$(BUILD_VDEVFS)/%.o,$(C_SRCS)) \
+	      $(patsubst %.cpp,$(BUILD_VDEVFS)/%.o,$(CPP_SRCS))
+
+VDEVFS := $(BUILD_VDEVFS)/vdevfs
+
+VDEVFS_INSTALL := $(INSTALL_VDEVFS)/vdevfs
 
 all: $(VDEVFS)
 
 $(VDEVFS): $(OBJ)
-	$(CPP) -o $(VDEVFS) $(OBJ) $(LIBINC) $(LIB)
+	@mkdir -p $(shell dirname "$@")
+	$(CPP) -o $@ $(OBJ) $(LIBINC) $(LIB)
 
-install: $(VDEVFS)
-	mkdir -p $(BINDIR)
-	cp -a $(VDEVFS) $(BINDIR)
+$(BUILD_VDEVFS)/%.o : %.c
+	@mkdir -p $(shell dirname "$@")
+	$(CPP) -o $@ -c $< $(DEF)
 
-%.o : %.c
-	$(CPP) -o $@ $(INC) -c $< $(DEFS)
+$(BUILD_VDEVFS)/%.o : %.cpp
+	@mkdir -p $(shell dirname "$@")
+	$(CPP) -o $@ -c $< $(DEF)
 
-%.o: %.cpp
-	$(CPP) -o $@ $(INC) -c $< $(DEFS)
+install: $(VDEVFS_INSTALL)
+$(VDEVFS_INSTALL): $(VDEVFS)
+	@mkdir -p $(INSTALL_VDEVFS)
+	cp -a $(VDEVFS) $(INSTALL_VDEVFS)/
 
 .PHONY: clean
 clean:
-	/bin/rm -f $(OBJ) $(VDEVFS)
+	rm -f $(OBJ) $(VDEVFS)
+
+.PHONY: uninstall
+uninstall:
+	rm -f $(VDEVFS_INSTALL)

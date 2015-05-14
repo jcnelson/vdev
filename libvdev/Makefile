@@ -1,44 +1,64 @@
-CPP    := gcc -Wall -g -fPIC -std=c99 -Wno-unused-but-set-variable -Wno-unused-variable
-LIB   := 
-INC   := -I. -I/usr/include -I/usr/local/include 
+include ../buildconf.mk
+
 C_SRCS:= $(wildcard *.c)
 
 HEADERS := $(wildcard *.h)
-OBJ   := $(patsubst %.c,%.o,$(C_SRCS))
-
-DEFS  := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS 
+OBJ := $(patsubst %.c,$(BUILD_LIBVDEV)/%.o,$(C_SRCS))
+LIB :=
 
 VERSION_MAJOR := 1
 VERSION_MINOR := 0
 VERSION_PATCH := 1
 
-LIBVDEV := libvdev.so
-LIBVDEV_SO := libvdev.so.$(VERSION_MAJOR)
-LIBVDEV_LIB := libvdev.so.$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_PATCH)
+LIBVDEV := $(BUILD_LIBVDEV)/libvdev.so
+LIBVDEV_SONAME := libvdev.so.$(VERSION_MAJOR)
+LIBVDEV_SO := $(BUILD_LIBVDEV)/libvdev.so.$(VERSION_MAJOR)
+LIBVDEV_LIB := $(BUILD_LIBVDEV)/libvdev.so.$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_PATCH)
 
-PREFIX ?= /
-BINDIR ?= $(PREFIX)/bin
-LIBDIR ?= $(PREFIX)/lib
-INCLUDEDIR ?= $(PREFIX)/include/libvdev
+LIBVDEV_FILES := $(LIBVDEV) $(LIBVDEV_SO) $(LIBVDEV_LIB)
 
-all: libvdev 
+LIBVDEV_HEADERS := $(patsubst %.h,$(BUILD_LIBVDEV_HEADERS)/%.h,$(HEADERS))
 
-libvdev: $(OBJ)
-	$(CPP) -shared -Wl,-soname,$(LIBVDEV_SO) -o $(LIBVDEV_LIB) $(OBJ) $(LIBINC) $(LIB)
-	$(SHELL) -c "if ! test -L $(LIBVDEV_SO); then /bin/ln -s $(LIBVDEV_LIB) $(LIBVDEV_SO); fi"
-	$(SHELL) -c "if ! test -L $(LIBVDEV); then /bin/ln -s $(LIBVDEV_SO) $(LIBVDEV); fi"
+LIBVDEV_FILES_INSTALL := $(patsubst $(BUILD_LIBVDEV)/%,$(LIBDIR)/%,$(LIBVDEV_FILES))
 
-install: libvdev
-	mkdir -p $(LIBDIR)
-	cp -a $(LIBVDEV) $(LIBVDEV_SO) $(LIBVDEV_LIB) $(LIBDIR)
+LIBVDEV_HEADERS_INSTALL := $(patsubst $(BUILD_LIBVDEV_HEADERS)/%.h,$(INCLUDEDIR)/libvdev/%.h,$(LIBVDEV_HEADERS))
 
-install-dev: libvdev
-	mkdir -p $(INCLUDEDIR) 
-	cp -a $(wildcard *.h) $(INCLUDEDIR)
+all: $(LIBVDEV_FILES) $(LIBVDEV_HEADERS)
 
-%.o : %.c
-	$(CPP) -o $@ $(INC) -c $< $(DEFS)
+$(LIBVDEV): $(OBJ)
+	@mkdir -p $(shell dirname "$@")
+	$(CPP) -shared -Wl,-soname,$(LIBVDEV_SO) -o $@ $(OBJ) $(LIBINC) $(LIB)
 
-.PHONY: clean
+$(LIBVDEV_LIB): $(LIBVDEV)
+	@mkdir -p $(shell dirname "$@")
+	@ln -s $(shell basename $<) $@
+
+$(LIBVDEV_SO): $(LIBVDEV_LIB)
+	@mkdir -p $(shell dirname "$@")
+	@ln -s $(shell basename $<) $@
+
+$(BUILD_LIBVDEV_HEADERS)/%.h: %.h
+	@mkdir -p $(shell dirname "$@")
+	@cp -a $< $@
+
+$(BUILD_LIBVDEV)/%.o: %.c
+	@mkdir -p $(shell dirname "$@")
+	$(CPP) -o $@ -c $< 
+
+install: $(LIBVDEV_FILES_INSTALL) $(LIBVDEV_HEADERS_INSTALL)
+
+$(LIBDIR)/%: $(BUILD_LIBVDEV)/%
+	@mkdir -p $(shell dirname "$@")
+	@cp -a $< $@
+
+$(INCLUDEDIR)/libvdev/%.h: $(BUILD_LIBVDEV_HEADERS)/%.h
+	@mkdir -p $(shell dirname "$@")
+	@cp -a $< $@
+
+.PHONY: uninstall
+uninstall:
+	rm -f $(LIBVDEV_FILES_INSTALL) $(LIBVDEV_HEADERS_INSTALL)
+
+.PHONY: clean 
 clean:
-	/bin/rm -f $(OBJ) $(LIBVDEV_LIB) $(LIBVDEV_SO) $(LIBVDEV)
+	rm -f $(LIBVDEV_FILES) $(LIBVDEV_HEADERS) $(OBJ)

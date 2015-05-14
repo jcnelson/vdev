@@ -1,82 +1,99 @@
-CONF_ROOT := .
-CONF_ABS_ROOT := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
-PREFIX ?= 
-
-BUILD_ROOT := $(CONF_ROOT)/build/
-
-INITRAMFS_ROOT := $(CONF_ROOT)/build/initramfs/
-VDEV_INITRAMFS := $(CONF_ROOT)/initramfs/
-
-CONF_DIR := $(PREFIX)/etc/vdev
-ACTIONS_DIR := $(CONF_DIR)/actions
+include ../buildconf.mk
 
 ACTIONS := $(wildcard actions/*.act)
-ACTIONS_BUILD := $(patsubst actions/%.act,$(BUILD_ROOT)/etc/vdev/actions/%.act,$(ACTIONS))
-ACTIONS_INSTALL := $(patsubst actions/%.act,$(CONF_DIR)/actions/%.act,$(ACTIONS))
 
-IFNAMES_BUILD := $(BUILD_ROOT)/etc/vdev/ifnames.conf
-CONF_BUILD := $(BUILD_ROOT)/etc/vdev/vdevd.conf
-INITSCRIPT_BUILD := $(BUILD_ROOT)/etc/init.d/vdev
+ACTIONS_BUILD := $(patsubst actions/%.act,$(BUILD_VDEV_CONFIG)/actions/%.act,$(ACTIONS))
+ACTIONS_INSTALL := $(patsubst actions/%.act,$(INSTALL_VDEV_CONFIG)/actions/%.act,$(ACTIONS))
 
-INITSCRIPT_INSTALL := $(PREFIX)/etc/init.d/vdev
+IFNAMES_BUILD := $(BUILD_VDEV_CONFIG)/ifnames.conf
+IFNAMES_INSTALL := $(INSTALL_VDEV_CONFIG)/ifnames.conf
 
-VDEV_BUILD := $(CONF_BUILD) $(ACTIONS_BUILD) $(IFNAMES_BUILD) $(INITSCRIPT_BUILD)
-VDEV_INSTALL := $(patsubst $(BUILD_ROOT)/%,$(PREFIX)/%,$(VDEV_BUILD))
+CONF_BUILD := $(BUILD_VDEV_CONFIG)/vdevd.conf
+CONF_INSTALL := $(INSTALL_VDEV_CONFIG)/vdevd.conf
+
+INITSCRIPT_BUILD := $(BUILD_VDEV_INITSCRIPT)/vdev
+INITSCRIPT_INSTALL := $(INSTALL_VDEV_INITSCRIPT)/vdev
+
+INITRAMFS_FILES := $(wildcard initramfs/hooks/*) \
+	                $(wildcard initramfs/scripts/init-bottom/*) \
+	                $(wildcard initramfs/scripts/init-top/*) \
+						 $(wildcard initramfs/init)
+
+INITRAMFS_BUILD := $(patsubst initramfs/%,$(BUILD_VDEV_INITRAMFS)/%,$(INITRAMFS_FILES))
+INITRAMFS_INSTALL := $(patsubst initramfs/%,$(INSTALL_VDEV_INITRAMFS)/%,$(INITRAMFS_FILES))
+
+VDEV_CONFIG_BUILD := $(CONF_BUILD) $(ACTIONS_BUILD) $(IFNAMES_BUILD) $(INITSCRIPT_BUILD) $(INITRAMFS_BUILD) 
+VDEV_CONFIG_INSTALL := $(CONF_INSTALL) $(ACTIONS_INSTALL) $(IFNAMES_INSTALL) $(INITSCRIPT_INSTALL) 
 
 TOOLS := ../tools/
+VDEVD := ../vdevd/
 
-GEN_IFNAMES := $(TOOLS)/persistent-net-names/gen-ifnames.sh
+GEN_IFNAMES := $(BUILD_VDEVD_HELPERS)/gen-ifnames.sh
 MKINITRAMFS := make-initramfs.sh
 VDEV_INSTALL_SCRIPT := vdev-install.sh
 
-all: $(VDEV_BUILD)
+# debugging
 print-%: ; @echo $*=$($*)
-$(CONF_BUILD): $(CONF_ROOT)/vdevd.conf.in
-	@mkdir -p $(shell dirname $@)
+
+all: $(VDEV_CONFIG_BUILD)
+$(CONF_BUILD): vdevd.conf.in
+	@mkdir -p $(shell dirname "$@")
 	@cat $< | \
 		sed -e 's~@PREFIX@~$(PREFIX)~g;' | \
-		sed -e 's~@CONF_DIR@~$(CONF_DIR)~g;' > $@
+		sed -e 's~@CONF_DIR@~$(INSTALL_VDEV_CONFIG)~g;' > $@
 
-$(IFNAMES_BUILD): $(CONF_ROOT)/ifnames.conf.in 
-	@mkdir -p $(shell dirname $@)
+$(IFNAMES_BUILD): ifnames.conf.in 
+	@mkdir -p $(shell dirname "$@")
 	@cat $< > $@
 	$(GEN_IFNAMES) >> $@
 
-$(INITSCRIPT_BUILD): $(CONF_ROOT)/sysv-initscript.sh 
-	@mkdir -p $(shell dirname $@)
+$(INITSCRIPT_BUILD): sysv-initscript.sh 
+	@mkdir -p $(shell dirname "$@")
+	@cp -a $< $@
+
+$(BUILD_VDEV_CONFIG)/actions/%: actions/%
+	@mkdir -p $(shell dirname "$@")
 	@cat $< > $@
 
-initscript_install: $(INITSCRIPT_INSTALL)
+$(BUILD_VDEV_INITRAMFS)/%: initramfs/%
+	@mkdir -p $(shell dirname "$@")
+	@cp -a $< $@
+
+$(CONF_INSTALL): $(CONF_BUILD)
+	@mkdir -p $(shell dirname "$@")
+	@cat $< > $@
+
+$(IFNAMES_INSTALL): $(IFNAMES_BUILD)
+	@mkdir -p $(shell dirname "$@")
+	@cat $< > $@
+
 $(INITSCRIPT_INSTALL): $(INITSCRIPT_BUILD)
-	@mkdir -p $(shell dirname $@)
-	@cat $< > $@
-	@chmod +x $@
+	@mkdir -p $(shell dirname "$@")
+	@cp -a $< $@
 
-actions: $(ACTIONS_BUILD)
-$(BUILD_ROOT)/etc/vdev/actions/%.act: actions/%.act
-	@mkdir -p $(shell dirname $@)
+$(INSTALL_VDEV_CONFIG)/actions/%: $(BUILD_VDEV_CONFIG)/actions/%
+	@mkdir -p $(shell dirname "$@")
 	@cat $< > $@
 
-install-files: $(VDEV_INSTALL) initscript_install
-$(PREFIX)/%: $(BUILD_ROOT)/%
-	@mkdir -p $(shell dirname $@)
-	@cat $< > $@
+$(INSTALL_VDEV_INITRAMFS)/%: $(BUILD_VDEV_INITRAMFS)/%
+	@mkdir -p $(shell dirname "$@")
+	@cp -a $< $@
 
 .PHONY: initramfs
-initramfs: $(VDEV_INSTALL) 
+initramfs: $(VDEV_CONFIG_INSTALL) $(INITRAMFS_INSTALL)
 	$(SHELL) ./$(MKINITRAMFS)
 
 .PHONY: install
-install: install-files
+install: $(VDEV_CONFIG_INSTALL)
 	$(SHELL) ./$(VDEV_INSTALL_SCRIPT) $(PREFIX)
 
 .PHONY: clean
 clean:
-	@rm -rf $(CONF_ROOT)/build
+	rm -f $(VDEV_CONFIG_BUILD)
 
 .PHONY: uninstall
 uninstall:
-	@rm -f $(VDEV_INSTALL)
+	rm -f $(VDEV_CONFIG_INSTALL)
 	update-rc.d -f vdev remove
 	@echo "vdev configuration and init scripts have been removed."
 	@echo "You will need to re-enable your previous device manager."

@@ -1,39 +1,44 @@
-CPP    := gcc -std=c99 -Wall -g -fstack-protector -fstack-protector-all -Wno-unused-but-set-variable -Wno-unused-variable
-LIB   := -lpthread -lrt -lvdev
-INC   := -I. -I../ -I/usr/include -I/usr/local/include
-LIBINC := -L../libvdev
+include ../buildconf.mk
+
 C_SRCS:= $(wildcard *.c) $(wildcard os/*.c)
-OBJ   := $(patsubst %.c,%.o,$(C_SRCS)) 
-DEFS  := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS -D_FILE_OFFSET_BITS=64
 
-VDEV := vdevd
+LIB   := -lvdev
+OBJ   := $(patsubst %.c,$(BUILD_VDEVD)/%.o,$(C_SRCS)) 
+VDEVD := $(BUILD_VDEVD)/vdevd
 
-PREFIX ?= /
-BINDIR ?= $(PREFIX)/sbin
+VDEVD_INSTALL := $(INSTALL_VDEVD)/vdevd
 
-# change/override this for your OS
-OS := LINUX
+HELPERS_DIR := helpers/$(OS)
 
-HELPERS_DIR := ./helpers/$(OS)
+all: $(VDEVD) helpers
 
-all: $(VDEV) helpers
+$(VDEVD): $(OBJ) helpers
+	@mkdir -p $(shell dirname "$@")
+	$(CC) -o $@ $(OBJ) $(LIBINC) $(LIB)
 
-$(VDEV): $(OBJ) helpers
-	$(CPP) -o $(VDEV) $(OBJ) $(LIBINC) $(LIB) -D_VDEV_OS_$(OS)
+$(BUILD_VDEVD)/%.o : %.c
+	@mkdir -p $(shell dirname "$@")
+	$(CC) -o $@ -c $< 
 
 .PHONY: helpers
 helpers:
 	$(MAKE) -C $(HELPERS_DIR)
 
-install: $(VDEV)
-	mkdir -p $(BINDIR)
-	cp -a $(VDEV) $(BINDIR)
+.PHONY: helpers-install
+helpers-install:
 	$(MAKE) -C $(HELPERS_DIR) install
 
-%.o : %.c
-	$(CPP) -o $@ $(INC) -c $< $(DEFS) -D_VDEV_OS_$(OS)
+install: $(VDEVD_INSTALL) helpers-install
+$(VDEVD_INSTALL): $(VDEVD)
+	@mkdir -p $(INSTALL_VDEVD)
+	cp -a $(VDEVD) $(INSTALL_VDEVD)/
 
 .PHONY: clean
 clean:
-	/bin/rm -f $(OBJ) $(VDEV)
+	rm -f $(OBJ) $(VDEVD)
 	$(MAKE) -C $(HELPERS_DIR) clean
+
+.PHONY: uninstall
+uninstall:
+	rm -f $(VDEVD)
+	$(MAKE) -C $(HELPERS_DIR) uninstall

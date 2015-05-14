@@ -1,34 +1,39 @@
-CPP    := gcc -Wall -g -std=c99
-LIB   := -lpthread -lrt 
-INC   := -I/usr/include -I/usr/local/include -I. 
-C_SRCS:= $(wildcard *.c) $(wildcard os/*.c)
-CXSRCS:= $(wildcard *.cpp) $(wildcard os/*.cpp)
-OBJ   := $(patsubst %.c,%.o,$(C_SRCS)) $(patsubst %.cpp,%.o,$(CXSRCS))
-DEFS  := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS -fstack-protector -fstack-protector-all
+include ../../../buildconf.mk
 
-HELPERS := stat_optical stat_ata stat_input stat_scsi stat_v4l stat_net stat_usb stat_bus stat_path
+C_SRCS:= $(wildcard *.c) 
+CXSRCS:= $(wildcard *.cpp) 
+OBJ   := $(patsubst %.c,$(BUILD_VDEVD_HELPERS)/%.o,$(C_SRCS)) $(patsubst %.cpp,$(BUILD_VDEVD_HELPERS)/%.o,$(CXSRCS))
+LIB   :=
+
 HELPER_SCRIPTS := $(wildcard *.sh)
+HELPERS := stat_optical stat_ata stat_input stat_scsi stat_v4l stat_net stat_usb stat_bus stat_path $(HELPER_SCRIPTS)
 
-PREFIX ?= /
-BINDIR ?= $(PREFIX)/lib/vdev/
+HELPERS_BUILD := $(patsubst %,$(BUILD_VDEVD_HELPERS)/%,$(HELPERS))
+HELPERS_INSTALL := $(patsubst %,$(INSTALL_VDEVD_HELPERS)/%,$(HELPERS))
 
-DEBUG ?= 0
+all: $(HELPERS_BUILD)
 
-all: $(HELPERS)
+$(BUILD_VDEVD_HELPERS)/%: $(BUILD_VDEVD_HELPERS)/%.o $(BUILD_VDEVD_HELPERS)/common.o
+	@mkdir -p $(shell dirname "$@")
+	$(CC) -o $@ $< $(BUILD_VDEVD_HELPERS)/common.o $(LIBINC) $(LIB)
 
-stat_%: stat_%.o common.o
-	$(CPP) -o $@ $(INC) $(LIBINC) $(LIB) $< common.o
+$(BUILD_VDEVD_HELPERS)/%.o: %.c
+	@mkdir -p $(shell dirname "$@")
+	$(CC) -o $@ -c $<
 
-install: $(HELPERS)
-	mkdir -p $(BINDIR)
-	cp -a $(HELPERS) $(HELPER_SCRIPTS) $(BINDIR)
+$(BUILD_VDEVD_HELPERS)/%.sh: %.sh
+	@mkdir -p $(shell dirname "$@")
+	@cp -a $< $@
 
-%.o : %.c
-	$(CPP) -o $@ $(INC) -c $< $(DEFS) -DDEBUG=$(DEBUG)
+install: $(HELPERS_INSTALL)
+$(INSTALL_VDEVD_HELPERS)/%: $(BUILD_VDEVD_HELPERS)/%
+	@mkdir -p $(shell dirname "$@")
+	cp -a $< $@
 
-%.o : %.cpp
-	$(CPP) -o $@ $(INC) -c $< $(DEFS) -DDEBUG=$(DEBUG)
+.PHONY: uninstall
+uninstall:
+	rm -f $(HELPERS_INSTALL)
 
 .PHONY: clean
 clean:
-	/bin/rm -f $(OBJ) $(HELPERS)
+	rm -f $(OBJ) $(HELPERS_BUILD)
