@@ -22,7 +22,7 @@
 #ifndef _VDEV_OS_METHODS_H_
 #define _VDEV_OS_METHODS_H_
 
-#include "vdev.h"
+#include "vdevd/vdev.h"
 #include "common.h"
 
 // add OS-specific headers here

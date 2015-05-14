@@ -20,7 +20,7 @@
 */
 
 #include "common.h"
-#include "device.h"
+#include "vdevd/device.h"
 #include "workqueue.h"
 #include "methods.h"
 
