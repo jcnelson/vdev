@@ -95,5 +95,12 @@ clean:
 uninstall:
 	rm -f $(VDEV_CONFIG_INSTALL)
 	update-rc.d -f vdev remove
+	@echo ""
 	@echo "vdev configuration and init scripts have been removed."
 	@echo "You will need to re-enable your previous device manager."
+	@echo ""
+	@echo "Example:"
+	@echo "   $$ sudo update-rc.d udev defaults"
+	@echo "   $$ sudo update-rc.d udev-finish defaults"
+	@echo "   $$ sudo insserv"
+	@echo ""
