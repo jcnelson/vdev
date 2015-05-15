@@ -14,7 +14,7 @@ all: $(VDEVD) helpers
 
 $(VDEVD): $(OBJ) helpers
 	@mkdir -p $(shell dirname "$@")
-	$(CC) -o $@ $(OBJ) $(LIBINC) $(LIB)
+	$(CC) -o $@ $(OBJ) $(LIB) $(LIBINC)
 
 $(BUILD_VDEVD)/%.o : %.c
 	@mkdir -p $(shell dirname "$@")
@@ -31,7 +31,7 @@ helpers-install:
 install: $(VDEVD_INSTALL) helpers-install
 $(VDEVD_INSTALL): $(VDEVD)
 	@mkdir -p $(INSTALL_VDEVD)
-	cp -a $(VDEVD) $(INSTALL_VDEVD)/
+	cp -a $< $@
 
 .PHONY: clean
 clean:
