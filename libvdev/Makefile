@@ -27,7 +27,7 @@ all: $(LIBVDEV_FILES) $(LIBVDEV_HEADERS)
 
 $(LIBVDEV): $(OBJ)
 	@mkdir -p $(shell dirname "$@")
-	$(CPP) -shared -Wl,-soname,$(LIBVDEV_SO) -o $@ $(OBJ) $(LIBINC) $(LIB)
+	$(CPP) -shared -Wl,-soname,$(LIBVDEV_SONAME) -o $@ $(OBJ) $(LIBINC) $(LIB)
 
 $(LIBVDEV_LIB): $(LIBVDEV)
 	@mkdir -p $(shell dirname "$@")
