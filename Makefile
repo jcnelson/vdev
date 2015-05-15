@@ -14,3 +14,10 @@ clean:
 	$(MAKE) -C libvdev clean
 	$(MAKE) -C vdevd clean
 	$(MAKE) -C fs clean
+	$(MAKE) -C example clean
+
+uninstall:
+	$(MAKE) -C libvdev uninstall
+	$(MAKE) -C vdevd uninstall
+	$(MAKE) -C fs uninstall
+	$(MAKE) -C example uninstall
