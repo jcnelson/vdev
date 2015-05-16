@@ -16,15 +16,15 @@ INSTALL_SETTINGS := $(wildcard $(BUILD)/.install.mk)
 
 # install environment
 ifeq ($(INSTALL_SETTINGS),)
-	PREFIX         ?= /usr/local
+	PREFIX         ?= /
 	BINDIR         ?= $(PREFIX)/bin
 	SBINDIR			?= $(PREFIX)/sbin
 	LIBDIR         ?= $(PREFIX)/lib
-	INCLUDEDIR     ?= /usr/local/include
+	INCLUDEDIR     ?= /usr/include
 	USRBINDIR		?= /usr/bin
 	USRSBINDIR		?= /usr/sbin
 	USRSHAREDIR		?= /usr/share
-	PKGCONFIGDIR   ?= $(PREFIX)/lib/pkgconfig
+	PKGCONFIGDIR   ?= /usr/lib/pkgconfig
 	ETCDIR			?= /etc
 else
 	include $(INSTALL_MK)
