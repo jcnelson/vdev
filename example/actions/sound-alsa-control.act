@@ -1,5 +1,5 @@
 [vdev-action]
 event=any
-path=^snd/controlC[0-9]+$
+path=^snd/.+$
 OS_SUBSYSTEM=sound
 command=exec $VDEV_HELPERS/sound.sh
