@@ -1,9 +1,9 @@
-#!/bin/sh
+#!/bin/dash
 
 
 # helper for generating dm block device paths and symlinks.
 
-. $VDEV_HELPERS/subr.sh
+. "$VDEV_HELPERS/subr.sh"
 
 # if removing, just blow away the links
 if [ "$VDEV_ACTION" = "remove" ]; then
@@ -32,26 +32,26 @@ fi
 
 if [ -n "$DM_NAME" ]; then
 
-   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/dm-name-$DM_NAME $VDEV_METADATA
-   vdev_symlink ../$VDEV_PATH $VDEV_MOUNTPOINT/mapper/$DM_NAME $VDEV_METADATA
+   vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/disk/by-id/dm-name-$DM_NAME" "$VDEV_METADATA"
+   vdev_symlink "../$VDEV_PATH" "$VDEV_MOUNTPOINT/mapper/$DM_NAME" "$VDEV_METADATA"
 fi
 
 if [ -n "$DM_UUID" ]; then
 
-   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/dm-uuid-$DM_UUID $VDEV_METADATA
+   vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/disk/by-id/dm-uuid-$DM_UUID" "$VDEV_METADATA"
 fi
 
 # also add by-uuid link 
 UUID=
 
 if [ -x /sbin/blkid ]; then
-   eval $(/sbin/blkid -o export $VDEV_MOUNTPOINT/$VDEV_PATH)
+   eval $(/sbin/blkid -o export "$VDEV_MOUNTPOINT/$VDEV_PATH")
 else
    vdev_warn "Could not find blkid in /sbin/blkid.  Symlinks in $VDEV_MOUNTPOINT/disk/by-* will not be created."
 fi
 
 if [ -n "$UUID" ]; then
-   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-uuid/$UUID $VDEV_METADATA 
+   vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/disk/by-uuid/$UUID" "$VDEV_METADATA"
 fi
 
 # create all logical volume links
@@ -86,8 +86,8 @@ if [ -x /sbin/lvs ]; then
       fi
 
       # create the LVM link for this mapped device
-      /bin/mkdir -p $VDEV_MOUNTPOINT/$LVM2_VG_NAME
-      vdev_symlink ../$VDEV_PATH $VDEV_MOUNTPOINT/$LVM2_VG_NAME/$LVM2_LV_NAME $VDEV_METADATA
+      /bin/mkdir -p "$VDEV_MOUNTPOINT/$LVM2_VG_NAME"
+      vdev_symlink "../$VDEV_PATH" "$VDEV_MOUNTPOINT/$LVM2_VG_NAME/$LVM2_LV_NAME" "$VDEV_METADATA"
 
    done
 else
@@ -96,6 +96,6 @@ else
 fi
 
 # set ownership and bits 
-vdev_permissions root.disk 0660 $VDEV_MOUNTPOINT/$VDEV_PATH
+vdev_permissions root.disk 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
 
 exit 0

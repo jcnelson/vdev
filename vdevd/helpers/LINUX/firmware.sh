@@ -1,11 +1,11 @@
-#!/bin/sh
+#!/bin/dash
 
-. $VDEV_HELPERS/subr.sh
+. "$VDEV_HELPERS/subr.sh"
 
 # if instructed to load firmware, do so
 if [ -n "$VDEV_OS_FIRMWARE" -a -n "$VDEV_OS_DEVPATH" ]; then 
    
-   vdev_firmware_load $VDEV_OS_DEVPATH $VDEV_FIRMARE_DIR/$VDEV_OS_FIRMWARE 
+   vdev_firmware_load "$VDEV_OS_DEVPATH" "$VDEV_FIRMARE_DIR/$VDEV_OS_FIRMWARE"
    
    _RC=$?
 

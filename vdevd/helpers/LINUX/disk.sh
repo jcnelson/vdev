@@ -1,14 +1,14 @@
-#!/bin/sh
+#!/bin/dash
 
 # vdev helper for setting up symlinks to disks and partitions 
 # works for ATA, SATA, and USB disks
 
-. $VDEV_HELPERS/subr.sh
+. "$VDEV_HELPERS/subr.sh"
 
 # if we're removing this disk, just blow away its symlinks
 if [ "$VDEV_ACTION" = "remove" ]; then 
 
-   vdev_rmlinks $VDEV_METADATA
+   vdev_rmlinks "$VDEV_METADATA"
    exit 0
 fi
 
@@ -19,12 +19,12 @@ if [ "$VDEV_ACTION" != "add" ]; then
 fi
 
 # is this an ATA disk?
-DISK_TYPE=$(test -n "$(echo $VDEV_OS_DEVPATH | /bin/grep -i ata)" && echo "ata")
+DISK_TYPE=$(test -n "$(echo "$VDEV_OS_DEVPATH" | /bin/grep -i ata)" && echo "ata")
 
 if [ -z "$DISK_TYPE" ]; then
    
    # is this a USB disk, then?
-   DISK_TYPE=$(test -n "$(echo $VDEV_OS_DEVPATH | /bin/grep -i usb)" && echo "usb")
+   DISK_TYPE=$(test -n "$(echo "$VDEV_OS_DEVPATH" | /bin/grep -i usb)" && echo "usb")
 fi
 
 # is this a disk type this script supports?
@@ -40,7 +40,7 @@ case "$DISK_TYPE" in
    ata)
 
       # (S)ATA disk
-      eval $($VDEV_HELPERS/stat_ata $VDEV_MOUNTPOINT/$VDEV_PATH)
+      eval $($VDEV_HELPERS/stat_ata "$VDEV_MOUNTPOINT/$VDEV_PATH")
       STAT_RET=$?
 
       # disk id is the serial number
@@ -54,7 +54,7 @@ case "$DISK_TYPE" in
    usb)
       
       # USB disk
-      eval $($VDEV_HELPERS/stat_usb $VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH)
+      eval $($VDEV_HELPERS/stat_usb "$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH")
       STAT_RET=$?
 
             
@@ -83,7 +83,7 @@ PART_NAME=
 # see if this is a partition...
 if [ "$VDEV_OS_DEVTYPE" = "partition" ]; then 
 
-   PART=$(/bin/cat $VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH/partition)
+   PART=$(/bin/cat "$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH/partition")
 
    test -z $PART && vdev_fail 5 "unknown partition"
 
@@ -99,7 +99,7 @@ PARTUUID=
 PARTLABEL=
 
 if [ -x /sbin/blkid ]; then 
-   eval $(/sbin/blkid -o export $VDEV_MOUNTPOINT/$VDEV_PATH)
+   eval $(/sbin/blkid -o export "$VDEV_MOUNTPOINT/$VDEV_PATH")
 else
    vdev_warn "Could not find blkid in /sbin/blkid.  $VDEV_MOUNTPOINT/disk/by-*/ symlinks will not be added."
 fi
@@ -116,26 +116,26 @@ fi
 
   
 # add the disk
-vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$DISK_NAME $VDEV_METADATA
+vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/disk/by-id/$DISK_NAME" "$VDEV_METADATA"
 
 if [ -n "$UUID" ]; then
-   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-uuid/$UUID $VDEV_METADATA 
+   vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/disk/by-uuid/$UUID" "$VDEV_METADATA"
 fi
 
 if [ -n "$LABEL" ]; then 
-   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-label/$LABEL $VDEV_METADATA
+   vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/disk/by-label/$LABEL" "$VDEV_METADATA"
 fi
 
 if [ -n "$WWN" ]; then
-   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/$WWN $VDEV_METADATA
+   vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/disk/by-id/$WWN" "$VDEV_METADATA"
 fi
 
 if [ -n "$PARTUUID" ]; then 
-   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-partuuid/$PARTUUID $VDEV_METADATA
+   vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/disk/by-partuuid/$PARTUUID" "$VDEV_METADATA"
 fi
 
 if [ -n "$PARTLABEL" ]; then 
-   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-partlabel/$PARTLABEL $VDEV_METADATA
+   vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/disk/by-partlabel/$PARTLABEL" "$VDEV_METADATA"
 fi
 
 # is this a physical volume?
@@ -153,11 +153,11 @@ fi
 if [ $PVS_RC -eq 0 -a -n "$LVM2_PV_UUID" ]; then 
    
    # this is a PV
-   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/disk/by-id/lvm-pv-uuid-$LVM2_PV_UUID $VDEV_METADATA
+   vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/disk/by-id/lvm-pv-uuid-$LVM2_PV_UUID" "$VDEV_METADATA"
 
 fi
 
 # set ownership and bits 
-vdev_permissions root.disk 0660 $VDEV_MOUNTPOINT/$VDEV_PATH
+vdev_permissions root.disk 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
 
 exit 0

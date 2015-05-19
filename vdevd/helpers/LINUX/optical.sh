@@ -1,8 +1,8 @@
-#!/bin/sh
+#!/bin/dash
 
 # vdev helper to set up symlinks to optical (CD, DVD) devices, based on capability
 
-. $VDEV_HELPERS/subr.sh
+. "$VDEV_HELPERS/subr.sh"
 
 # removing? blow away the symlinks 
 if [ "$VDEV_ACTION" = "remove" ]; then 
@@ -18,7 +18,7 @@ if [ "$VDEV_ACTION" != "add" ]; then
 fi
 
 # set up capability environment variables 
-eval $($VDEV_HELPERS/stat_optical $VDEV_MOUNTPOINT/$VDEV_PATH)
+eval $($VDEV_HELPERS/stat_optical "$VDEV_MOUNTPOINT/$VDEV_PATH")
 STAT_RC=$?
 
 # verify that we stat'ed the optical device...
@@ -34,22 +34,22 @@ add_capability_link() {
 
    if [ $CAPABILITY = "1" ]; then
 
-      vdev_symlink $VDEV_PATH $VDEV_MOUNTPOINT/$TARGET $VDEV_METADATA
+      vdev_symlink "$VDEV_PATH" "$VDEV_MOUNTPOINT/$TARGET" "$VDEV_METADATA"
    fi
 }
 
 
 # always add 'cdrom'
-vdev_symlink $VDEV_PATH $VDEV_MOUNTPOINT/cdrom $VDEV_METADATA 
+vdev_symlink "$VDEV_PATH" "$VDEV_MOUNTPOINT/cdrom" "$VDEV_METADATA"
 
 # conditionally add symlinks, based on capability
-add_capability_link $VDEV_PATH $VDEV_OPTICAL_CD_R "cdrw"
-add_capability_link $VDEV_PATH $VDEV_OPTICAL_CD_RW "cdrw"
-add_capability_link $VDEV_PATH $VDEV_OPTICAL_DVD "dvd"
-add_capability_link $VDEV_PATH $VDEV_OPTICAL_DVD_R "dvdrw"
-add_capability_link $VDEV_PATH $VDEV_OPTICAL_DVD_RAM "dvdrw"
+add_capability_link "$VDEV_PATH" $VDEV_OPTICAL_CD_R "cdrw"
+add_capability_link "$VDEV_PATH" $VDEV_OPTICAL_CD_RW "cdrw"
+add_capability_link "$VDEV_PATH" $VDEV_OPTICAL_DVD "dvd"
+add_capability_link "$VDEV_PATH" $VDEV_OPTICAL_DVD_R "dvdrw"
+add_capability_link "$VDEV_PATH" $VDEV_OPTICAL_DVD_RAM "dvdrw"
 
 # set ownership and bits 
-vdev_permissions root.cdrom 0660 $VDEV_MOUNTPOINT/$VDEV_PATH
+vdev_permissions root.cdrom 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
 
 exit 0

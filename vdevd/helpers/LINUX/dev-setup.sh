@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/dash
 
 # Pre-seed initialization script to vdevd.
 # usage: dev-setup.sh /path/to/dev
@@ -18,28 +18,28 @@ VDEV_MOUNTPOINT=$1
 umask 022
 
 # add /dev/fd
-/bin/ln -sf /proc/self/fd $VDEV_MOUNTPOINT/fd
+/bin/ln -sf /proc/self/fd "$VDEV_MOUNTPOINT/fd"
 
 # add /dev/core 
-/bin/ln -sf /proc/kcore $VDEV_MOUNTPOINT/core
+/bin/ln -sf /proc/kcore "$VDEV_MOUNTPOINT/core"
 
 # feed /dev/null into vdev
 echo "c null 1 3"
 
 # add /dev/stdin, /dev/stdout, /dev/stderr
-/bin/ln -sf /proc/self/fd/0 $VDEV_MOUNTPOINT/stdin
-/bin/ln -sf /proc/self/fd/1 $VDEV_MOUNTPOINT/stdout
-/bin/ln -sf /proc/self/fd/2 $VDEV_MOUNTPOINT/stderr
+/bin/ln -sf /proc/self/fd/0 "$VDEV_MOUNTPOINT/stdin"
+/bin/ln -sf /proc/self/fd/1 "$VDEV_MOUNTPOINT/stdout"
+/bin/ln -sf /proc/self/fd/2 "$VDEV_MOUNTPOINT/stderr"
 
 # add MAKEDEV
 if [ -e /sbin/MAKEDEV ]; then
-   /bin/ln -sf /sbin/MAKEDEV $VDEV_MOUNTPOINT/MAKEDEV
+   /bin/ln -sf /sbin/MAKEDEV "$VDEV_MOUNTPOINT/MAKEDEV"
 else
-   /bin/ln -sf /bin/true $VDEV_MOUNTPOINT/MAKEDEV
+   /bin/ln -sf /bin/true "$VDEV_MOUNTPOINT/MAKEDEV"
 fi
 
 # add /dev/shm
-test -d $VDEV_MOUNTPOINT/shm || /bin/ln -sf /run/shm $VDEV_MOUNTPOINT/shm
+test -d "$VDEV_MOUNTPOINT/shm" || /bin/ln -sf /run/shm "$VDEV_MOUNTPOINT/shm"
 
 # guess the subsystem if /sys/dev/{block,char}/$major:$minor isn't helpful.
 # print it to stdout
@@ -73,7 +73,7 @@ feed_static_nodes_kmod() {
     # strip bang from $type 
     type=${type%%\!}
     
-    [ -e $VDEV_MOUNTPOINT/$name ] && continue
+    [ -e "$VDEV_MOUNTPOINT/$name" ] && continue
 
     # skip directories--vdevd can make them 
     if [ "$type" = "d" ]; then 
@@ -113,10 +113,10 @@ feed_static_nodes_kmod() {
     
     else
 
-      devpath=$(/bin/readlink $sys_link | /bin/sed -r 's/\.\.\///g')
+      devpath=$(/bin/readlink "$sys_link" | /bin/sed -r 's/\.\.\///g')
       devpath="/$devpath"
 
-      subsystem=$(/bin/readlink /sys/$devpath/subsystem | /bin/sed -r "s/[^/]*\///g")
+      subsystem=$(/bin/readlink "/sys/$devpath/subsystem" | /bin/sed -r "s/[^/]*\///g")
     fi
 
     # build up params list 
@@ -136,7 +136,7 @@ feed_static_nodes_kmod() {
     # keep SELinux happy
     if [ -x /sbin/restorecon ]; then
 
-      /sbin/restorecon $VDEV_MOUNTPOINT/$name
+      /sbin/restorecon "$VDEV_MOUNTPOINT/$name"
     fi
   done
 }

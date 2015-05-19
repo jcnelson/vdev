@@ -1,8 +1,7 @@
-#!/bin/sh
+#!/bin/dash
 
 # common subroutines for adding and removing devices 
 VDEV_PROGNAME=$0
-
 
 # add a device symlink, but remember which device node it was for,
 # so we can remove it later even when the device node no longer exists.
@@ -21,15 +20,15 @@ vdev_symlink() {
 
    _DIRNAME=$(echo $_LINK_TARGET | /bin/sed -r "s/[^/]+$//g")
 
-   test -d $_DIRNAME || /bin/mkdir -p $_DIRNAME
+   test -d $_DIRNAME || /bin/mkdir -p "$_DIRNAME"
 
-   /bin/ln -s $_LINK_SOURCE $_LINK_TARGET
+   /bin/ln -s "$_LINK_SOURCE" "$_LINK_TARGET"
    _RC=$?
 
    if [ 0 -eq $_RC ]; then
 
       # save this
-      echo $_LINK_TARGET >> $_METADATA/links
+      echo "$_LINK_TARGET" >> "$_METADATA/links"
    fi
 
    return 0
@@ -46,14 +45,14 @@ vdev_rmlinks() {
 
    while read _LINKNAME; do
 
-      _DIRNAME=$(echo $_LINKNAME | /bin/sed -r "s/[^/]+$//g")
+      _DIRNAME=$(echo "$_LINKNAME" | /bin/sed -r "s/[^/]+$//g")
       
-      /bin/rm -f $_LINKNAME
-      /bin/rmdir $_DIRNAME 2>/dev/null
+      /bin/rm -f "$_LINKNAME"
+      /bin/rmdir "$_DIRNAME" 2>/dev/null
 
-   done < $_METADATA/links
+   done < "$_METADATA/links"
 
-   /bin/rm -f $_METADATA/links
+   /bin/rm -f "$_METADATA/links"
    
    return 0
 }
@@ -70,7 +69,7 @@ vdev_log() {
    else
 
       # logfile 
-      echo "[helpers/subr.sh] INFO: $1" >> $VDEV_LOGFILE
+      echo "[helpers/subr.sh] INFO: $1" >> "$VDEV_LOGFILE"
    fi 
 }
 
@@ -87,7 +86,7 @@ vdev_warn() {
    else
 
       # logfile 
-      echo "[helpers/subr.sh] WARN: $1" >> $VDEV_LOGFILE
+      echo "[helpers/subr.sh] WARN: $1" >> "$VDEV_LOGFILE"
    fi 
 }
 
@@ -103,7 +102,7 @@ vdev_error() {
    else
 
       # logfile 
-      echo "[helpers/subr.sh] ERROR: $1" >> $VDEV_LOGFILE
+      echo "[helpers/subr.sh] ERROR: $1" >> "$VDEV_LOGFILE"
    fi 
 }
 
@@ -135,15 +134,15 @@ vdev_drivers() {
    _SYSFS_PATH="$1"
 
    # strip trailing '/'
-   _SYSFS_PATH=$(echo $_SYSFS_PATH | /bin/sed -r "s/[/]+$//g")
+   _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[/]+$//g")
    
    while [ -n "$_SYSFS_PATH" ]; do
       
       # driver name is the base path name of the link target of $_SYSFS_PATH/driver
-      test -L $_SYSFS_PATH/driver && /bin/readlink $_SYSFS_PATH/driver | /bin/sed -r "s/[^/]*\///g"
+      test -L "$_SYSFS_PATH/driver" && /bin/readlink "$_SYSFS_PATH/driver" | /bin/sed -r "s/[^/]*\///g"
 
       # search parent 
-      _SYSFS_PATH=$(echo $_SYSFS_PATH | /bin/sed -r "s/[^/]+$//g" | /bin/sed -r "s/[/]+$//g")
+      _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g" | /bin/sed -r "s/[/]+$//g")
       
    done
 }
@@ -159,15 +158,15 @@ vdev_subsystems() {
    _SYSFS_PATH="$1"
 
    # strip trailing '/'
-   _SYSFS_PATH=$(echo $_SYSFS_PATH | /bin/sed -r "s/[/]+$//g")
+   _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[/]+$//g")
    
    while [ -n "$_SYSFS_PATH" ]; do
       
       # subsystem name is the base path name of the link target of $_SYSFS_PATH/subsystem
-      test -L $_SYSFS_PATH/subsystem && /bin/readlink $_SYSFS_PATH/subsystem | /bin/sed -r "s/[^/]*\///g"
+      test -L "$_SYSFS_PATH/subsystem" && /bin/readlink "$_SYSFS_PATH/subsystem" | /bin/sed -r "s/[^/]*\///g"
 
       # search parent 
-      _SYSFS_PATH=$(echo $_SYSFS_PATH | /bin/sed -r "s/[^/]+$//g" | /bin/sed -r "s/[/]+$//g")
+      _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g" | /bin/sed -r "s/[/]+$//g")
       
    done
 }
@@ -184,21 +183,21 @@ vdev_firmware_load() {
    
    _SYSFS_PATH="$1"
    _FIRMWARE_PATH="$2"
-   _SYSFS_FIRMWARE_PATH=$VDEV_OS_SYSFS_MOUNTPOINT/$_SYSFS_PATH
+   _SYSFS_FIRMWARE_PATH="$VDEV_OS_SYSFS_MOUNTPOINT/$_SYSFS_PATH"
 
-   test -e $_SYSFS_FIRMWARE_PATH/loading || return 1
-   test -e $_SYSFS_FIRMWARE_PATH/data || return 1
+   test -e "$_SYSFS_FIRMWARE_PATH/loading" || return 1
+   test -e "$_SYSFS_FIRMWARE_PATH/data" || return 1
    
-   echo 1 > $_SYSFS_FIRMWARE_PATH/loading
-   /bin/cat $_FIRMWARE_PATH > $_SYSFS_FIRMWARE_PATH/data
+   echo 1 > "$_SYSFS_FIRMWARE_PATH/loading"
+   /bin/cat "$_FIRMWARE_PATH" > "$_SYSFS_FIRMWARE_PATH/data"
    
    _RC=$?
    if [ $_RC -ne 0 ]; then 
       # abort 
-      echo -1 > $_SYSFS_FIRMWARE_PATH/loading
+      echo -1 > "$_SYSFS_FIRMWARE_PATH/loading"
    else 
       # success
-      echo 0 > $_SYSFS_FIRMWARE_PATH/loading
+      echo 0 > "$_SYSFS_FIRMWARE_PATH/loading"
    fi
 
    return $_RC
@@ -224,7 +223,7 @@ vdev_metadata_put() {
       _METADATA="$VDEV_METADATA"
    fi
 
-   echo $_VALUE > $_METADATA/$_KEY
+   echo "$_VALUE" > "$_METADATA/$_KEY"
    return $?
 }
 
@@ -242,18 +241,18 @@ vdev_metadata_get() {
    _KEY="$1"
    _METADATA="$2"
 
-   if [ -z $_METADATA ]; then 
+   if [ -z "$_METADATA" ]; then 
       _METADATA="$VDEV_METADATA"
    fi
 
-   _VALUE=$(/bin/cat $_METADATA/$_KEY)
+   _VALUE=$(/bin/cat "$_METADATA/$_KEY")
    _RC=$?
 
    if [ $_RC -ne 0 ]; then 
       return $_RC
    fi
 
-   echo $_VALUE
+   echo "$_VALUE"
    return 0
 }
 
@@ -272,8 +271,8 @@ vdev_permissions() {
    _MODE="$2"
    _PATH="$3"
 
-   _CHOWN=/bin/chown
-   _CHMOD=/bin/chmod
+   _CHOWN="/bin/chown"
+   _CHMOD="/bin/chmod"
 
    $_CHOWN $_OWNER $_PATH
    _RC=$?
@@ -282,7 +281,7 @@ vdev_permissions() {
       return $_RC
    fi
 
-   $_CHMOD $_MODE $_PATH 
+   $_CHMOD "$_MODE" "$_PATH"
    _RC=$?
 
    return $_RC

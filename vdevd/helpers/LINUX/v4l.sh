@@ -1,8 +1,8 @@
-#!/bin/sh
+#!/bin/dash
 
 # video4linux helper 
 
-source $VDEV_HELPERS/subr.sh
+. "$VDEV_HELPERS/subr.sh"
 
 # removing? just blow the links away 
 if [ "$VDEV_ACTION" = "remove" ]; then 
@@ -27,13 +27,13 @@ ID=
 PATH=
 
 # get the type and index
-TYPE_PLUS_INDEX=$(echo $VDEV_PATH | /bin/sed -r 's/.*\/([^/]+)/\1/g')
+TYPE_PLUS_INDEX=$(echo "$VDEV_PATH" | /bin/sed -r 's/.*\/([^/]+)/\1/g')
 
 TYPE=$(echo $TYPE_PLUS_INDEX | /bin/sed -r 's/[0-9]+$//g')
 INDEX=
 
-if [ -f $VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH/index ]; then 
-   INDEX=$(/bin/cat $VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH/index)
+if [ -f "$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH/index" ]; then 
+   INDEX=$(/bin/cat "$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH/index")
 else 
 
    # no index? no persistent paths
@@ -41,10 +41,10 @@ else
 fi
 
 # is this a USB device?
-if [ -n "$(echo $VDEV_OS_DEVPATH | /bin/grep 'usb')" ]; then 
+if [ -n "$(echo "$VDEV_OS_DEVPATH" | /bin/grep 'usb')" ]; then 
 
-   eval $($VDEV_HELPERS/stat_usb $VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH)
-
+   eval $($VDEV_HELPERS/stat_usb "$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH")
+   
    test -n "$VDEV_USB_VENDOR" || exit 1
    test -n "$VDEV_USB_MODEL" || exit 1
 
@@ -57,12 +57,12 @@ fi
 if [ -n "$BUS" -a -n "$INDEX" -a -n "$VENDOR" -a -n "$MODEL" -a -n "$TYPE" ]; then
    
    ID="$BUS-${VENDOR}_${MODEL}-$TYPE-index${INDEX}"
-   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/v4l/by-id/$ID $VDEV_METADATA
+   vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/v4l/by-id/$ID" "$VDEV_METADATA"
 fi
 
 # by-path 
 VDEV_PERSISTENT_PATH=
-eval $($VDEV_HELPERS/stat_path $VDEV_MOUNTPOINT/$VDEV_PATH)
+eval $($VDEV_HELPERS/stat_path "$VDEV_MOUNTPOINT/$VDEV_PATH")
 RC=$?
 
 [ $RC -ne 0 ] && vdev_fail 1 "$VDEV_HELPERS/stat_path $VDEV_MOUNTPOINT/$VDEV_PATH exit status $RC"
@@ -70,18 +70,18 @@ RC=$?
 # did we get a path?
 [ -z "$VDEV_PERSISTENT_PATH" ] && exit 0
 
-if [ -n "$(echo $VDEV_PATH | /bin/egrep "video|vbi")" ]; then 
+if [ -n "$(echo "$VDEV_PATH" | /bin/egrep "video|vbi")" ]; then 
    
    # video v4l device 
-   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/v4l/by-path/$VDEV_PERSISTENT_PATH-video-index${INDEX} $VDEV_METADATA
+   vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/v4l/by-path/$VDEV_PERSISTENT_PATH-video-index${INDEX}" "$VDEV_METADATA"
 
-elif [ -n "$(echo $VDEV_PATH | /bin/egrep "audio")" ]; then 
+elif [ -n "$(echo "$VDEV_PATH" | /bin/egrep "audio")" ]; then 
 
    # audio v4l device 
-   vdev_symlink ../../$VDEV_PATH $VDEV_MOUNTPOINT/v4l/by-path/$VDEV_PERSISTENT_PATH-audio-index${INDEX} $VDEV_METADATA
+   vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/v4l/by-path/$VDEV_PERSISTENT_PATH-audio-index${INDEX}" "$VDEV_METADATA"
 fi
 
 # set up permissions...
-vdev_permissions root.video 0660 $VDEV_MOUNTPOINT/$VDEV_PATH
+vdev_permissions root.video 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
 
 exit 0

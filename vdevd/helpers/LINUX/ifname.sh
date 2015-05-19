@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/dash
 
 # rename interfaces to have persistnet names, according to the rules in $VDEV_IFNAMES_PATH
 # the format of this file should be lines of:
@@ -7,10 +7,10 @@
 # $ID_ARG is either the MAC address (formatted xx:xx:xx:xx:xx:xx) if $ID_TYPE is "mac", or
 # $ID_ARG is the device path (starting with /devices)
 
-. $VDEV_HELPERS/subr.sh
+. "$VDEV_HELPERS/subr.sh"
 
 # make sure the file exists
-test -e $VDEV_IFNAMES_PATH || exit 0
+test -e "$VDEV_IFNAMES_PATH" || exit 0
 
 # only bother with adding 
 if [ "$VDEV_ACTION" = "remove" ]; then 
@@ -125,9 +125,9 @@ if_devpath() {
    
    _DEVPATH="$1"
    
-   for _SYSFS_IFNAME in $(/bin/ls $VDEV_OS_SYSFS_MOUNTPOINT/class/net/); do 
+   for _SYSFS_IFNAME in $(/bin/ls "$VDEV_OS_SYSFS_MOUNTPOINT/class/net/"); do 
       
-      _IF_DEVPATH=$(/bin/readlink $VDEV_OS_SYSFS_MOUNTPOINT/class/net/$_SYSFS_IFNAME | /bin/sed -r 's/^(..\/)+//g')
+      _IF_DEVPATH=$(/bin/readlink "$VDEV_OS_SYSFS_MOUNTPOINT/class/net/$_SYSFS_IFNAME" | /bin/sed -r 's/^(..\/)+//g')
       _IF_DEVPATH="/$_IF_DEVPATH"
       
       if [ "$_IF_DEVPATH" = "$_DEVPATH/net/$_SYSFS_IFNAME" ]; then 
