@@ -436,7 +436,7 @@ char* vdev_device_metadata_fullpath( char const* mountpoint, char const* device_
 // create or update an item of metadata to $VDEV_MOUNTPOINT/$VDEV_METADATA_PREFIX/$VDEV_PATH/$PARAM_KEY
 // return 0 on success
 // return negative on error 
-static int vdev_device_add_metadata_item( char* base_dir, char const* param_name, char const* param_value, int flags, mode_t mode ) {
+static int vdev_device_put_metadata_item( char* base_dir, char const* param_name, char const* param_value, int flags, mode_t mode ) {
    
    int rc = 0;
    char* param_value_with_newline = NULL;
@@ -488,7 +488,7 @@ static int vdev_device_add_metadata_item( char* base_dir, char const* param_name
 // return -EINVAL if there is no device path defined for this request
 // return negative on I/O error
 // NOTE: the metadata directory ($VDEV_MOUNTPOINT/$VDEV_METADATA_PREFIX) must exist
-static int vdev_device_add_metadata( struct vdev_device_request* req ) {
+static int vdev_device_put_metadata( struct vdev_device_request* req ) {
 
    int rc = 0;
    struct sglib_vdev_params_iterator itr;
@@ -542,34 +542,34 @@ static int vdev_device_add_metadata( struct vdev_device_request* req ) {
       char const* param_name = dp->key;
       char const* param_value = dp->value;
       
-      rc = vdev_device_add_metadata_item( base_dir, param_name, param_value, O_CREAT | O_WRONLY | O_TRUNC, 0644 );
+      rc = vdev_device_put_metadata_item( base_dir, param_name, param_value, O_CREAT | O_WRONLY | O_TRUNC, 0644 );
       if( rc != 0 ) {
          
          if( rc == -EEXIST ) {
             
             // try to update instead
-            rc = vdev_device_add_metadata_item( base_dir, param_name, param_value, O_WRONLY | O_TRUNC, 0644 );
+            rc = vdev_device_put_metadata_item( base_dir, param_name, param_value, O_WRONLY | O_TRUNC, 0644 );
          }
          
          if( rc != 0 ) {
-            vdev_error("vdev_device_add_metadata_item('%s', '%s') rc = %d\n", param_name, param_value, rc );
+            vdev_error("vdev_device_put_metadata_item('%s', '%s') rc = %d\n", param_name, param_value, rc );
             break;
          }
       }
    }
    
    // save instance nonce
-   rc = vdev_device_add_metadata_item( base_dir, VDEV_METADATA_PARAM_INSTANCE, req->state->config->instance_str, O_CREAT | O_WRONLY | O_TRUNC, 0644 );
+   rc = vdev_device_put_metadata_item( base_dir, VDEV_METADATA_PARAM_INSTANCE, req->state->config->instance_str, O_CREAT | O_WRONLY | O_TRUNC, 0644 );
    if( rc != 0 ) {
       
       if( rc == -EEXIST ) {
          
          // try to update instead
-         rc = vdev_device_add_metadata_item( base_dir, VDEV_METADATA_PARAM_INSTANCE, req->state->config->instance_str, O_WRONLY | O_TRUNC, 0644 );
+         rc = vdev_device_put_metadata_item( base_dir, VDEV_METADATA_PARAM_INSTANCE, req->state->config->instance_str, O_WRONLY | O_TRUNC, 0644 );
       }
       
       if( rc != 0 ) {
-         vdev_error("vdev_device_add_metadata_item('%s', '%s') rc = %d\n", VDEV_METADATA_PARAM_INSTANCE, req->state->config->instance_str, rc );
+         vdev_error("vdev_device_put_metadata_item('%s', '%s') rc = %d\n", VDEV_METADATA_PARAM_INSTANCE, req->state->config->instance_str, rc );
       }
    }
    
@@ -724,8 +724,8 @@ static int vdev_device_mkdirs( struct vdev_device_request* req, char** dev_fullp
 int vdev_device_add( struct vdev_device_request* req ) {
    
    int rc = 0;
-   int update_only = 0;         // if 1, only update metadata; don't run actions.
    int do_mknod = 1;            // if 1, issue mknod.  Otherwise, check to see if the device exists by checking for metadata.
+   int device_exists = 0;       // if 1, the device already exists.  only run commands with the if_exists directive set to "run"
    
    // do the rename, possibly generating it
    rc = vdev_action_create_path( req, req->state->acts, req->state->num_acts, &req->renamed_path );
@@ -783,8 +783,10 @@ int vdev_device_add( struct vdev_device_request* req ) {
                // nope, but did we process it already?
                if( vdev_device_has_metadata( req ) ) {
                   
-                  // already processed :(
-                  rc = -EEXIST;
+                  // this device already exists, insofar as 
+                  // we (or some other device manager)
+                  // have already processed it.
+                  device_exists = 1;
                }
             }
             
@@ -796,6 +798,14 @@ int vdev_device_add( struct vdev_device_request* req ) {
                if( rc != 0 ) {
                   
                   rc = -errno;
+                  if( rc == -EEXIST ) {
+                     
+                     // device already exists, insofar as 
+                     // we (or some other device manager)
+                     // have already processed it.
+                     device_exists = 1;
+                     rc = 0;
+                  }
                }
             }
             
@@ -818,45 +828,38 @@ int vdev_device_add( struct vdev_device_request* req ) {
             }
             else {
                
-               // already present
-               rc = -EEXIST;
+               // metadata already present, meaning
+               // that this device has been processed
+               rc = 0;
+               device_exists = 1;
             }
          }
          
-         if( rc == -EEXIST && req->state->once ) {
+         if( rc != 0 ) {
             
-            // this is fine--"once" semantics verifies whether or not a device exists in order to know whether or not to run action scripts 
-            rc = 0;
-            update_only = 1;
-         }
-         else if( rc != 0 ) {
-            
+            // some mknod or metadata I/O error occurred
             vdev_error("Add device '%s/%s', rc = %d\n", req->state->mountpoint, req->renamed_path, rc );
          }
             
-         if( rc == 0 ) {
+         else {
 
             // put/update metadata 
-            rc = vdev_device_add_metadata( req );
+            rc = vdev_device_put_metadata( req );
             
             if( rc != 0 ) {
                
-               vdev_warn("vdev_device_add_metadata('%s/%s') rc = %d\n", req->state->mountpoint, req->renamed_path, rc );
-               
-               // technically not an error, but a problem we should log
-               rc = 0;
+               vdev_error("vdev_device_put_metadata('%s/%s') rc = %d\n", req->state->mountpoint, req->renamed_path, rc );
             }
          }
       }
       
-      if( rc == 0 && !update_only ) {
+      if( rc == 0 ) {
 
-         // no problems yet.  call all ADD actions if we actually added the device
-         rc = vdev_action_run_commands( req, req->state->acts, req->state->num_acts );
+         // no problems yet.  call all ADD actions 
+         rc = vdev_action_run_commands( req, req->state->acts, req->state->num_acts, device_exists );
          if( rc != 0 ) {
             
             vdev_error("vdev_action_run_commands(ADD %s, dev=(%u, %u)) rc = %d\n", req->renamed_path, major(req->dev), minor(req->dev), rc );
-            rc = 0;
          }  
       }
    }
@@ -865,7 +868,7 @@ int vdev_device_add( struct vdev_device_request* req ) {
    vdev_device_request_free( req );
    free( req );
    
-   return rc;
+   return 0;
 }
 
 // workqueue call to vdev_device_add
@@ -914,7 +917,7 @@ int vdev_device_remove( struct vdev_device_request* req ) {
    if( req->renamed_path != NULL ) {
       
       // call all REMOVE actions
-      rc = vdev_action_run_commands( req, req->state->acts, req->state->num_acts );
+      rc = vdev_action_run_commands( req, req->state->acts, req->state->num_acts, true );
       if( rc != 0 ) {
          
          vdev_error("vdev_action_run_all(REMOVE %s) rc = %d\n", req->renamed_path, rc );
