@@ -11,7 +11,7 @@ The steps to compile and prepare vdevd for testing are as follows:
     $ git clone https://github.com/jcnelson/vdev vdev
     $ cd vdev
     $ make -C libvdev
-    $ sudo make -C libvdev install PREFIX=/usr/local
+    $ sudo make -C libvdev install DESTDIR=/usr/local
     $ make -C vdevd
 
 As a result of these commands, you will have checked out the latest copy of vdev's source code, built and installed `libvdev` (to /usr/local/lib and /usr/local/include), and compiled the hotplug daemon `vdevd`.
