@@ -61,7 +61,7 @@ struct vdev_state {
    // are we taking events from the OS? (back-end)
    bool running;
    
-   // run once?
+   // run once? (i.e. coldplug only)
    bool once;
    
    // fd to write to to signal when the initial devices have all been processed
