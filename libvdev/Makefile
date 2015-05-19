@@ -31,11 +31,11 @@ $(LIBVDEV): $(OBJ)
 
 $(LIBVDEV_LIB): $(LIBVDEV)
 	@mkdir -p $(shell dirname "$@")
-	@ln -s $(shell basename $<) $@
+	@ln -sf $(shell basename $<) $@
 
 $(LIBVDEV_SO): $(LIBVDEV_LIB)
 	@mkdir -p $(shell dirname "$@")
-	@ln -s $(shell basename $<) $@
+	@ln -sf $(shell basename $<) $@
 
 $(BUILD_LIBVDEV_HEADERS)/%.h: %.h
 	@mkdir -p $(shell dirname "$@")
