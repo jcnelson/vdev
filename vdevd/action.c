@@ -228,6 +228,31 @@ static int vdev_action_ini_parser( void* userdata, char const* section, char con
          act->type = vdev_strdup_or_null( value );
          return 1;
       }
+      
+      if( strcmp(name, VDEV_ACTION_NAME_IF_EXISTS) == 0 ) {
+         
+         // if-exists flag 
+         if( strcmp( value, VDEV_ACTION_IF_EXISTS_ERROR ) == 0 ) {
+            
+            act->if_exists = VDEV_IF_EXISTS_ERROR;
+            return 1;
+         }
+         
+         if( strcmp( value, VDEV_ACTION_IF_EXISTS_MASK ) == 0 ) {
+            
+            act->if_exists = VDEV_IF_EXISTS_MASK;
+            return 1;
+         }
+         
+         if( strcmp( value, VDEV_ACTION_IF_EXISTS_RUN ) == 0 ) {
+            
+            act->if_exists = VDEV_IF_EXISTS_RUN;
+            return 1;
+         }
+         
+         fprintf(stderr, "Invalid '%s' value '%s'\n", name, value );
+         return 0;
+      }
          
       if( strncmp(name, VDEV_ACTION_NAME_OS_PREFIX, strlen(VDEV_ACTION_NAME_OS_PREFIX)) == 0 ) {
          
@@ -779,9 +804,10 @@ int vdev_action_create_path( struct vdev_device_request* vreq, struct vdev_actio
 
 // run all actions for a device, sequentially, in lexographic order.
 // commands are executed optimistically--even if one fails, the other subsequent ones will be attempted
+// if the device already exists (given by the exists flag), then only run commands with if_exists set to "run"
 // return 0 on success
 // return negative on failure
-int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts ) {
+int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts, bool exists ) {
    
    int rc = 0;
    int act_offset = 0;
@@ -818,6 +844,10 @@ int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_acti
          rc = 0;
          
          if( acts[i].command == NULL ) {
+            continue;
+         }
+         
+         if( exists && acts[i].if_exists != VDEV_IF_EXISTS_RUN ) {
             continue;
          }
          

@@ -37,12 +37,23 @@
 #define VDEV_ACTION_NAME_RENAME         "rename_command"
 #define VDEV_ACTION_NAME_SHELL          "command"
 #define VDEV_ACTION_NAME_ASYNC          "async"
+#define VDEV_ACTION_NAME_IF_EXISTS      "if_exists"
 #define VDEV_ACTION_NAME_OS_PREFIX      "OS_"
 
 #define VDEV_ACTION_EVENT_ADD           "add"
 #define VDEV_ACTION_EVENT_REMOVE        "remove"
 #define VDEV_ACTION_EVENT_CHANGE        "change"
 #define VDEV_ACTION_EVENT_ANY           "any"
+
+#define VDEV_ACTION_IF_EXISTS_ERROR     "error"
+#define VDEV_ACTION_IF_EXISTS_MASK      "mask"
+#define VDEV_ACTION_IF_EXISTS_RUN       "run"
+
+enum vdev_action_if_exists {
+   VDEV_IF_EXISTS_ERROR = 1,
+   VDEV_IF_EXISTS_MASK,
+   VDEV_IF_EXISTS_RUN
+};
 
 // vdev action to take on an event 
 struct vdev_action {
@@ -69,6 +80,9 @@ struct vdev_action {
    
    // synchronous or asynchronous 
    bool async;
+   
+   // how to handle the case where the device already exists 
+   int if_exists;
 };
 
 typedef struct vdev_action vdev_action;
@@ -86,7 +100,7 @@ int vdev_action_load_file( FILE* f, struct vdev_action* act );
 int vdev_action_load_all( char const* dir, struct vdev_action** acts, size_t* num_acts );
 
 int vdev_action_create_path( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts, char** path );
-int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts );
+int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts, bool exists );
 
 C_LINKAGE_END
 
