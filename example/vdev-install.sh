@@ -10,8 +10,6 @@ fi
 # make sure we installed vdev 
 test -x $PREFIX/etc/init.d/vdev || (echo "You must install vdev first" && exit 1)
 
-test -d $PREFIX/etc/vdev || (echo "You must install vdev first" && exit 1)
-
 update-rc.d -f udev remove
 update-rc.d -f udev-finish remove
 update-rc.d -f vdev defaults
