@@ -6,16 +6,6 @@ all:
 	$(MAKE) -C vdevd
 	$(MAKE) -C fs
 	$(MAKE) -C example
-	@echo "PREFIX ?= $(PREFIX)" > "$(INSTALL_MK)"
-	@echo "BINDIR ?= $(BINDIR)" >> "$(INSTALL_MK)"
-	@echo "SBINDIR ?= $(SBINDIR)" >> "$(INSTALL_MK)"
-	@echo "LIBDIR ?= $(LIBDIR)" >> "$(INSTALL_MK)"
-	@echo "INCLUDEDIR ?= $(INCLUDEDIR)" >> "$(INSTALL_MK)"
-	@echo "USRBINDIR ?= $(USRBINDIR)" >> "$(INSTALL_MK)"
-	@echo "USRSBINDIR ?= $(USRSBINDIR)" >> "$(INSTALL_MK)"
-	@echo "USRSHAREDIR ?= $(USRSHAREDIR)" >> "$(INSTALL_MK)"
-	@echo "PKGCONFIGDIR ?= $(PKGCONFIGDIR)" >> "$(INSTALL_MK)"
-	@echo "ETCDIR ?= $(ETCDIR)" >> "$(INSTALL_MK)"
 
 .PHONY: install
 install:
@@ -30,7 +20,6 @@ clean:
 	$(MAKE) -C vdevd clean
 	$(MAKE) -C fs clean
 	$(MAKE) -C example clean
-	@rm -f $(INSTALL_MK)
 
 .PHONY: uninstall
 uninstall:

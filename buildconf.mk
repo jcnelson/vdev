@@ -11,24 +11,18 @@ BUILD_USRSBIN := $(BUILD)/usr/sbin
 BUILD_INCLUDEDIR := $(BUILD)/include/
 BUILD_ETCDIR := $(BUILD)/etc
 
-INSTALL_MK := $(BUILD)/.install.mk
-INSTALL_SETTINGS := $(wildcard $(BUILD)/.install.mk)
-
 # install environment
-ifeq ($(INSTALL_SETTINGS),)
-	PREFIX         ?= /
-	BINDIR         ?= $(PREFIX)/bin
-	SBINDIR			?= $(PREFIX)/sbin
-	LIBDIR         ?= $(PREFIX)/lib
-	INCLUDEDIR     ?= /usr/include
-	USRBINDIR		?= /usr/bin
-	USRSBINDIR		?= /usr/sbin
-	USRSHAREDIR		?= /usr/share
-	PKGCONFIGDIR   ?= /usr/lib/pkgconfig
-	ETCDIR			?= /etc
-else
-	include $(INSTALL_MK)
-endif
+DESTDIR			?= /
+PREFIX         ?= /
+BINDIR         ?= $(DESTDIR)$(PREFIX)/bin
+SBINDIR			?= $(DESTDIR)$(PREFIX)/sbin
+LIBDIR         ?= $(DESTDIR)$(PREFIX)/lib
+INCLUDEDIR     ?= $(DESTDIR)/usr/include
+USRBINDIR		?= $(DESTDIR)/usr/bin
+USRSBINDIR		?= $(DESTDIR)/usr/sbin
+USRSHAREDIR		?= $(DESTDIR)/usr/share
+PKGCONFIGDIR   ?= $(DESTDIR)/usr/lib/pkgconfig
+ETCDIR			?= $(DESTDIR)/etc
 
 # libvdev 
 BUILD_LIBVDEV := $(BUILD_LIBDIR)
