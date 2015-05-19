@@ -85,7 +85,10 @@ initramfs: $(VDEV_CONFIG_INSTALL) $(INITRAMFS_INSTALL)
 
 .PHONY: install
 install: $(VDEV_CONFIG_INSTALL)
-	$(SHELL) ./$(VDEV_INSTALL_SCRIPT) $(PREFIX)
+
+.PHONY: install-initscript
+install-initscript: $(VDEV_CONFIG_INSTALL)
+	$(SHELL) ./$(VDEV_INSTALL_SCRIPT) $(DESTDIR)$(PREFIX)
 
 .PHONY: clean
 clean:
