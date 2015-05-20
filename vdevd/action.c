@@ -803,7 +803,8 @@ int vdev_action_create_path( struct vdev_device_request* vreq, struct vdev_actio
 
 
 // run all actions for a device, sequentially, in lexographic order.
-// commands are executed optimistically--even if one fails, the other subsequent ones will be attempted
+// commands are executed optimistically--even if one fails, the other subsequent ones will be attempted, unless
+// the device already exists and we encounter if_exists=error in one of the matching actions.
 // if the device already exists (given by the exists flag), then only run commands with if_exists set to "run"
 // return 0 on success
 // return negative on failure
