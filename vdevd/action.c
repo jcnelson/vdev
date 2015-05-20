@@ -814,7 +814,7 @@ int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_acti
    int i = 0;
    char const* method = NULL;
    
-   while( act_offset < (signed)num_acts ) {
+   while( act_offset < (signed)num_acts && rc == 0 ) {
       
       // skip this action if there is no command 
       if( acts[act_offset].command == NULL ) {
@@ -848,7 +848,17 @@ int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_acti
          }
          
          if( exists && acts[i].if_exists != VDEV_IF_EXISTS_RUN ) {
-            continue;
+            
+            if( acts[i].if_exists == VDEV_IF_EXISTS_ERROR ) {
+               
+               vdev_error("Will stop processing %s, since it already exists\n", vreq->path );
+               rc = 1;
+               break;
+            }
+            else {
+               
+               continue;
+            }
          }
          
          // what kind of action?
@@ -877,6 +887,12 @@ int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_acti
             }
          }
       }
+   }
+   
+   if( rc > 0 ) {
+      
+      // not an error, but a cause to abort
+      rc = 0;
    }
    
    return rc;
