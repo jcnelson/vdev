@@ -1,6 +1,6 @@
 [vdev-action]
-event=any
+event=add
 OS_SUBSYSTEM=misc
 path=^tun$
 rename_command=test "$VDEV_PATH" != "UNKNOWN" && echo -n "net/$VDEV_PATH"; exit 0
-command=/bin/chmod 0666 $VDEV_MOUNTPOINT/$VDEV_PATH
+command=/bin/chmod 0666 "$VDEV_MOUNTPOINT/$VDEV_PATH"

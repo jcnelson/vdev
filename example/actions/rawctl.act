@@ -1,4 +1,4 @@
 [vdev-action]
 event=add
 path=^rawctl$
-command=/bin/chgrp disk $VDEV_MOUNTPOINT/$VDEV_PATH
+command=/bin/chgrp disk "$VDEV_MOUNTPOINT/$VDEV_PATH"

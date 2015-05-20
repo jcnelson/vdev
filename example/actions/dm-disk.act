@@ -2,4 +2,4 @@
 event=any
 OS_DEVTYPE=disk
 OS_SUBSYSTEM=block
-command=test -n "$(echo $VDEV_OS_DEVNAME | grep dm-[0-9]*)" && $VDEV_HELPERS/dm-disk.sh && exit $?; exit 0
+command=test -n "$(echo "$VDEV_OS_DEVNAME" | grep dm-[0-9]*)" && "$VDEV_HELPERS/dm-disk.sh" && exit $?; exit 0

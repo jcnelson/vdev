@@ -1,4 +1,4 @@
 [vdev-action]
 event=add
 path=^tty[0-9]+$
-command=. $VDEV_HELPERS/subr.sh; vdev_permissions root.tty 0620 $VDEV_MOUNTPOINT/$VDEV_PATH
+command=. "$VDEV_HELPERS/subr.sh"; vdev_permissions root.tty 0620 "$VDEV_MOUNTPOINT/$VDEV_PATH"

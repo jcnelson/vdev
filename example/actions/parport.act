@@ -1,4 +1,4 @@
 [vdev-action]
 event=add
 path=^parport[0-9]+$
-command=/bin/chgrp lp $VDEV_MOUNTPOINT/$VDEV_PATH
+command=/bin/chgrp lp "$VDEV_MOUNTPOINT/$VDEV_PATH"

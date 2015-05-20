@@ -1,4 +1,4 @@
 [vdev-action]
 event=add
 OS_FIRMWARE=
-command=exec $VDEV_HELPERS/firmware.sh
+command=exec "$VDEV_HELPERS/firmware.sh"

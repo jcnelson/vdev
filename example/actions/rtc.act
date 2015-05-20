@@ -1,4 +1,4 @@
 [vdev-action]
 event=add
 path=^rtc[0-9]+$
-command=/bin/ln -s $VDEV_PATH $VDEV_MOUNTPOINT/rtc
+command=/bin/ln -s "$VDEV_PATH" "$VDEV_MOUNTPOINT/rtc"

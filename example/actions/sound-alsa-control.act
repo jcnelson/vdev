@@ -2,4 +2,4 @@
 event=any
 path=^snd/.+$
 OS_SUBSYSTEM=sound
-command=exec $VDEV_HELPERS/sound.sh
+command=exec "$VDEV_HELPERS/sound.sh"

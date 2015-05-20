@@ -1,4 +1,4 @@
 [vdev-action]
 event=add
 path=^tty[A-Z]+[0-9]*$|^pppox[0-9]*$|^ircomm[0-9]*$|^noz[0-9]*$|^rfcomm[0-9]*$
-command=/bin/chgrp dialout $VDEV_MOUNTPOINT/$VDEV_PATH
+command=/bin/chgrp dialout "$VDEV_MOUNTPOINT/$VDEV_PATH"

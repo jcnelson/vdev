@@ -1,4 +1,4 @@
 [vdev-action]
 event=add
 path=^mwave$
-command=/bin/chgrp dialout $VDEV_MOUNTPOINT/$VDEV_PATH
+command=/bin/chgrp dialout "$VDEV_MOUNTPOINT/$VDEV_PATH"

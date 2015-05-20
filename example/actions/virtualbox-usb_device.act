@@ -2,4 +2,4 @@
 event=any
 OS_SUBSYSTEM=usb
 OS_DEVTYPE=usb_device
-command=$VDEV_HELPERS/VBoxCreateUSBNode.sh $VDEV_MAJOR $VDEV_MINOR $(/bin/cat $VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH/bDeviceClass 2>/dev/null) vboxusers
+command="$VDEV_HELPERS/VBoxCreateUSBNode.sh" $VDEV_MAJOR $VDEV_MINOR $(/bin/cat "$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH/bDeviceClass" 2>/dev/null) vboxusers

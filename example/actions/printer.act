@@ -2,4 +2,4 @@
 event=add
 path=^lp.*$
 OS_SUBSYSTEM=printer
-command=/bin/chgrp lp $VDEV_MOUNTPOINT/$VDEV_PATH
+command=/bin/chgrp lp "$VDEV_MOUNTPOINT/$VDEV_PATH"

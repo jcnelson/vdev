@@ -1,4 +1,4 @@
 [vdev-action]
 event=any
 path=^microcode$
-rename_command=echo -n cpu/$VDEV_PATH
+rename_command=echo -n "cpu/$VDEV_PATH"

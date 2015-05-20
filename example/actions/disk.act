@@ -2,4 +2,4 @@
 event=any
 OS_DEVTYPE=disk
 OS_SUBSYSTEM=block
-command=exec $VDEV_HELPERS/disk.sh
+command=exec "$VDEV_HELPERS/disk.sh"

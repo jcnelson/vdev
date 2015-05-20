@@ -1,4 +1,4 @@
 [vdev-action]
 event=add
 OS_INTERFACE=
-command=exec $VDEV_HELPERS/ifname.sh
+command=exec "$VDEV_HELPERS/ifname.sh"

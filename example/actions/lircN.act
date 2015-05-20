@@ -1,4 +1,4 @@
 [vdev-action]
 event=add
 path=^lirc[0-9]+$
-command=/bin/chgrp video $VDEV_MOUNTPOINT/$VDEV_PATH
+command=/bin/chgrp video "$VDEV_MOUNTPOINT/$VDEV_PATH"

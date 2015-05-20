@@ -3,4 +3,4 @@ event=add
 path=^vport.*
 OS_SUBSYSTEM=virtio-ports
 OS_DEVPATH=
-command=. $VDEV_HELPERS/subr.sh; VIRTIO_NAME=$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH/name; test -f $VIRTIO_NAME && vdev_symlink ../$VDEV_PATH "$VDEV_MOUNTPOINT/virtio-ports/$(cat $VIRTIO_NAME)" $VDEV_METADATA
+command=. "$VDEV_HELPERS/subr.sh"; VIRTIO_NAME="$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH/name"; test -f "$VIRTIO_NAME" && vdev_symlink "../$VDEV_PATH" "$VDEV_MOUNTPOINT/virtio-ports/$(cat $VIRTIO_NAME)" "$VDEV_METADATA"

@@ -1,4 +1,4 @@
 [vdev-action]
 event=add
 path=^qft[0-9]*$|^nqft[0-9]*$|^zqft[0-9]*$|^nzqft[0-9]*$|^rawqft[0-9]*$|^nrawqft[0-9]*$
-command=/bin/chgrp disk $VDEV_MOUNTPOINT/$VDEV_PATH
+command=/bin/chgrp disk "$VDEV_MOUNTPOINT/$VDEV_PATH"

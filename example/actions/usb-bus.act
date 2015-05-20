@@ -1,4 +1,4 @@
 [vdev-action]
 event=any
 OS_SUBSYSTEM=usb
-rename_command=exec $VDEV_HELPERS/usb-name.sh
+rename_command=exec "$VDEV_HELPERS/usb-name.sh"
