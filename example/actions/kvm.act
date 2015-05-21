@@ -1,4 +1,4 @@
 [vdev-action]
 event=add
 path=^kvm$
-command=. "$VDEV_HELPERS/subr.sh"; vdev_permissions root.kvm 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
+command=. "$VDEV_HELPERS/subr.sh"; vdev_permissions root:kvm 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
