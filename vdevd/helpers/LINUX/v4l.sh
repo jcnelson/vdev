@@ -82,6 +82,6 @@ elif [ -n "$(echo "$VDEV_PATH" | /bin/egrep "audio")" ]; then
 fi
 
 # set up permissions...
-vdev_permissions root.video 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
+vdev_permissions root:video 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
 
 exit 0

@@ -50,6 +50,6 @@ add_capability_link "$VDEV_PATH" $VDEV_OPTICAL_DVD_R "dvdrw"
 add_capability_link "$VDEV_PATH" $VDEV_OPTICAL_DVD_RAM "dvdrw"
 
 # set ownership and bits 
-vdev_permissions root.cdrom 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
+vdev_permissions root:cdrom 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
 
 exit 0

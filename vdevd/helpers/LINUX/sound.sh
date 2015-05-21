@@ -64,6 +64,6 @@ if [ -n "$(vdev_subsystems "$VDEV_OS_DEVPATH" | /bin/grep "usb")" ]; then
 fi
 
 # set up permissions...
-vdev_permissions root.audio 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
+vdev_permissions root:audio 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
 
 exit 0

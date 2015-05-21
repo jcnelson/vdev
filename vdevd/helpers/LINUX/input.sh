@@ -20,7 +20,7 @@ setup_input_permissions() {
       MODE=0664
    fi
 
-   vdev_permissions root.input $MODE "$VDEV_MOUNTPOINT/$VDEV_PATH"
+   vdev_permissions root:input $MODE "$VDEV_MOUNTPOINT/$VDEV_PATH"
    return $?
 }
 

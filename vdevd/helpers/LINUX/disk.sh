@@ -158,6 +158,6 @@ if [ $PVS_RC -eq 0 -a -n "$LVM2_PV_UUID" ]; then
 fi
 
 # set ownership and bits 
-vdev_permissions root.disk 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
+vdev_permissions root:disk 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
 
 exit 0
