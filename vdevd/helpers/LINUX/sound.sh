@@ -35,17 +35,19 @@ if [ -n "$(echo $VDEV_PATH | /bin/egrep "controlC[0-9]+")" ]; then
    fi
 fi
 
+SYSFS_PATH="$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH"
+
 # if this is a USB device, then add by-id persistent path 
-if [ -n "$(vdev_subsystems "$VDEV_OS_DEVPATH" | /bin/grep "usb")" ]; then 
+if [ -n "$(vdev_subsystems "$SYSFS_PATH" | /bin/grep 'usb')" ]; then 
    
-   eval $($VDEV_HELPERS/stat_usb "$VDEV_OS_DEVPATH")
+   eval $($VDEV_HELPERS/stat_usb "$SYSFS_PATH")
    STAT_RC=$?
    
    # did we get USB info?
    if [ $STAT_RC -ne 0 ]; then 
 
       # nope 
-      vdev_error "$VDEV_HELPERS/stat_usb \"$VDEV_OS_DEVPATH\" rc = $STAT_RC"
+      vdev_error "$VDEV_HELPERS/stat_usb \"$SYSFS_PATH\" rc = $STAT_RC"
 
    elif [ -n "$VDEV_USB_SERIAL" ]; then 
 
