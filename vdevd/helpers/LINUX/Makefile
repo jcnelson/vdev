@@ -19,7 +19,7 @@ $(BUILD_VDEVD_HELPERS)/%: $(BUILD_VDEVD_HELPERS)/%.o $(BUILD_VDEVD_HELPERS)/comm
 
 $(BUILD_VDEVD_HELPERS)/%.o: %.c
 	@mkdir -p $(shell dirname "$@")
-	$(CC) -o $@ -c $<
+	$(CC) $(CFLAGS) -o $@ -c $<
 
 $(BUILD_VDEVD_HELPERS)/%.sh: %.sh
 	@mkdir -p $(shell dirname "$@")

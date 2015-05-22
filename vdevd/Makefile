@@ -14,7 +14,7 @@ all: $(VDEVD) helpers
 
 $(VDEVD): $(OBJ) helpers
 	@mkdir -p $(shell dirname "$@")
-	$(CC) -o $@ $(OBJ) $(LIB) $(LIBINC)
+	$(CC) $(LDFLAGS) -o $@ $(OBJ) $(LIB) $(LIBINC)
 
 $(BUILD_VDEVD)/%.o : %.c
 	@mkdir -p $(shell dirname "$@")

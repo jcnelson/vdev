@@ -72,5 +72,8 @@ build_setup: $(BUILD_DIRS)
 $(BUILD_DIRS):
 	@mkdir -p $@
 
+# rule to make an archive member from an object file
+(%.o): %.o ;    $(AR) cr $@ $*.o
+
 # debugging...
 print-%: ; @echo $*=$($*)

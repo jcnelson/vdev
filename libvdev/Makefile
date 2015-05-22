@@ -14,8 +14,9 @@ LIBVDEV := $(BUILD_LIBVDEV)/libvdev.so
 LIBVDEV_SONAME := libvdev.so.$(VERSION_MAJOR)
 LIBVDEV_SO := $(BUILD_LIBVDEV)/libvdev.so.$(VERSION_MAJOR)
 LIBVDEV_LIB := $(BUILD_LIBVDEV)/libvdev.so.$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_PATCH)
-
-LIBVDEV_FILES := $(LIBVDEV) $(LIBVDEV_SO) $(LIBVDEV_LIB)
+LIBVDEV_A := $(BUILD_LIBVDEV)/libvdev.a
+ 
+LIBVDEV_FILES := $(LIBVDEV) $(LIBVDEV_SO) $(LIBVDEV_LIB) $(LIBVDEV_A)
 
 LIBVDEV_HEADERS := $(patsubst %.h,$(BUILD_LIBVDEV_HEADERS)/%.h,$(HEADERS))
 
@@ -27,7 +28,7 @@ all: $(LIBVDEV_FILES) $(LIBVDEV_HEADERS)
 
 $(LIBVDEV): $(OBJ)
 	@mkdir -p $(shell dirname "$@")
-	$(CPP) -shared -Wl,-soname,$(LIBVDEV_SONAME) -o $@ $(OBJ) $(LIBINC) $(LIB)
+	$(CC) -shared -Wl,-soname,$(LIBVDEV_SONAME) -o $@ $(OBJ) $(LIBINC) $(LIB)
 
 $(LIBVDEV_LIB): $(LIBVDEV)
 	@mkdir -p $(shell dirname "$@")
@@ -37,13 +38,15 @@ $(LIBVDEV_SO): $(LIBVDEV_LIB)
 	@mkdir -p $(shell dirname "$@")
 	@ln -sf $(shell basename $<) $@
 
+$(LIBVDEV_A): $(BUILD_LIBVDEV) $(LIBVDEV_A)($(OBJ))
+
 $(BUILD_LIBVDEV_HEADERS)/%.h: %.h
 	@mkdir -p $(shell dirname "$@")
 	@cp -a $< $@
 
 $(BUILD_LIBVDEV)/%.o: %.c
 	@mkdir -p $(shell dirname "$@")
-	$(CPP) -o $@ -c $< 
+	$(CC) -o $@ -c $< 
 
 install: $(LIBVDEV_FILES_INSTALL) $(LIBVDEV_HEADERS_INSTALL)
 
