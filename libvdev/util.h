@@ -71,8 +71,8 @@
 #include <syslog.h>
 #include <sys/resource.h>
 
-#define VDEV_WHERESTR "%05d:%05d: [%16s:%04u] %s: "
-#define VDEV_WHEREARG (int)getpid(), (int)pthread_self(), __FILE__, __LINE__, __func__
+#define VDEV_WHERESTR "%05d:%016llX: [%16s:%04u] %s: "
+#define VDEV_WHEREARG (int)getpid(), vdev_pthread_self(), __FILE__, __LINE__, __func__
 
 #define VDEV_LOGLEVEL_DEBUG     2
 #define VDEV_LOGLEVEL_INFO      1
@@ -205,6 +205,7 @@ char* vdev_fullpath( char const* root, char const* path, char* dest );
 char* vdev_dirname( char const* path, char* dest );
 size_t vdev_basename_len( char const* path );
 char* vdev_basename( char const* path, char* dest );
+unsigned long long int vdev_pthread_self(void);
 
 // setup 
 void vdev_setup_global(void);

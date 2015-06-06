@@ -400,6 +400,8 @@ int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t m
       return rc;
    }
    
+   max_fd = sysconf(_SC_OPEN_MAX);
+   
    // fork the child 
    pid = fork();
    
@@ -411,16 +413,12 @@ int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t m
       
       if( rc < 0 ) {
          
-         rc = -errno;
-         vdev_error("dup2(%d, %d) rc = %d\n", p[1], STDOUT_FILENO, rc );
-         
+         rc = errno;
          close( p[1] );
-         exit(1);
+         exit(rc);
       }
       
       // close everything else but stdout
-      max_fd = sysconf(_SC_OPEN_MAX);
-      
       for( int i = 0; i < max_fd; i++ ) {
          
          if( i != STDOUT_FILENO ) {
@@ -433,16 +431,18 @@ int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t m
          rc = execle( "/bin/sh", "sh", "-c", cmd, (char*)0, env );
       }
       else {
-         rc = execl( "/bin/sh", "sh", "-c", cmd, (char*)0 );
+         
+         char** noenv = { NULL };
+         rc = execle( "/bin/sh", "sh", "-c", cmd, (char*)0, noenv );
       }
       
       if( rc != 0 ) {
          
-         rc = -errno;
-         vdev_error("execl[e]() rc = %d\n", rc );
-         exit(1);
+         rc = errno;
+         exit(rc);
       }
       else {
+         
          // make gcc happy 
          exit(0);
       }
@@ -1092,3 +1092,17 @@ void vdev_setup_global(void) {
    seed48( seedv );
 }
 
+
+// portable cast pthread_t to uint64_t 
+unsigned long long int vdev_pthread_self(void) {
+   
+   union {
+      pthread_t t;
+      uint64_t i;
+   } vdev_pthread;
+
+   vdev_pthread.i = 0;
+   vdev_pthread.t = pthread_self();
+   
+   return vdev_pthread.i;
+}
