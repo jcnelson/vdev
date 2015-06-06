@@ -754,7 +754,7 @@ int main(int argc, char **argv ) {
       
       memset( wwn_buf, 0, 100 );
       
-      snprintf( wwn_buf, 99, "0x%04x%04x%04x%04x\n", identify.wyde[108], identify.wyde[109], identify.wyde[110], identify.wyde[111]);
+      snprintf( wwn_buf, 99, "0x%04x%04x%04x%04x", identify.wyde[108], identify.wyde[109], identify.wyde[110], identify.wyde[111]);
       
       vdev_property_add("VDEV_ATA_WWN", wwn_buf );
       vdev_property_add("VDEV_ATA_WWN_WITH_EXTENSION", wwn_buf );
