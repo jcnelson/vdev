@@ -74,7 +74,7 @@ esac
 test 0 -ne $STAT_RET && vdev_fail 3 "stat_${DISK_TYPE} exited with $STAT_RET"
 
 # verify that we got a disk ID; otherwise we're done (no label to set)
-test -z "$DISK_ID" && vdev_fail 4 "unknown disk ID"
+test -z "$DISK_ID" && vdev_fail 4 "unknown disk ID at $VDEV_OS_DEVPATH"
 
 # put label into place
 DISK_NAME="$DISK_TYPE-$DISK_ID"
