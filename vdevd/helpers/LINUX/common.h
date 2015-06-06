@@ -51,6 +51,7 @@
 #include <strings.h>
 #include <time.h>
 #include <dirent.h>
+#include <getopt.h>
 
 #ifndef DEBUG
 #define DEBUG 0
