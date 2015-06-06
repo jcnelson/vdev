@@ -65,11 +65,11 @@ vdev_log() {
    
    if [ -z "$VDEV_LOGFILE" ]; then
       # stdout 
-      echo "[helpers/subr.sh] INFO: $1"
+      echo "[helpers] INFO: $1"
    else
 
       # logfile 
-      echo "[helpers/subr.sh] INFO: $1" >> "$VDEV_LOGFILE"
+      echo "[helpers] INFO: $1" >> "$VDEV_LOGFILE"
    fi 
 }
 
@@ -82,11 +82,11 @@ vdev_warn() {
    
    if [ -z "$VDEV_LOGFILE" ]; then
       # stdout 
-      echo "[helpers/subr.sh] WARN: $1"
+      echo "[helpers] WARN: $1"
    else
 
       # logfile 
-      echo "[helpers/subr.sh] WARN: $1" >> "$VDEV_LOGFILE"
+      echo "[helpers] WARN: $1" >> "$VDEV_LOGFILE"
    fi 
 }
 
@@ -98,11 +98,11 @@ vdev_error() {
    
    if [ -z "$VDEV_LOGFILE" ]; then
       # stdout 
-      echo "[helpers/subr.sh] ERROR: $1"
+      echo "[helpers] ERROR: $1"
    else
 
       # logfile 
-      echo "[helpers/subr.sh] ERROR: $1" >> "$VDEV_LOGFILE"
+      echo "[helpers] ERROR: $1" >> "$VDEV_LOGFILE"
    fi 
 }
 
@@ -286,5 +286,4 @@ vdev_permissions() {
 
    return $_RC
 }
-
 
