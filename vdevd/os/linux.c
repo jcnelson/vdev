@@ -198,6 +198,28 @@ static int vdev_linux_log_uevent( char const* uevent_buf, size_t uevent_buf_len,
 }
 
 
+// serialize a uevent buffer--replace \0 with \n.
+// put the resulting (null-terminated) data into out_buf--at most out_buflen bytes (including the '\0').
+// if out_buf is too short, the data will be truncated.
+// return the number of bytes copied 
+static int vdev_linux_serialize_uevent( char const* uevent_buf, size_t uevent_buflen, char* out_buf, size_t out_buflen ) {
+   
+   size_t nw = 0;
+   for( unsigned int i = 0; i < uevent_buflen; ) {
+      
+      size_t num_printed = snprintf( out_buf + nw, out_buflen - nw - 1, "%s\n", uevent_buf + i );
+      
+      nw += num_printed;
+      i += strlen(uevent_buf + i) + 1;
+   }
+   
+   // trim the last '\n'
+   out_buf[ strlen(out_buf) - 1 ] = '\0';
+   
+   return nw + 1;
+}
+
+
 #define vdev_linux_debug_uevent( uevent_buf, uevent_buf_len ) vdev_linux_log_uevent( uevent_buf, uevent_buf_len, true )
 #define vdev_linux_error_uevent( uevent_buf, uevent_buf_len ) vdev_linux_log_uevent( uevent_buf, uevent_buf_len, false )
 
@@ -219,6 +241,9 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
    mode_t dev_mode = 0;
    int line_count = 0;
    bool not_param = false;      // if set to true, add as an OS-specific parameter to the vreq
+   
+   char nlbuf_dup[VDEV_LINUX_NETLINK_BUF_MAX];
+   vdev_linux_serialize_uevent( nlbuf, buflen, nlbuf_dup, VDEV_LINUX_NETLINK_BUF_MAX );
    
    char* devpath = NULL;        // sysfs devpath 
    char* subsystem = NULL;      // sysfs subsystem 
@@ -455,6 +480,14 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
    
    // tell helpers where /sys is mounted 
    rc = vdev_device_request_add_param( vreq, "SYSFS_MOUNTPOINT", ctx->sysfs_mountpoint );
+   if( rc != 0 ) {
+      
+      // OOM 
+      return rc;
+   }
+   
+   // give helpers the full uevent 
+   rc = vdev_device_request_add_param( vreq, "UEVENT", nlbuf_dup );
    
    return rc;
 }
@@ -1179,6 +1212,7 @@ static int vdev_linux_context_init( struct vdev_os_context* os_ctx, struct vdev_
    
    int rc = 0;
    size_t slen = VDEV_LINUX_NETLINK_RECV_BUF_MAX;
+   int so_passcred_enable = 1;
    
    memset( ctx, 0, sizeof(struct vdev_linux_context) );
    
@@ -1215,7 +1249,7 @@ static int vdev_linux_context_init( struct vdev_os_context* os_ctx, struct vdev_
       }
       
       // check credentials of message--only root should be able talk to us
-      rc = setsockopt( ctx->pfd.fd, SOL_SOCKET, SO_PASSCRED, &slen, sizeof(slen) );
+      rc = setsockopt( ctx->pfd.fd, SOL_SOCKET, SO_PASSCRED, &so_passcred_enable, sizeof(so_passcred_enable) );
       if( rc < 0 ) {
          
          rc = -errno;
