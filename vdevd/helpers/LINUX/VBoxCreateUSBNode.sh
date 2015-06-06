@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/dash
 # $Id: VBoxCreateUSBNode.sh $ */
 ## @file
 # VirtualBox USB Proxy Service, Linux Specialization.
