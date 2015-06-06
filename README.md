@@ -59,14 +59,17 @@ Substitute $OS_TYPE with:
 
 $OS_TYPE defaults to "LINUX".
 
-
 To build vdevfs, type:
 
     $ make -C fs
     $ sudo make -C fs install
 
 
-By default, libvdev is installed to /lib/, vdevd is installed to /sbin/vdevd, vdevd's helper programs are installed to /lib/vdev/, and vdevfs is installed to /usr/sbin/vdevfs.  You can override any of these directory choices by setting the "PREFIX=" variable on the command-line (e.g. `sudo make -C libvdev install PREFIX=/usr/local/lib`).
+By default, libvdev is installed to /lib/, vdevd is installed to /sbin/vdevd, vdevd's helper programs are installed to /lib/vdev/, and vdevfs is installed to /usr/sbin/vdevfs.  You can override any of these directory choices at build-time by setting the "PREFIX=" variable on the command-line (e.g. `make -C libvdev PREFIX=/usr/local/lib`), and you can override the installation location by setting "DESTDIR=" at install-time (e.g. `sudo make -C libvdev install DESTDIR=/usr/local/lib`).
+
+**A Note on Static Linking**
+
+You can directly set `CFLAGS` and `LDFLAGS` to build a statically-linked vdevd and a `libvdev.a` file, and you should be able to link against non-GNU libcs.  However, if you choose to do so, you should not run multiple jobs in parallel (e.g. running `make -j1` will guarantee this).  This is due to the way the archive file is generated; this will be improved at a later date.
 
 FAQ
 ---
