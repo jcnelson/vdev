@@ -30,6 +30,12 @@ BUILD_LIBVDEV_HEADERS := $(BUILD_INCLUDEDIR)/libvdev
 BUILD_LIBVDEV_DIRS := $(BUILD_LIBVDEV) $(BUILD_LIBVDEV_HEADERS)
 INSTALL_LIBVDEV := $(LIBDIR)
 
+# libudev-compat 
+BUILD_LIBUDEV_COMPAT := $(BUILD)/libudev-compat
+BUILD_LIBUDEV_COMPAT_HEADERS := $(BUILD_INCLUDEDIR)/libudev
+BUILD_LIBUDEV_COMPAT_DIRS := $(BUILD_LIBUDEV_COMPAT) $(BUILD_LIBUDEV_COMPAT_HEADERS)
+INSTALL_LIBUDEV_COMPAT := $(LIBDIR)
+
 # vdevd 
 BUILD_VDEVD := $(BUILD_SBINDIR)
 BUILD_VDEVD_HELPERS := $(BUILD_LIBDIR)/vdev
@@ -54,16 +60,18 @@ INSTALL_VDEV_INITRAMFS := $(USRSHAREDIR)/initramfs-tools
 # compiler
 CFLAGS     := -Wall -std=c99 -g -fPIC -fstack-protector -fstack-protector-all -pthread -Wno-unused-variable -Wno-unused-but-set-variable
 CPPFLAGS   := -Wall -g -fPIC -fstack-protector -fstack-protector-all -pthread -Wno-unused-variable -Wno-unused-but-set-variable
+LDFLAGS    :=
 INC      := -I. -I$(ROOT_DIR) -I$(BUILD_INCLUDEDIR)
 DEFS     := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS -D_VDEV_OS_$(OS)
 LIBINC   := -L$(BUILD_LIBVDEV)
-CC       := gcc $(CFLAGS) $(INC) $(DEFS)
-CPP      := g++ $(CPPFLAGS) $(INC) $(DEFS)
+CC       := gcc
+CPP      := g++
 
 # build setup
-BUILD_DIRS   := $(BUILD_VDEVD_DIRS) \
+BUILD_DIRS   := $(sort $(BUILD_VDEVD_DIRS) \
                 $(BUILD_VDEVFS_DIRS) \
-					 $(BUILD_LIBVDEV_DIRS)
+					 $(BUILD_LIBUDEV_COMPAT_DIRS) \
+					 $(BUILD_LIBVDEV_DIRS))
 
 all:
 

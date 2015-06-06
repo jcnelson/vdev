@@ -2,7 +2,7 @@ include ../buildconf.mk
 
 C_SRCS:= $(wildcard *.c) $(wildcard os/*.c)
 
-LIB   := -lvdev
+LIB   := -lvdev -lpthread -lrt
 OBJ   := $(patsubst %.c,$(BUILD_VDEVD)/%.o,$(C_SRCS)) 
 VDEVD := $(BUILD_VDEVD)/vdevd
 
@@ -14,11 +14,11 @@ all: $(VDEVD) helpers
 
 $(VDEVD): $(OBJ) helpers
 	@mkdir -p $(shell dirname "$@")
-	$(CC) $(LDFLAGS) -o $@ $(OBJ) $(LIB) $(LIBINC)
+	$(CC) -o $@ $(OBJ) $(LIB) $(LIBINC) $(LDFLAGS)
 
 $(BUILD_VDEVD)/%.o : %.c
 	@mkdir -p $(shell dirname "$@")
-	$(CC) -o $@ -c $< 
+	$(CC) $(CFLAGS) $(DEFS) $(INC) -o $@ -c $< 
 
 .PHONY: helpers
 helpers:

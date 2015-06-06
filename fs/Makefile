@@ -3,7 +3,7 @@ include ../buildconf.mk
 C_SRCS:= $(wildcard *.c)
 CPP_SRCS := $(wildcard *.cpp)
 
-DEF   := -D_FILE_OFFSET_BITS=64
+DEFS  := $(DEFS) -D_FILE_OFFSET_BITS=64
 LIB   := -lvdev -lfuse -lfskit_fuse -lfskit -lpstat
 OBJ   := $(patsubst %.c,$(BUILD_VDEVFS)/%.o,$(C_SRCS)) \
 	      $(patsubst %.cpp,$(BUILD_VDEVFS)/%.o,$(CPP_SRCS))
@@ -15,16 +15,16 @@ VDEVFS_INSTALL := $(INSTALL_VDEVFS)/vdevfs
 all: $(VDEVFS)
 
 $(VDEVFS): $(OBJ)
-	@mkdir -p $(shell dirname "$@")
-	$(CPP) -o $@ $(OBJ) $(LIBINC) $(LIB)
+	@mkdir -p "$(shell dirname "$@")"
+	$(CPP) $(LDFLAGS)  -o "$@" $(OBJ) $(LIBINC) $(LIB)
 
 $(BUILD_VDEVFS)/%.o : %.c
-	@mkdir -p $(shell dirname "$@")
-	$(CPP) -o $@ -c $< $(DEF)
+	@mkdir -p "$(shell dirname "$@")"
+	$(CPP) $(CPPFLAGS) $(INC) $(DEFS) -o "$@" -c "$<"
 
 $(BUILD_VDEVFS)/%.o : %.cpp
-	@mkdir -p $(shell dirname "$@")
-	$(CPP) -o $@ -c $< $(DEF)
+	@mkdir -p "$(shell dirname "$@")"
+	$(CPP) $(CPPFLAGS) $(INC) $(DEFS) -o "$@" -c "$<"
 
 install: $(VDEVFS_INSTALL)
 $(VDEVFS_INSTALL): $(VDEVFS)

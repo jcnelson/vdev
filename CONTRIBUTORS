@@ -5,3 +5,6 @@ judecn@gmail.com
 
 GravisZro - udev rule parser 
 https://github.com/GravisZro
+
+Didier Kryn - Makefile rules for static linking and compatibility with musl libc
+kryn@in2p3.fr

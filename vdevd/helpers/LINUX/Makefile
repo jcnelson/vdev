@@ -6,7 +6,7 @@ OBJ   := $(patsubst %.c,$(BUILD_VDEVD_HELPERS)/%.o,$(C_SRCS)) $(patsubst %.cpp,$
 LIB   :=
 
 HELPER_SCRIPTS := $(wildcard *.sh)
-HELPERS := stat_optical stat_ata stat_input stat_scsi stat_v4l stat_net stat_usb stat_bus stat_path $(HELPER_SCRIPTS)
+HELPERS := stat_optical stat_ata stat_input stat_scsi stat_v4l stat_net stat_usb stat_bus stat_path event-put $(HELPER_SCRIPTS)
 
 HELPERS_BUILD := $(patsubst %,$(BUILD_VDEVD_HELPERS)/%,$(HELPERS))
 HELPERS_INSTALL := $(patsubst %,$(INSTALL_VDEVD_HELPERS)/%,$(HELPERS))
@@ -14,21 +14,21 @@ HELPERS_INSTALL := $(patsubst %,$(INSTALL_VDEVD_HELPERS)/%,$(HELPERS))
 all: $(HELPERS_BUILD)
 
 $(BUILD_VDEVD_HELPERS)/%: $(BUILD_VDEVD_HELPERS)/%.o $(BUILD_VDEVD_HELPERS)/common.o
-	@mkdir -p $(shell dirname "$@")
-	$(CC) -o $@ $< $(BUILD_VDEVD_HELPERS)/common.o $(LIBINC) $(LIB)
+	@mkdir -p "$(shell dirname "$@")"
+	$(CC) -o "$@" "$<" $(BUILD_VDEVD_HELPERS)/common.o $(LIBINC) $(LIB) $(LDFLAGS)
 
 $(BUILD_VDEVD_HELPERS)/%.o: %.c
-	@mkdir -p $(shell dirname "$@")
-	$(CC) $(CFLAGS) -o $@ -c $<
+	@mkdir -p "$(shell dirname "$@")"
+	$(CC) $(CFLAGS) $(DEFS) $(INC) -o "$@" -c "$<"
 
 $(BUILD_VDEVD_HELPERS)/%.sh: %.sh
-	@mkdir -p $(shell dirname "$@")
-	@cp -a $< $@
+	@mkdir -p "$(shell dirname "$@")"
+	@cp -a "$<" "$@"
 
 install: $(HELPERS_INSTALL)
 $(INSTALL_VDEVD_HELPERS)/%: $(BUILD_VDEVD_HELPERS)/%
-	@mkdir -p $(shell dirname "$@")
-	cp -a $< $@
+	@mkdir -p "$(shell dirname "$@")"
+	cp -a "$<" "$@"
 
 .PHONY: uninstall
 uninstall:
