@@ -40,7 +40,7 @@ case "$DISK_TYPE" in
    ata)
 
       # (S)ATA disk
-      eval $($VDEV_HELPERS/stat_ata "$VDEV_MOUNTPOINT/$VDEV_PATH")
+      eval "$($VDEV_HELPERS/stat_ata "$VDEV_MOUNTPOINT/$VDEV_PATH")"
       STAT_RET=$?
 
       # disk id is the serial number
@@ -54,7 +54,7 @@ case "$DISK_TYPE" in
    usb)
       
       # USB disk
-      eval $($VDEV_HELPERS/stat_usb "$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH")
+      eval "$($VDEV_HELPERS/stat_usb "$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH")"
       STAT_RET=$?
 
             
