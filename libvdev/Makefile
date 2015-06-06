@@ -4,7 +4,7 @@ C_SRCS:= $(wildcard *.c)
 
 HEADERS := $(wildcard *.h)
 OBJ := $(patsubst %.c,$(BUILD_LIBVDEV)/%.o,$(C_SRCS))
-LIB :=
+LIB := -lpthread -lrt
 
 VERSION_MAJOR := 1
 VERSION_MINOR := 0
@@ -27,36 +27,36 @@ LIBVDEV_HEADERS_INSTALL := $(patsubst $(BUILD_LIBVDEV_HEADERS)/%.h,$(INCLUDEDIR)
 all: $(LIBVDEV_FILES) $(LIBVDEV_HEADERS)
 
 $(LIBVDEV): $(OBJ)
-	@mkdir -p $(shell dirname "$@")
-	$(CC) -shared -Wl,-soname,$(LIBVDEV_SONAME) -o $@ $(OBJ) $(LIBINC) $(LIB)
+	@mkdir -p "$(shell dirname "$@")"
+	$(CC) -shared -Wl,-soname,$(LIBVDEV_SONAME) -o $@ $(OBJ) $(LIBINC) $(LIB) $(LDFLAGS)
 
 $(LIBVDEV_LIB): $(LIBVDEV)
-	@mkdir -p $(shell dirname "$@")
-	@ln -sf $(shell basename $<) $@
+	@mkdir -p "$(shell dirname "$@")"
+	@ln -sf "$(shell basename "$<")" "$@"
 
 $(LIBVDEV_SO): $(LIBVDEV_LIB)
-	@mkdir -p $(shell dirname "$@")
-	@ln -sf $(shell basename $<) $@
+	@mkdir -p "$(shell dirname "$@")"
+	@ln -sf "$(shell basename "$<")" "$@"
 
 $(LIBVDEV_A): $(BUILD_LIBVDEV) $(LIBVDEV_A)($(OBJ))
 
 $(BUILD_LIBVDEV_HEADERS)/%.h: %.h
-	@mkdir -p $(shell dirname "$@")
-	@cp -a $< $@
+	@mkdir -p "$(shell dirname "$@")"
+	@cp -a "$<" "$@"
 
 $(BUILD_LIBVDEV)/%.o: %.c
-	@mkdir -p $(shell dirname "$@")
-	$(CC) -o $@ -c $< 
+	@mkdir -p "$(shell dirname "$@")"
+	$(CC) $(CFLAGS) $(DEFS) $(INC) -o "$@" -c "$<"
 
 install: $(LIBVDEV_FILES_INSTALL) $(LIBVDEV_HEADERS_INSTALL)
 
 $(LIBDIR)/%: $(BUILD_LIBVDEV)/%
-	@mkdir -p $(shell dirname "$@")
-	@cp -a $< $@
+	@mkdir -p "$(shell dirname "$@")"
+	@cp -a "$<" "$@"
 
 $(INCLUDEDIR)/libvdev/%.h: $(BUILD_LIBVDEV_HEADERS)/%.h
-	@mkdir -p $(shell dirname "$@")
-	@cp -a $< $@
+	@mkdir -p "$(shell dirname "$@")"
+	@cp -a "$<" "$@"
 
 .PHONY: uninstall
 uninstall:
