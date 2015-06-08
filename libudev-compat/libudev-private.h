@@ -33,6 +33,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <netpacket/packet.h>
+#include <arpa/inet.h>
+#include <linux/netlink.h>
+
 #include "libudev.h"
 #include "util.h"
 #include "mkdir.h"
@@ -81,12 +87,6 @@ int udev_device_update_db(struct udev_device *udev_device);
 int udev_device_delete_db(struct udev_device *udev_device);
 int udev_device_tag_index(struct udev_device *dev, struct udev_device *dev_old, bool add);
 
-/* libudev-monitor.c - netlink/unix socket communication  */
-int udev_monitor_disconnect(struct udev_monitor *udev_monitor);
-int udev_monitor_allow_unicast_sender(struct udev_monitor *udev_monitor, struct udev_monitor *sender);
-int udev_monitor_send_device(struct udev_monitor *udev_monitor,
-                             struct udev_monitor *destination, struct udev_device *udev_device);
-struct udev_monitor *udev_monitor_new_from_netlink_fd(struct udev *udev, const char *name, int fd);
 
 /* libudev-list.c */
 struct udev_list_node {
@@ -124,6 +124,69 @@ void udev_list_entry_set_num(struct udev_list_entry *list_entry, int num);
         for (entry = first, tmp = udev_list_entry_get_next(entry); \
              entry != NULL; \
              entry = tmp, tmp = udev_list_entry_get_next(tmp))
+             
+/* libudev-monitor.c - netlink/unix socket communication  */
+
+/**
+ * SECTION:libudev-monitor
+ * @short_description: device event source
+ *
+ * Connects to a device event source.
+ */
+
+union sockaddr_union {
+        struct sockaddr sa;
+        struct sockaddr_in in;
+        struct sockaddr_in6 in6;
+        struct sockaddr_un un;
+        struct sockaddr_nl nl;
+        struct sockaddr_storage storage;
+        struct sockaddr_ll ll;
+};
+
+
+/**
+ * udev_monitor:
+ *
+ * Opaque object handling an event source.
+ */
+struct udev_monitor {
+        struct udev *udev;
+        int refcount;
+        
+        int type;                       // libudev-compat: kernel or udev link?
+        int sock;                       // libudev-compat: for udev-links, this is a socketpair sink which receives udev devices
+                                        // libudev-compat: for kernel-links, this is a netlink socket
+        union sockaddr_union snl;
+        union sockaddr_union snl_trusted_sender;
+        union sockaddr_union snl_destination;
+        socklen_t addrlen;
+        struct udev_list filter_subsystem_list;
+        struct udev_list filter_tag_list;
+        bool bound;
+        
+        // new in libudev-compat
+        int sock_fs;                    // socketpair source into which we send udev_devices
+        int events_wd;                  // watch descriptor for our events directory
+        int inotify_fd;                 // pollable one-shot inotify file descriptor watching the events directory for IN_CREATE.  Oneshot because it can overflow.
+        int epoll_fd;                   // pollable handle for detecting either the availability of previously-found events (signaled by sock_fs) or new events (inotify_fd)
+        
+        pid_t pid;                      // the PID of the process at the time this monitor was created
+        char events_dir[PATH_MAX+1];    // path to the directory we watch 
+        
+        int slot;                       // monitor slot in our global monitor table
+};
+
+// types of monitors
+#define UDEV_MONITOR_TYPE_KERNEL 1
+#define UDEV_MONITOR_TYPE_UDEV   2
+
+int udev_monitor_disconnect(struct udev_monitor *udev_monitor);
+int udev_monitor_allow_unicast_sender(struct udev_monitor *udev_monitor, struct udev_monitor *sender);
+int udev_monitor_send_device(struct udev_monitor *udev_monitor,
+                             struct udev_monitor *destination, struct udev_device *udev_device);
+struct udev_monitor *udev_monitor_new_from_netlink_fd(struct udev *udev, const char *name, int fd);
+int udev_monitor_filter_update(struct udev_monitor *udev_monitor);
 
 /* libudev-queue.c */
 unsigned long long int udev_get_kernel_seqnum(struct udev *udev);

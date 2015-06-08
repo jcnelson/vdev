@@ -493,6 +493,24 @@ static int udev_device_set_action(struct udev_device *udev_device, const char *a
  *
  * udev_device_set_info_loaded() needs to be set, to avoid trying
  * to use a device without a DEVPATH set
+ * 
+ * Properties parsed:
+ *    DEVPATH=(/devices path)
+ *    SUBSYSTEM=(subsystem name)
+ *    DEVNAME=(/dev node path)
+ *    DEVLINKS=(space-separated (!!!) list of symlinks)
+ *    TAGS=(colon-separated list of tags)
+ *    USEC_INITIALIZED=(microseconds since initialization)
+ *    DRIVER=(name of driver)
+ *    ACTION=(add, remove, change, etc.)
+ *    MAJOR=(major device number)
+ *    MINOR=(minor device number)
+ *    DEVPATH_OLD=(old device path (on move)???)
+ *    SEQNUM=(kernel uevent sequence number)
+ *    IFINDEX=(interface index, for USB and network interfaces???)
+ *    DEVMODE=(device node mode bits???)
+ *    DEVUID=(device node UID???)
+ *    DEVGID=(device node GID???)
  */
 static void udev_device_add_property_from_string_parse(struct udev_device *udev_device, const char *property)
 {
@@ -2027,20 +2045,23 @@ struct udev_device *udev_device_clone_with_db(struct udev_device *old_device)
         return device;
 }
 
+// NOTE: expects "key=value" pairs separated by exactly one '\0'
 struct udev_device *udev_device_new_from_nulstr(struct udev *udev, char *nulstr, ssize_t buflen) {
-        struct udev_device *device;
+        
+        struct udev_device *device = NULL;
         ssize_t bufpos = 0;
 
         if (nulstr == NULL || buflen <= 0) {
+                
                 errno = EINVAL;
-
+               
                 return NULL;
         }
 
         device = udev_device_new(udev);
         if (!device) {
+                
                 errno = ENOMEM;
-
                 return NULL;
         }
 
@@ -2061,7 +2082,7 @@ struct udev_device *udev_device_new_from_nulstr(struct udev *udev, char *nulstr,
 
         if (udev_device_add_property_from_string_parse_finish(device) < 0) {
                 log_debug("%s", "missing values, invalid device");
-
+                
                 udev_device_unref(device);
 
                 errno = EINVAL;
