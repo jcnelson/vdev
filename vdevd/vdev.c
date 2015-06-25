@@ -42,7 +42,7 @@ static int vdev_device_read_vdevd_instance( char const* mountpoint, char const* 
    int rc = 0;
    char const* devpath = dev_fullpath + strlen(mountpoint);
    
-   char* instance_attr_relpath = vdev_fullpath( VDEV_METADATA_PREFIX, devpath, NULL );
+   char* instance_attr_relpath = vdev_fullpath( VDEV_METADATA_PREFIX "/dev", devpath, NULL );
    if( instance_attr_relpath == NULL ) {
       
       return -ENOMEM;
@@ -618,7 +618,7 @@ int vdev_preseed_run( struct vdev_state* vdev ) {
       return -ENOMEM;
    }
    
-   command = VDEV_CALLOC( char, strlen( vdev->config->preseed_path ) + 2 + strlen( vdev->config->mountpoint ) + 1 );
+   command = VDEV_CALLOC( char, strlen( vdev->config->preseed_path ) + 2 + strlen( vdev->config->mountpoint ) + 2 + strlen( vdev->config->config_path ) + 1 );
    if( command == NULL ) {
       
       // OOM
@@ -626,7 +626,7 @@ int vdev_preseed_run( struct vdev_state* vdev ) {
       return -ENOMEM;
    }
    
-   sprintf(command, "%s %s", vdev->config->preseed_path, vdev->config->mountpoint );
+   sprintf(command, "%s %s %s", vdev->config->preseed_path, vdev->config->mountpoint, vdev->config->config_path );
    
    rc = vdev_subprocess( command, NULL, &output, output_len, &exit_status );
    if( rc != 0 ) {
@@ -757,12 +757,10 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
    }
    
    vdev_info("vdev actions dir: '%s'\n", vdev->config->acts_dir );
-   vdev_info("firmware dir:     '%s'\n", vdev->config->firmware_dir );
    vdev_info("helpers dir:      '%s'\n", vdev->config->helpers_dir );
    vdev_info("logfile path:     '%s'\n", vdev->config->logfile_path );
    vdev_info("pidfile path:     '%s'\n", vdev->config->pidfile_path );
    vdev_info("default mode:      0%o\n", vdev->config->default_mode );
-   vdev_info("ifnames file:     '%s'\n", vdev->config->ifnames_path );
    vdev_info("preseed script:   '%s'\n", vdev->config->preseed_path );
    
    vdev->mountpoint = vdev_strdup_or_null( vdev->config->mountpoint );
