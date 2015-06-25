@@ -8,7 +8,7 @@
 # if removing, just blow away the links
 if [ "$VDEV_ACTION" = "remove" ]; then
 
-   vdev_rmlinks $VDEV_METADATA
+   vdev_cleanup "$VDEV_METADATA"
    exit 0
 fi
 
@@ -41,8 +41,14 @@ if [ -n "$DM_UUID" ]; then
    vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/disk/by-id/dm-uuid-$DM_UUID" "$VDEV_METADATA"
 fi
 
-# also add by-uuid link 
+# get disk UUID, LABEL, PARTUUID, partition table UUID, partition table type, FS type
 UUID=
+LABEL=
+PARTUUID=
+PARTLABEL=
+PTUUID=
+PTTYPE=
+TYPE=
 
 if [ -x /sbin/blkid ]; then
    eval $(/sbin/blkid -o export "$VDEV_MOUNTPOINT/$VDEV_PATH")
@@ -58,8 +64,8 @@ fi
 if [ -x /sbin/lvs ]; then 
 
    LVS="/sbin/lvs -o all --noheadings --nameprefixes"
-   $LVS 2>/dev/null | \
    
+   $LVS 2>/dev/null | \
    while read lvs_vars; do
       
       LVM2_LV_KERNEL_MAJOR=
@@ -97,5 +103,16 @@ fi
 
 # set ownership and bits 
 vdev_permissions root:disk 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
+
+# device properties 
+VDEV_PART_TABLE_TYPE="$PTTYPE"
+VDEV_PART_TABLE_UUID="$PTUUID"
+VDEV_FS_TYPE="$TYPE"
+VDEV_DM_NAME="$DM_NAME"
+VDEV_DM_UUID="$DM_UUID"
+
+ALL_PROPS="VDEV_PART_TABLE_TYPE VDEV_PART_TABLE_UUID VDEV_FS_TYPE VDEV_DM_NAME VDEV_DM_UUID $VDEV_PROPERTIES"
+
+vdev_add_properties "$VDEV_METADATA" $ALL_PROPS
 
 exit 0
