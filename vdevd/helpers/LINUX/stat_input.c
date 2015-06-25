@@ -179,12 +179,14 @@ static void test_pointers (const unsigned long* bitmask_ev,
       }
       
       else if (test_bit (BTN_TOOL_FINGER, bitmask_key) && !test_bit (BTN_TOOL_PEN, bitmask_key)) {
+         
          is_touchpad = 1;
       }
       
       else if (test_bit (BTN_MOUSE, bitmask_key)) {
          /* This path is taken by VMware's USB mouse, which has
             * absolute axes, but no touch/pressure button. */
+         
          is_mouse = 1;
       }
       
@@ -219,8 +221,8 @@ static void test_pointers (const unsigned long* bitmask_ev,
    if (test_bit (EV_REL, bitmask_ev) &&
       test_bit (REL_X, bitmask_rel) && test_bit (REL_Y, bitmask_rel) &&
       test_bit (BTN_MOUSE, bitmask_key)) {
-      
-            is_mouse = 1;
+       
+      is_mouse = 1;
    }
    
    if (is_mouse) {
@@ -257,6 +259,7 @@ static void test_key (const unsigned long* bitmask_ev,
       found |= bitmask_key[i];
       log_debug("test_key: checking bit block %lu for any keys; found=%i", (unsigned long)i*BITS_PER_LONG, found > 0);
    }
+   
    /* If there are no keys in the lower block, check the higher block */
    if (!found) {
       for (i = KEY_OK; i < BTN_TRIGGER_HAPPY; ++i) {
@@ -297,6 +300,8 @@ int main( int argc, char** argv ) {
    // look for the character device with VDEV_MAJOR and VDEV_MINOR 
    char capabilities_path[4096];
    char full_sysfs_path[4096];
+   char subsystem[4096];
+   char sysdev_path[4096];
    
    unsigned long bitmask_ev[NBITS(EV_MAX)];
    unsigned long bitmask_abs[NBITS(ABS_MAX)];
@@ -361,13 +366,35 @@ int main( int argc, char** argv ) {
       exit(1);
    }
    
-   sprintf(capabilities_path, "/sys/dev/char/%s:%s/device/capabilities", major, minor );
+   // is this an input device?
+   memset( sysdev_path, 0, 4096 );
+   memset( subsystem, 0, 4096 );
+   
+   snprintf( sysdev_path, 4096, "/sys/dev/char/%s:%s/subsystem", major, minor );
+   rc = readlink( sysdev_path, subsystem, 4096 );
+   if( rc < 0 ) {
+      fprintf(stderr, "readlink('%s'): %s\n", sysdev_path, strerror( rc ) );
+      exit(1);
+   }
+   
+   if( strcmp( subsystem + strlen(subsystem) - 5, "input" ) != 0 ) {
+      
+      // not an input device 
+      exit(1);
+   }
+   
+   // replaces ID_INPUT
+   vdev_property_add( "VDEV_INPUT", "1" );
+   
+   memset( capabilities_path, 0, 4096 );
+   
+   snprintf(capabilities_path, 4095, "/sys/dev/char/%s:%s/device/capabilities", major, minor );
    
    // read each capability
    for( int i = 0; caps[i] != NULL; i++ ) {
       
       memset( full_sysfs_path, 0, 4096 );
-      sprintf( full_sysfs_path, "%s/%s", capabilities_path, caps[i] );
+      snprintf( full_sysfs_path, 4096, "%s/%s", capabilities_path, caps[i] );
       
       get_cap_mask( full_sysfs_path, bitmasks[i], bitmask_lens[i] );
    }
