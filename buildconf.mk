@@ -57,6 +57,11 @@ INSTALL_VDEV_CONFIG := $(ETCDIR)/vdev
 INSTALL_VDEV_INITSCRIPT := $(ETCDIR)/init.d
 INSTALL_VDEV_INITRAMFS := $(USRSHAREDIR)/initramfs-tools
 
+# hwdb 
+BUILD_HWDB := $(BUILD_LIBDIR)/vdev/hwdb
+BUILD_HWDB_DIRS := $(BUILD_HWDB)
+INSTALL_HWDB := $(LIBDIR)/vdev/hwdb
+
 # compiler
 CFLAGS     := -Wall -std=c99 -g -fPIC -fstack-protector -fstack-protector-all -pthread -Wno-unused-variable -Wno-unused-but-set-variable
 CPPFLAGS   := -Wall -g -fPIC -fstack-protector -fstack-protector-all -pthread -Wno-unused-variable -Wno-unused-but-set-variable
@@ -71,7 +76,8 @@ CPP      := g++
 BUILD_DIRS   := $(sort $(BUILD_VDEVD_DIRS) \
                 $(BUILD_VDEVFS_DIRS) \
 					 $(BUILD_LIBUDEV_COMPAT_DIRS) \
-					 $(BUILD_LIBVDEV_DIRS))
+					 $(BUILD_LIBVDEV_DIRS) \
+					 $(BUILD_HWDB))
 
 all:
 
