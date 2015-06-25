@@ -23,7 +23,7 @@ $(BUILD_VDEVD_HELPERS)/%.o: %.c
 
 $(BUILD_VDEVD_HELPERS)/%.sh: %.sh
 	@mkdir -p "$(shell dirname "$@")"
-	@cp -a "$<" "$@"
+	cp -a "$<" "$@"
 
 install: $(HELPERS_INSTALL)
 $(INSTALL_VDEVD_HELPERS)/%: $(BUILD_VDEVD_HELPERS)/%
