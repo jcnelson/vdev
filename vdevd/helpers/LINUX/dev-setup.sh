@@ -195,7 +195,7 @@ test -d "$VDEV_MOUNTPOINT/shm" || /bin/ln -sf /run/shm "$VDEV_MOUNTPOINT/shm"
 test -d "$VDEV_MOUNTPOINT/events" || /bin/mkdir -p "$VDEV_MOUNTPOINT/events"
 
 # add vdevd's metadata directories 
-for dirp in "metadata/dev" "metadata/tags" "metadata/hwdb"; do
+for dirp in "metadata/dev" "metadata/hwdb"; do
    test -d "$VDEV_MOUNTPOINT/$dirp" || /bin/mkdir -p "$VDEV_MOUNTPOINT/$dirp"
 done
 
