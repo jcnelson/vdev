@@ -13,7 +13,7 @@ case "$VDEV_ACTION" in
 
    remove)
 
-      vdev_rmlinks "$VDEV_METADATA"
+      vdev_cleanup "$VDEV_METADATA"
       ;;
 
    *)
