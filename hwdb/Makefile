@@ -14,7 +14,7 @@ $(HWDB_BUILD): $(HWDB_BUILD_INPUT) $(HWDB_BUILD_GEN)
 	@echo "Generating hardware database"
 	@mkdir -p "$@.dir"
 	$(BUILD_HWDB)/gen_database.sh -o "$@.dir" $(BUILD_HWDB)/input/*.hwdb
-	mksquashfs -force-uid 0 -force-gid 0 "$@.dir" "$@"
+	mksquashfs "$@.dir" "$@" -force-uid 0 -force-gid 0
 
 $(BUILD_HWDB)/input/%.hwdb: udev/%.hwdb
 	@mkdir -p "$(shell dirname "$@")"
