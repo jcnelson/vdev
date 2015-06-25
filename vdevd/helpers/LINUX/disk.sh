@@ -408,7 +408,7 @@ fi
 
   
 # add the disk links
-if [ -n "$DISK_NAME" ]; then
+if [ -n "$DISK_NAME" ] && [ -n "$DISK_ID" ]; then
    vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/disk/by-id/$DISK_NAME" "$VDEV_METADATA"
 fi
 
