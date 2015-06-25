@@ -25,6 +25,32 @@ setup_input_permissions() {
 }
 
 
+# store all device properties
+# call this after stat_input and stat_path
+# $1+   Names of variables to grab from the caller's context
+store_properties() {
+   
+   # NOTE: pulling positional arguments from caller...
+   vdev_add_properties "$VDEV_METADATA" $@
+
+   # if this is an evdev keyboard, add X.org keyboard properties (i.e. from /etc/default/keyboard)
+   if [ -n "$(echo "$VDEV_OS_DEVNAME" | /bin/egrep "event[0-9]+")" ] && [ -n "$VDEV_INPUT_KEY" ]; then
+      
+      # subshell, so we don't have to worry about messing up the environment 
+      # NOTE: this is a bit of a hack, left over from the old hal days.
+      # It would make more sense to me if X.org simply parsed this file, instead of 
+      # having the device manager do so on its behalf.
+      if [ -f "/etc/default/keyboard" ]; then (
+         
+         . "/etc/default/keyboard"
+         ALL_PROPS="XKBMODEL XKBLAYOUT XKBVARIANT BACKSPACE KMAP"
+      
+         vdev_add_properties "$VDEV_METADATA" $ALL_PROPS
+      ) fi
+      
+   fi
+}
+
 # full sysfs path
 SYSFS_PATH="$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH"
 
@@ -36,25 +62,34 @@ fi
 # if removing, just blow away the symlinks
 if [ "$VDEV_ACTION" = "remove" ]; then 
    
-   vdev_rmlinks "$VDEV_METADATA"
+   vdev_cleanup "$VDEV_METADATA"
    exit 0
 fi
 
 
 # stat the device!
+VDEV_INPUT_PROPERTIES=
 eval $($VDEV_HELPERS/stat_input "$VDEV_MOUNTPOINT/$VDEV_PATH")
 STAT_RC=$?
 
 # succeeded?
 test 0 -ne $STAT_RC && vdev_fail 2 "stat_input $VDEV_PATH exit code $STAT_RC"
 
+VDEV_INPUT_PROPERTIES="$VDEV_PROPERTIES"
+
 # get the persistent path for this device 
 # should set VDEV_PERSISTENT_PATH
+VDEV_PATH_PROPERTIES=
+VDEV_PROPERTIES=
 VDEV_PERSISTENT_PATH=
 eval $($VDEV_HELPERS/stat_path "$VDEV_MOUNTPOINT/$VDEV_PATH")
 
+if [ -n "$VDEV_PROPERTIES" ]; then 
+   VDEV_PATH_PROPERTIES="$VDEV_PROPERTIES"
+fi
+
 # input class?
-INPUT_CLASS=$VDEV_INPUT_CLASS
+INPUT_CLASS="$VDEV_INPUT_CLASS"
 CLASSLESS_EVDEV=0
 
 if [ -z "$INPUT_CLASS" ]; then 
@@ -92,8 +127,10 @@ fi
 # no path?
 if [ -z "$VDEV_PERSISTENT_PATH" ]; then 
    
-   # just set up permissions 
+   # just set up permissions and add properties.
+   # no links to add.
    setup_input_permissions "$INPUT_CLASS"
+   store_properties $VDEV_PATH_PROPERTIES $VDEV_INPUT_PROPERTIES
    exit 0
 fi
 
@@ -182,5 +219,8 @@ fi
 
 # permissions...
 setup_input_permissions "$INPUT_CLASS"
+
+# device properties
+store_properties $VDEV_PATH_PROPERTIES $VDEV_INPUT_PROPERTIES
 
 exit 0
