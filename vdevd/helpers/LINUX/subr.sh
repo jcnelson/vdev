@@ -9,7 +9,7 @@ VDEV_PROGNAME=$0
 # arguments:
 #  $1  link source 
 #  $2  link target
-#  $3  vdev device metadata directory
+#  $3  vdev device metadata directory (defaults to $VDEV_METADATA)
 vdev_symlink() {
 
    local _LINK_SOURCE _LINK_TARGET _METADATA _DIRNAME
@@ -17,6 +17,10 @@ vdev_symlink() {
    _LINK_SOURCE="$1"
    _LINK_TARGET="$2"
    _METADATA="$3"
+
+   if [ -z "$_METADATA" ]; then 
+      _METADATA="$VDEV_METADATA"
+   fi
 
    _DIRNAME=$(echo $_LINK_TARGET | /bin/sed -r "s/[^/]+$//g")
 
@@ -35,24 +39,20 @@ vdev_symlink() {
 }
 
 # remove all of a device's symlinks, stored by vdev_symlink.
+# preserve the links file itself, though.
 # arguments: 
 #  $1  vdev device metadata directory
 vdev_rmlinks() {
 
-   local _METADATA _LINKNAME _DIRNAME 
+   local _METADATA _LINKNAME 
    
    _METADATA="$1"
 
    while read _LINKNAME; do
 
-      _DIRNAME=$(echo "$_LINKNAME" | /bin/sed -r "s/[^/]+$//g")
-      
       /bin/rm -f "$_LINKNAME"
-      /bin/rmdir "$_DIRNAME" 2>/dev/null
 
    done < "$_METADATA/links"
-
-   /bin/rm -f "$_METADATA/links"
    
    return 0
 }
@@ -172,89 +172,251 @@ vdev_subsystems() {
 }
 
 
-# load firmware for a device 
-# $1   the sysfs device path 
-# $2   the path to the firmware 
-# return 0 on success
+# generate a device ID, distinct from a path.  Based on udev's scheme
+# * if major/minor numbers are given, then this is something like "b259:131072" or "c254:0" (i.e. {type}{major}:{minor})
+# * otherwise if a netdev interface number is given, this is something like "n3" (i.e. n{ifnum})
+# * otherwise, this is +$subsystem:$sysname
+# return 0 and echo the name on success
 # return 1 on error
-vdev_firmware_load() {
+vdev_device_id() {
    
-   local _SYSFS_PATH _FIRMWARE_PATH _SYSFS_FIRMWARE_PATH _RC
-   
-   _SYSFS_PATH="$1"
-   _FIRMWARE_PATH="$2"
-   _SYSFS_FIRMWARE_PATH="$VDEV_OS_SYSFS_MOUNTPOINT/$_SYSFS_PATH"
+   local _DEVTYPE _DEVICE_ID _SYSNAME
 
-   test -e "$_SYSFS_FIRMWARE_PATH/loading" || return 1
-   test -e "$_SYSFS_FIRMWARE_PATH/data" || return 1
+   _DEVTYPE=""
+   _DEVICE_ID=""
+   _SYSNAME=""
    
-   echo 1 > "$_SYSFS_FIRMWARE_PATH/loading"
-   /bin/cat "$_FIRMWARE_PATH" > "$_SYSFS_FIRMWARE_PATH/data"
+   if [ -n "$VDEV_MAJOR" ] && [ -n "$VDEV_MINOR" ]; then 
+      
+      if [ "$VDEV_MODE" = "block" ]; then 
+         _DEVTYPE="b"
+      else
+         _DEVTYPE="c"
+      fi
+
+      _DEVICE_ID="${_DEVTYPE}${VDEV_MAJOR}:${VDEV_MINOR}"
    
-   _RC=$?
-   if [ $_RC -ne 0 ]; then 
-      # abort 
-      echo -1 > "$_SYSFS_FIRMWARE_PATH/loading"
-   else 
-      # success
-      echo 0 > "$_SYSFS_FIRMWARE_PATH/loading"
+   elif [ -n "$VDEV_OS_IFINDEX" ]; then 
+
+      _DEVICE_ID="n${VDEV_OS_IFINDEX}"
+
+   elif [ -n "$VDEV_OS_SUBSYSTEM" ] && [ -n "$VDEV_OS_DEVPATH" ]; then 
+      
+      _SYSNAME="$(echo "$VDEV_OS_DEVPATH" | /bin/sed -r 's/[^/]*\///g')"
+      
+      _DEVICE_ID="+${VDEV_OS_SUBSYSTEM}:${_SYSNAME}"
    fi
+
+   if [ -n "$_DEVICE_ID" ]; then 
+      echo -n "$_DEVICE_ID"
+      return 0
+   else 
+      return 1
+   fi
+}
+
+
+# get the parent device, given a sysfs path.
+# this means "the deepest parent with a 'device' symlink"
+# $1    the sysfs path of the child 
+# return 0 and echo the parent if found 
+# return 1 if no parent could be found
+vdev_device_parent() {
+
+   local _SYSFS_PATH
+
+   _SYSFS_PATH="$1"
+
+   
+   # strip trailing '/'
+   _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[/]+$//g")
+   
+   while [ -n "$_SYSFS_PATH" ]; do
+
+      if [ -e "$_SYSFS_PATH/device" ]; then 
+
+         echo "$_SYSFS_PATH"
+         return 0
+      fi
+
+      
+      # search parent 
+      _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g" | /bin/sed -r "s/[/]+$//g")
+      
+   done
+
+   return 1
+}
+
+
+# get a device attribute, by looking in the device's sysfs directory
+# $1    attr name 
+# $2    sysfs device path
+# return 0 on success and write the value to stdout 
+# return 1 on failure
+vdev_getattr() {
+
+   local _SYSFS_PATH _ATTR_NAME _ATTR_VALUE
+
+   _ATTR_NAME="$1"
+   _SYSFS_PATH="$2"
+
+   if [ -f "$_SYSFS_PATH/$_ATTR_NAME" ]; then 
+      
+      _ATTR_VALUE="$(/bin/cat "$_SYSFS_PATH/$_ATTR_NAME")"
+      return 0
+   fi
+
+   return 1
+}
+
+
+# get all device attributes, by walking the device's sysfs directory and finding the attribute in all its parents 
+# $1    attr name 
+# $2    sysfs device path
+# return 0 on success and write all values to stdout (newline-separated)
+# return 1 if no match found
+vdev_getattrs() {
+   
+   local _SYSFS_PATH _ATTR_NAME _ATTR_VALUE
+
+   _ATTR_NAME="$1"
+   _SYSFS_PATH="$2"
+   _RC=1
+   
+   # strip trailing '/'
+   _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[/]+$//g")
+
+   while [ -n "$_SYSFS_PATH" ]; do 
+
+      if [ -f "$_SYSFS_PATH/$_ATTR_NAME" ]; then 
+      
+         _ATTR_VALUE="$(/bin/cat "$_SYSFS_PATH/$_ATTR_NAME")"
+         echo "$_ATTR_VALUE"
+      fi
+
+      # search parent 
+      _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g" | /bin/sed -r "s/[/]+$//g")
+      _RC=0
+   done
 
    return $_RC
 }
 
 
-# store a key/value pair into metadata.
-# it will be placed as a top-level file--key cannot have '/' in the name.
-# $1    the key 
-# $2    the value 
-# $3    the metadata directory (will use $VDEV_METADATA if not given)
+# add a tag for a device.
+# create an empty file with the tag name under /dev/metadata/dev/$VDEV_PATH/tags/
+# $1   the tag name 
+# $2   the device metadata directory.  VDEV_METADATA will be used, if this is not given
+# $3   the *global* metadata directory (not the device-specific one).  VDEV_GLOBAL_METADATA will be used, if this is not given.
+# $4   the device identifier (see vdev_device_id).  If not given, it will be generated from the environment variables passed in by vdevd.
 # return 0 on success 
-# return nonzero on error 
-vdev_metadata_put() {
+# return 1 on error
+vdev_add_tag() {
    
-   local _KEY _VALUE _METADATA
-
-   _KEY="$1"
-   _VALUE="$2"
-   _METADATA="$3"
-
-   if [ -z $_METADATA ]; then 
-      _METADATA="$VDEV_METADATA"
-   fi
-
-   echo "$_VALUE" > "$_METADATA/$_KEY"
-   return $?
-}
-
-
-# get a key/value metadata pair 
-# write the value to stdout
-# $1   the key 
-# $2   the metadata directory (defaults to $VDEV_METADATA)
-# return 0 on success
-# return 1 on error 
-vdev_metadata_get() {
-
-   local _KEY _VALUE _METADATA _RC
-
-   _KEY="$1"
+   local _DEVNAME _TAGNAME _DEVICE_ID _METADATA _GLOBAL_METADATA
+   
+   _TAGNAME="$1"
    _METADATA="$2"
+   _GLOBAL_METADATA="$3"
+   _DEVICE_ID="$4"
 
    if [ -z "$_METADATA" ]; then 
       _METADATA="$VDEV_METADATA"
    fi
 
-   _VALUE=$(/bin/cat "$_METADATA/$_KEY")
-   _RC=$?
-
-   if [ $_RC -ne 0 ]; then 
-      return $_RC
+   if [ -z "$_GLOBAL_METADATA" ]; then 
+      _GLOBAL_METADATA="$VDEV_GLOBAL_METADATA"
    fi
 
-   echo "$_VALUE"
-   return 0
+   if [ -z "$_DEVICE_ID" ]; then 
+      _DEVICE_ID="$(vdev_device_id)"
+   fi
+
+   # device-to-tags
+   if ! [ -e "$_METADATA/tags/$_TAGNAME" ]; then 
+      /bin/mkdir -p "$_METADATA/tags"
+      echo "" > "$_METADATA/tags/$_TAGNAME"
+      _RC=$?
+      
+      if [ $_RC -ne 0 ]; then 
+         return $_RC
+      fi 
+   fi
+   
+   return $_RC
 }
+
+
+# add a property for a device, if it is not given yet.
+# create it as a file with the property name containing the property value, in the directory /dev/metadata/dev/$VDEV_PATH/properties/
+# $1   the property key 
+# $2   the property value
+# $3   the device metadata directory.  VDEV_METADATA will be used, if this is not given
+vdev_add_property() {
+   
+   local _PROP_KEY _PROP_VALUE _METADATA
+
+   _PROP_KEY="$1"
+   _PROP_VALUE="$2"
+   _METADATA="$3"
+   _RC=0
+
+   if [ -z "$_METADATA" ]; then 
+      _METADATA="$VDEV_METADATA"
+   fi
+
+   echo "$_PROP_KEY=$_PROP_VALUE" >> "$_METADATA/properties"
+   
+   #if ! [ -e "$_METADATA/properties/$_PROP_KEY" ]; then 
+   #   /bin/mkdir -p "$_METADATA/properties"
+   #   echo "$_PROP_VALUE" > "$_METADATA/properties/$_PROP_KEY"
+   #fi
+   
+   return $_RC
+}
+
+
+# add a stream of properties, encoded as positional arguments.
+# feed them into vdev_add_property.
+# $1    the device-specific metadata directory
+# $2+   device properties to grab from the caller's environment
+# return 0 on success 
+# return 1 if vdev_add_property failed
+# return 2 if we failed to parse a KEY=VALUE string
+vdev_add_properties() {
+   
+   local _METADATA _GLOBAL_METADATA _PROP _PROP_VALUE _RC
+   
+   _METADATA="$1"
+   _RC=0
+
+   shift 1
+   
+   while [ $# -gt 0 ]; do
+
+      _PROP="$1"
+      shift 1
+
+      _PROP_VALUE=
+      eval "_PROP_VALUE=\"\${$_PROP}\""
+
+      if [ -z "$_PROP_VALUE" ]; then 
+         continue 
+      fi
+      
+      vdev_add_property "$_PROP" "$_PROP_VALUE" "$_METADATA"
+      _RC=$?
+      
+      if [ $_RC -ne 0 ]; then 
+         break
+      fi
+   
+   done 
+   
+   return $_RC
+}
+
 
 # set permissions and ownership on a device 
 # do not change permissions if the owner/group isn't defined 
@@ -287,3 +449,68 @@ vdev_permissions() {
    return $_RC
 }
 
+
+# serialize a path: swap each / with \x2f
+# $1    the path 
+# echo the serialized path to stdout 
+# return 0 on success
+# return 1 on error 
+vdev_serialize_path() {
+
+   local _PATH 
+   
+   _PATH="$1"
+
+   echo "$_PATH" | /bin/sed -r 's/\//\\x2f/g'
+}
+
+
+# parse a vdev config file
+# echo KEY=VALUE pairs to stdout with the fields
+# $1    path to the file 
+# $2    namespace the variables should take
+vdev_parse_config() {
+
+   local _FILE_PATH _NAMESPACE _LINE _KEY _VALUE
+   
+   _FILE_PATH="$1"
+   _NAMESPACE="$2"
+   
+   /bin/cat "$_FILE_PATH" | /bin/sed -r "s/.*\[.*\].*//g" | \
+   while read _LINE; do 
+   
+      OLDIFS="$IFS"
+      IFS="="
+
+      set -- "$_LINE"
+
+      OLDIFS="$IFS"
+      
+      _KEY="$1"
+      _VALUE="$2"
+
+      if [ -n "$_KEY" ]; then 
+         echo "${_NAMESPACE}${_KEY}=${_VALUE}"
+      fi
+   done
+
+   return $?
+}
+
+
+# clean up a device's metadata 
+#  $1   vdev device metadata directory
+# return 0 on success
+vdev_cleanup() {
+   
+   local _METADATA 
+
+   _METADATA="$1"
+   
+   if [ -z "$_METADATA" ]; then 
+      _METADATA="$VDEV_METADATA"
+   fi
+
+   vdev_rmlinks "$_METADATA"
+   return 0
+}
