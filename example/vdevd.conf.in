@@ -3,6 +3,7 @@ firmware=@PREFIX@/lib/firmware
 acls=@CONF_DIR@/acls
 actions=@CONF_DIR@/actions
 helpers=@PREFIX@/lib/vdev
+hwdb=@PREFIX@/lib/vdev/hwdb/hwdb.squashfs
 ifnames=@CONF_DIR@/ifnames.conf
 pidfile=@PREFIX@/run/vdev/vdevd.pid
 default_permissions=0600
