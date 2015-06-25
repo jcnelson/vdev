@@ -7,7 +7,7 @@
 # if removing, just remove symlinks
 if [ "$VDEV_ACTION" = "remove" ]; then 
    
-   vdev_rmlinks "$VDEV_METADATA"
+   vdev_cleanup "$VDEV_METADATA"
 fi
 
 # make sure we're adding 
