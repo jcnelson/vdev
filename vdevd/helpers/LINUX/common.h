@@ -52,6 +52,7 @@
 #include <time.h>
 #include <dirent.h>
 #include <getopt.h>
+#include <limits.h>
 
 #ifndef DEBUG
 #define DEBUG 0
