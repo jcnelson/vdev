@@ -235,10 +235,10 @@ static void udev_monitor_atfork(void) {
       
    g_monitor_table_unlock();
    
+   write( STDERR_FILENO, "end atfork()\n", strlen("end atfork()\n") );
+   
    // restore...
    errno = errsv;
-   
-   write( STDERR_FILENO, "end atfork()\n", strlen("end atfork()\n") );
 }
 
 
