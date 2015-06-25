@@ -7,7 +7,7 @@
 # removing? just blow the links away 
 if [ "$VDEV_ACTION" = "remove" ]; then 
 
-   vdev_rmlinks $VDEV_METADATA
+   vdev_cleanup "$VDEV_METADATA"
    exit 0
 fi
 
