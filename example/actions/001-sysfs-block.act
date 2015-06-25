@@ -1,0 +1,5 @@
+[vdev-action]
+event=add
+type=block
+OS_DEVPATH=
+command=exec "$VDEV_HELPERS/sysfs.sh"
