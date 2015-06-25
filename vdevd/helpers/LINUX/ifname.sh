@@ -9,8 +9,13 @@
 
 . "$VDEV_HELPERS/subr.sh"
 
+# go find the ifnames file from our config
+eval "$(vdev_parse_config "$VDEV_CONFIG_FILE" "VDEV_" | /bin/grep "VDEV_ifnames")"
+VDEV_IFNAMES_PATH="$VDEV_ifnames"
+
 # make sure the file exists
 test -e "$VDEV_IFNAMES_PATH" || exit 0
+test -f "$VDEV_IFNAMES_PATH" || vdev_fail 1 "Could not find ifnames file $VDEV_IFNAMES_PATH"
 
 # only bother with adding 
 if [ "$VDEV_ACTION" = "remove" ]; then 
