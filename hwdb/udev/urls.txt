@@ -1,0 +1,15 @@
+http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/20-OUI.hwdb
+http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/20-acpi-vendor.hwdb
+http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/20-bluetooth-vendor-product.hwdb
+http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/20-net-ifname.hwdb
+http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/20-pci-classes.hwdb
+http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/20-pci-vendor-model.hwdb
+http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/20-sdio-classes.hwdb
+http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/20-sdio-vendor-model.hwdb
+http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/20-usb-classes.hwdb
+http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/20-usb-vendor-model.hwdb
+http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/60-keyboard.hwdb
+http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/70-mouse.hwdb
+http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/70-touchpad.hwdb
+http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/ids-update.pl
+http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/sdio.ids
