@@ -1699,6 +1699,7 @@ main_finish:
       }
       tag[i] = '\0';
 
+      // replaces ID_PATH and ID_PATH_TAG
       vdev_property_add( "VDEV_PERSISTENT_PATH", path );
       vdev_property_add( "VDEV_PERSISTENT_PATH_TAG", tag );
       
