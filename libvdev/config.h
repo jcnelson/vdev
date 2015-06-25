@@ -30,7 +30,6 @@
 #define VDEV_CONFIG_NAME        "vdev-config"
 #define VDEV_OS_CONFIG_NAME     "vdev-OS"
 
-#define VDEV_CONFIG_FIRMWARE_DIR  "firmware"
 #define VDEV_CONFIG_ACLS          "acls"
 #define VDEV_CONFIG_ACTIONS       "actions"
 #define VDEV_CONFIG_HELPERS       "helpers"
@@ -42,7 +41,6 @@
 #define VDEV_CONFIG_MOUNTPOINT    "mountpoint"
 #define VDEV_CONFIG_ONCE          "run_once"
 #define VDEV_CONFIG_FOREGROUND    "foreground"
-#define VDEV_CONFIG_IFNAMES       "ifnames"
 #define VDEV_CONFIG_PRESEED       "preseed"
 
 #define VDEV_CONFIG_INSTANCE_NONCE_LEN 32
@@ -58,12 +56,6 @@ struct vdev_config {
    
    // config file path (used by opts)
    char* config_path;
-   
-   // firmware directory 
-   char* firmware_dir;
-   
-   // interface names file 
-   char* ifnames_path;
    
    // preseed script 
    char* preseed_path;

@@ -95,8 +95,8 @@ extern int _VDEV_SYSLOG;
             syslog( LOG_DAEMON | LOG_DEBUG, format, __VA_ARGS__ ); \
          } \
          else { \
-            printf( VDEV_WHERESTR "DEBUG: " format, VDEV_WHEREARG, __VA_ARGS__ ); \
-            fflush(stdout); \
+            fprintf(stderr, VDEV_WHERESTR "DEBUG: " format, VDEV_WHEREARG, __VA_ARGS__ ); \
+            fflush(stderr); \
          } \
       } \
    } while(0)
@@ -109,8 +109,8 @@ extern int _VDEV_SYSLOG;
             syslog( LOG_DAEMON | LOG_INFO, format, __VA_ARGS__ ); \
          } \
          else { \
-            printf( VDEV_WHERESTR "INFO: " format, VDEV_WHEREARG, __VA_ARGS__ ); \
-            fflush(stdout); \
+            fprintf(stderr, VDEV_WHERESTR "INFO: " format, VDEV_WHEREARG, __VA_ARGS__ ); \
+            fflush(stderr); \
          } \
       } \
    } while(0)

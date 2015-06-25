@@ -43,17 +43,6 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
    
    if( strcmp( section, VDEV_CONFIG_NAME ) == 0 ) {
       
-      
-      if( strcmp( name, VDEV_CONFIG_FIRMWARE_DIR ) == 0 ) {
-         
-         if( conf->firmware_dir == NULL ) {
-            // save this 
-            conf->firmware_dir = vdev_strdup_or_null( value );
-         }
-         
-         return 1;
-      }
-      
       if( strcmp( name, VDEV_CONFIG_ACLS ) == 0 ) {
          
          if( conf->acls_dir == NULL ) {
@@ -189,16 +178,6 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
          }
       }
       
-      if( strcmp( name, VDEV_CONFIG_IFNAMES ) == 0 ) {
-         
-         if( conf->ifnames_path == NULL ) {
-            
-            conf->ifnames_path = vdev_strdup_or_null( value );
-         }
-            
-         return 1;  
-      }
-      
       if( strcmp( name, VDEV_CONFIG_PRESEED ) == 0 ) {
          
          if( conf->preseed_path == NULL ) {
@@ -209,7 +188,6 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
          return 1;
       }
       
-      fprintf(stderr, "Unrecognized '%s' field '%s'\n", section, name);
       return 1;
    }
    
@@ -353,12 +331,6 @@ int vdev_config_load_file( FILE* file, struct vdev_config* conf ) {
 // always succeeds
 int vdev_config_free( struct vdev_config* conf ) {
    
-   if( conf->firmware_dir != NULL ) {
-      
-      free( conf->firmware_dir );
-      conf->firmware_dir = NULL;
-   }
-   
    if( conf->acls_dir != NULL ) {
       
       free( conf->acls_dir );
@@ -395,12 +367,6 @@ int vdev_config_free( struct vdev_config* conf ) {
       conf->mountpoint = NULL;
    }
    
-   if( conf->ifnames_path != NULL ) {
-      
-      free( conf->ifnames_path );
-      conf->ifnames_path = NULL;
-   }
-   
    if( conf->preseed_path != NULL ) {
       
       free( conf->preseed_path );
@@ -432,14 +398,12 @@ int vdev_config_fullpaths( struct vdev_config* conf ) {
    int rc = 0;
    
    char** need_fullpath[] = {
-      &conf->firmware_dir,
       &conf->acls_dir,
       &conf->acts_dir,
       &conf->helpers_dir,
       &conf->pidfile_path,
       &conf->logfile_path,
       &conf->preseed_path,
-      &conf->ifnames_path,
       NULL
    };
    
