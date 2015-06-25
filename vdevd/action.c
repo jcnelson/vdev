@@ -544,43 +544,85 @@ int vdev_action_run_async( struct vdev_device_request* req, char const* command 
    
    int rc = 0;
    pid_t pid = 0;
+   pid_t sid = 0;
    int max_fd = 0;
    
    pid = fork();
    
    if( pid == 0 ) {
       
-      // child 
-      max_fd = sysconf(_SC_OPEN_MAX);
-      
-      // close everything 
-      for( int i = 0; i < max_fd; i++ ) {
-         close( i );
-      }
-      
-      clearenv();
-      
-      // generate the environment 
-      char** env = NULL;
-      size_t num_env = 0;
-      
-      rc = vdev_device_request_to_env( req, &env, &num_env );
-      if( rc != 0 ) {
+      // child
+      // detach from parent 
+      sid = setsid();
+      if( sid < 0 ) {
          
-         vdev_error("vdev_device_request_to_env('%s') rc = %d\n", req->path, rc );
+         rc = -errno;
+         vdev_error("setsid rc = %d\n", rc );
          exit(1);
       }
       
-      // run the command 
-      execle( "/bin/sh", "sh", "-c", command, (char*)0, env );
+      pid = fork();
       
-      // keep gcc happy 
-      return 0;
+      if( pid == 0 ) {
+         
+         // fully detached
+         max_fd = sysconf(_SC_OPEN_MAX);
+         
+         // close everything 
+         for( int i = 0; i < max_fd; i++ ) {
+            close( i );
+         }
+         
+         clearenv();
+         
+         // generate the environment 
+         char** env = NULL;
+         size_t num_env = 0;
+         
+         rc = vdev_device_request_to_env( req, &env, &num_env );
+         if( rc != 0 ) {
+            
+            vdev_error("vdev_device_request_to_env('%s') rc = %d\n", req->path, rc );
+            exit(1);
+         }
+         
+         // run the command 
+         execle( "/bin/sh", "sh", "-c", command, (char*)0, env );
+         
+         // keep gcc happy 
+         exit(0);
+      }
+      else if( pid > 0 ) {
+         
+         exit(0);
+      }
+      else {
+         
+         rc = -errno;
+         vdev_error("fork() rc = %d\n", rc );
+         exit(-rc);
+      }
    }
    else if( pid > 0 ) {
       
+      rc = 0;
+      
       // parent; succeeded
-      return 0;
+      // wait for intermediate process
+      pid_t child_pid = waitpid( pid, &rc, 0 );
+      if( child_pid < 0 ) {
+         
+         rc = -errno;
+         vdev_error("waitpid(%d) rc = %d\n", pid, rc );
+         return rc;
+      }
+      else if( WIFEXITED( rc ) && WEXITSTATUS( rc ) != 0 ) {
+         
+         rc = -WEXITSTATUS( rc );
+         vdev_error("fork() rc = %d\n", rc );
+      }
+      
+      return rc;
    }
    else {
       
