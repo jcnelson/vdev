@@ -197,32 +197,8 @@ static int vdev_linux_log_uevent( char const* uevent_buf, size_t uevent_buf_len,
    return 0;
 }
 
-
-// serialize a uevent buffer--replace \0 with \n.
-// put the resulting (null-terminated) data into out_buf--at most out_buflen bytes (including the '\0').
-// if out_buf is too short, the data will be truncated.
-// return the number of bytes copied 
-static int vdev_linux_serialize_uevent( char const* uevent_buf, size_t uevent_buflen, char* out_buf, size_t out_buflen ) {
-   
-   size_t nw = 0;
-   for( unsigned int i = 0; i < uevent_buflen; ) {
-      
-      size_t num_printed = snprintf( out_buf + nw, out_buflen - nw - 1, "%s\n", uevent_buf + i );
-      
-      nw += num_printed;
-      i += strlen(uevent_buf + i) + 1;
-   }
-   
-   // trim the last '\n'
-   out_buf[ strlen(out_buf) - 1 ] = '\0';
-   
-   return nw + 1;
-}
-
-
 #define vdev_linux_debug_uevent( uevent_buf, uevent_buf_len ) vdev_linux_log_uevent( uevent_buf, uevent_buf_len, true )
 #define vdev_linux_error_uevent( uevent_buf, uevent_buf_len ) vdev_linux_log_uevent( uevent_buf, uevent_buf_len, false )
-
 
 // parse a uevent, and use the information to fill in a device request.
 // nlbuf must be a contiguous concatenation of null-terminated KEY=VALUE strings.
@@ -241,9 +217,6 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
    mode_t dev_mode = 0;
    int line_count = 0;
    bool not_param = false;      // if set to true, add as an OS-specific parameter to the vreq
-   
-   char nlbuf_dup[VDEV_LINUX_NETLINK_BUF_MAX];
-   vdev_linux_serialize_uevent( nlbuf, buflen, nlbuf_dup, VDEV_LINUX_NETLINK_BUF_MAX );
    
    char* devpath = NULL;        // sysfs devpath 
    char* subsystem = NULL;      // sysfs subsystem 
@@ -485,9 +458,6 @@ static int vdev_linux_parse_request( struct vdev_linux_context* ctx, struct vdev
       // OOM 
       return rc;
    }
-   
-   // give helpers the full uevent 
-   rc = vdev_device_request_add_param( vreq, "UEVENT", nlbuf_dup );
    
    return rc;
 }
@@ -982,7 +952,7 @@ struct vdev_linux_sysfs_scan_context {
    struct sglib_cstr_vector* device_frontier;
 };
 
-// populate a /sys/devices directory with its child directories
+// scan a directory in /sys/devices directory, to find its child directories
 // return 0 on success
 // return -ENOMEM on OOM
 // return -errno on failure to stat
@@ -1051,7 +1021,8 @@ static int vdev_linux_sysfs_scan_device_directory( char const* fp, void* cls ) {
 }
 
 
-// read all devices from sysfs, and put their uevent paths into the given uevent_paths
+// read all devices from sysfs, and put their uevent paths into the given uevent_paths.
+// scan in breadth-first order, so we find and process parent devices before their child devices.
 // return 0 on success
 // return negative on error
 static int vdev_linux_sysfs_find_devices( struct vdev_linux_context* ctx, struct sglib_cstr_vector* uevent_paths ) {
@@ -1121,11 +1092,23 @@ static int vdev_linux_sysfs_find_devices( struct vdev_linux_context* ctx, struct
          if( uevent_path == NULL ) {
             
             free( device_root );
+            free( scan_context.uevent_path );
+            scan_context.uevent_path = NULL;
+            
             rc = -ENOMEM;
             break;
          }
          
-         sglib_cstr_vector_push_back( uevent_paths, uevent_path );
+         rc = sglib_cstr_vector_push_back( uevent_paths, uevent_path );
+         if( rc < 0 ) {
+            
+            free( uevent_path );
+            free( device_root );
+            free( scan_context.uevent_path );
+            scan_context.uevent_path = NULL;
+            
+            break;
+         }
          
          free( scan_context.uevent_path );
          scan_context.uevent_path = NULL;
