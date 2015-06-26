@@ -465,39 +465,6 @@ vdev_serialize_path() {
 }
 
 
-# parse a vdev config file
-# echo KEY=VALUE pairs to stdout with the fields
-# $1    path to the file 
-# $2    namespace the variables should take
-vdev_parse_config() {
-
-   local _FILE_PATH _NAMESPACE _LINE _KEY _VALUE
-   
-   _FILE_PATH="$1"
-   _NAMESPACE="$2"
-   
-   /bin/cat "$_FILE_PATH" | /bin/sed -r "s/.*\[.*\].*//g" | \
-   while read _LINE; do 
-   
-      OLDIFS="$IFS"
-      IFS="="
-
-      set -- "$_LINE"
-
-      OLDIFS="$IFS"
-      
-      _KEY="$1"
-      _VALUE="$2"
-
-      if [ -n "$_KEY" ]; then 
-         echo "${_NAMESPACE}${_KEY}=${_VALUE}"
-      fi
-   done
-
-   return $?
-}
-
-
 # clean up a device's metadata 
 #  $1   vdev device metadata directory
 # return 0 on success

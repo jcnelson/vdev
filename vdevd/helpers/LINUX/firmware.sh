@@ -40,9 +40,14 @@ firmware_load() {
 if [ -n "$VDEV_OS_FIRMWARE" -a -n "$VDEV_OS_DEVPATH" ]; then 
    
    # load firmware dir 
-   eval "$(vdev_parse_config "$VDEV_CONFIG_FILE" "VDEV_" | /bin/grep "VDEV_firmware")"
-   VDEV_FIRMARE_DIR="$VDEV_firmware"
+   FIRMWARE_VAR="$(/bin/fgrep "firmware=" "$VDEV_CONFIG_FILE")"
+   VDEV_FIRMWARE_DIR=
 
+   if [ -n "$FIRMWARE_VAR" ]; then 
+      eval "$FIRMWARE_VAR"
+      VDEV_FIRMARE_DIR="$firmware"
+   fi
+   
    if [ -z "$VDEV_FIRMARE_DIR" ] || ! [ -d "$VDEV_FIRMARE_DIR" ]; then 
 
       vdev_fail 1 "Firmware directory not found at $VDEV_FIRMARE_DIR"

@@ -10,8 +10,14 @@
 . "$VDEV_HELPERS/subr.sh"
 
 # go find the ifnames file from our config
-eval "$(vdev_parse_config "$VDEV_CONFIG_FILE" "VDEV_" | /bin/grep "VDEV_ifnames")"
-VDEV_IFNAMES_PATH="$VDEV_ifnames"
+IFNAMES_VAR="$(/bin/fgrep "ifnames=" "$VDEV_CONFIG_FILE")"
+VDEV_IFNAMES_PATH=
+
+if [ -n "$IFNAMES_VAR" ]; then 
+   eval "$IFNAMES_VAR"
+   VDEV_HWDB_PATH="$ifnames"
+fi
+
 
 # make sure the file exists
 test -e "$VDEV_IFNAMES_PATH" || exit 0
@@ -33,6 +39,7 @@ fi
 if [ -z "$IP" ]; then 
    vdev_fail 0 "Could not find iproute2.  Network interfaces will not be configured."
 fi
+
 
 # rename an interface 
 # $1    desired interface name 
@@ -130,6 +137,7 @@ if_devpath() {
    
    _DEVPATH="$1"
    
+   # TODO: while-loop with ls here-document
    for _SYSFS_IFNAME in $(/bin/ls "$VDEV_OS_SYSFS_MOUNTPOINT/class/net/"); do 
       
       _IF_DEVPATH=$(/bin/readlink "$VDEV_OS_SYSFS_MOUNTPOINT/class/net/$_SYSFS_IFNAME" | /bin/sed -r 's/^(..\/)+//g')
