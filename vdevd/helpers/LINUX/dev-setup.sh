@@ -21,42 +21,49 @@ VDEV_CONFIG_FILE="$2"
 
 # mount the squashfs hardware database
 # $1    hardware database file
+# $2    the name of the loopback device to create
 attach_hwdb() {
 
+   local _HWDB_PATH _HWDB_LOOP _LOOP_MINOR
+   
    _HWDB_PATH="$1"
+   _HWDB_LOOP="$2"
+
+   # deduce minor number 
+   _LOOP_MINOR="${_HWDB_LOOP##loop}"
    
    # attempt to mount the hardware database
-   /bin/mknod "$VDEV_MOUNTPOINT/loop0" b 7 0
+   /bin/mknod "$VDEV_MOUNTPOINT/$_HWDB_LOOP" b 7 $_LOOP_MINOR
    RC=$?
    
    if [ $RC -ne 0 ]; then 
       return $RC
    fi 
    
-   /sbin/losetup "$VDEV_MOUNTPOINT/loop0" "$_HWDB_PATH"
+   /sbin/losetup "$VDEV_MOUNTPOINT/$_HWDB_LOOP" "$_HWDB_PATH"
    RC=$?
    
    if [ $RC -ne 0 ]; then 
       return $RC
    fi 
    
-   /bin/mount -t squashfs "$VDEV_MOUNTPOINT/loop0" "$VDEV_MOUNTPOINT/metadata/hwdb"
+   /bin/mount -t squashfs "$VDEV_MOUNTPOINT/$_HWDB_LOOP" "$VDEV_MOUNTPOINT/metadata/hwdb"
    RC=$?
    
    if [ $RC -ne 0 ]; then 
       
-      /sbin/losetup -d "$VDEV_MOUNTPOINT/loop0"
+      /sbin/losetup -d "$VDEV_MOUNTPOINT/$_HWDB_LOOP"
       return $RC
    fi 
 
-   # make sure we still process loop0
-   /bin/rm "$VDEV_MOUNTPOINT/loop0"
+   # make sure we still process the loop device
+   /bin/rm "$VDEV_MOUNTPOINT/$_HWDB_LOOP"
    RC=$?
 
    if [ $RC -ne 0 ]; then 
       
       /bin/umount "$VDEV_MOUNTPOINT/metadata/hwdb"
-      /sbin/losetup -d "$VDEV_MOUNTPOINT/loop0"
+      /sbin/losetup -d "$VDEV_MOUNTPOINT/$_HWDB_LOOP"
       return $RC
    fi
 
@@ -206,19 +213,27 @@ done
 
 # attach the hardware database, if we have one 
 HWDB_VAR="$(/bin/fgrep "hwdb=" "$VDEV_CONFIG_FILE")"
+LOOP_VAR="$(/bin/fgrep "hwdb_loop=" "$VDEV_CONFIG_FILE" | /bin/egrep "=loop[0-9]+$")"
+
 VDEV_HWDB_PATH=
+LOOP_NAME="loop0"
 
 if [ -n "$HWDB_VAR" ]; then 
    eval "$HWDB_VAR"
    VDEV_HWDB_PATH="$hwdb"
 fi
 
+if [ -n "$LOOP_VAR" ]; then 
+   eval "$LOOP_VAR"
+   LOOP_NAME="$hwdb_loop"
+fi
+
 if [ -n "$VDEV_HWDB_PATH" ] && [ -x /sbin/losetup ]; then 
    
-   attach_hwdb "$VDEV_HWDB_PATH"
+   attach_hwdb "$VDEV_HWDB_PATH" "$LOOP_NAME"
    RC=$?
    if [ $RC -ne 0 ]; then 
-      exit $RC
+      echo "WARN: Failed to mount hardware database" > /proc/self/fd/2
    fi
 fi
 
