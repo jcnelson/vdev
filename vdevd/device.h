@@ -70,6 +70,9 @@ struct vdev_device_request {
    // reference to vdev state, so we can call other methods when working
    struct vdev_state* state;
    
+   // does this device file already exist?  for example, did the preseed script create it?  this applies to files like /dev/null, which *need* to exist.
+   bool exists;
+   
    // reference to the next item, since this structure often gets used for linked lists 
    struct vdev_device_request* next;
 };
@@ -87,6 +90,7 @@ int vdev_device_request_set_dev( struct vdev_device_request* req, dev_t dev );
 int vdev_device_request_set_mode( struct vdev_device_request* req, mode_t mode );
 int vdev_device_request_set_path( struct vdev_device_request* req, char const* path );
 int vdev_device_request_add_param( struct vdev_device_request* req, char const* key, char const* value );
+int vdev_device_request_set_exists( struct vdev_device_request* req, bool exists );
 
 // environment variables 
 int vdev_device_request_to_env( struct vdev_device_request* req, char*** env, size_t* num_env );

@@ -145,13 +145,14 @@ int vdev_device_request_to_env( struct vdev_device_request* req, char*** ret_env
    // params --> VDEV_OS_* 
    // mountpoint --> VDEV_MOUNTPOINT
    // metadata --> VDEV_METADATA (if path is non-null)
-   // global metadata --> VDEV_MOUNTPOINT/VDEV_METADATA_PREFIX
+   // global metadata --> VDEV_GLOBAL_METADATA
    // helpers --> VDEV_HELPERS
    // logfile --> VDEV_LOGFILE
    // vdev instance nonce --> VDEV_INSTANCE
    // config file --> VDEV_CONFIG_FILE
+   // daemonlet --> VDEV_DAEMONLET (0 by default)
    
-   size_t num_vars = 14 + sglib_vdev_params_len( req->params );
+   size_t num_vars = 15 + sglib_vdev_params_len( req->params );
    int i = 0;
    int rc = 0;
    char dev_buf[51];
@@ -306,6 +307,15 @@ int vdev_device_request_to_env( struct vdev_device_request* req, char*** ret_env
    
    i++;
    
+   rc = vdev_device_request_make_env_str( "VDEV_DAEMONLET", "0", &env[i] );
+   if( rc != 0 ) {
+      
+      VDEV_FREE_LIST( env );
+      return rc;
+   }
+   
+   i++;
+   
    // add all OS-specific parameters 
    for( dp = sglib_vdev_params_it_init_inorder( &itr, req->params ); dp != NULL; dp = sglib_vdev_params_it_next( &itr ) ) {
       
@@ -366,6 +376,15 @@ int vdev_device_request_set_path( struct vdev_device_request* req, char const* p
 int vdev_device_request_set_dev( struct vdev_device_request* req, dev_t dev ) {
    
    req->dev = dev;
+   return 0;
+}
+
+
+// mark this device as already existing 
+// always succeeds
+int vdev_device_request_set_exists( struct vdev_device_request* req, bool exists ) {
+   
+   req->exists = exists;
    return 0;
 }
    
@@ -798,8 +817,15 @@ int vdev_device_add( struct vdev_device_request* req ) {
             
             else {
                
-               // file is not expected to exist
-               rc = mknod( fp, req->mode | req->state->config->default_mode, req->dev );
+               if( !req->exists ) {
+               
+                  // file is not expected to exist
+                  rc = mknod( fp, req->mode | req->state->config->default_mode, req->dev );
+               }
+               else {
+                  
+                  rc = 0;
+               }
                
                if( rc != 0 ) {
                   
@@ -934,7 +960,7 @@ int vdev_device_remove( struct vdev_device_request* req ) {
          
          // known path
          // only remove files from /dev if this is a device, and we created it
-         if( req->dev != 0 && req->mode != 0 && vdev_config_has_OS_quirk( req->state->config->OS_quirks, VDEV_OS_QUIRK_DEVICE_EXISTS ) ) {
+         if( req->dev != 0 && req->mode != 0 && !vdev_config_has_OS_quirk( req->state->config->OS_quirks, VDEV_OS_QUIRK_DEVICE_EXISTS ) ) {
                
             // remove the data itself, if there is data 
             char* fp = vdev_fullpath( req->state->mountpoint, req->renamed_path, NULL );
@@ -989,6 +1015,72 @@ static int vdev_device_remove_wq( struct vdev_wreq* wreq, void* cls ) {
 }
 
 
+// handler to change a device
+// Process any rename commands to get the final path, and then update that path's metadata
+// Fails if the device does not exist.
+// return 0 on success, masking failure to write metadata or failure to run a specific command.
+// return -ENOMEM on OOM 
+// return -EACCES if we do not have enough privileges to create the device node 
+// return -EEXIST if the device node already exists
+int vdev_device_change( struct vdev_device_request* req ) {
+   
+   int rc = 0;
+   
+   // do the rename, possibly generating it
+   rc = vdev_action_create_path( req, req->state->acts, req->state->num_acts, &req->renamed_path );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_action_create_path('%s') rc = %d\n", req->path, rc);
+      
+      // done with this request
+      vdev_device_request_free( req );
+      free( req );
+   
+      return rc;
+   }
+   
+   if( req->renamed_path == NULL ) {
+      
+      // base path becomes renamed path (trivial rename)
+      req->renamed_path = vdev_strdup_or_null( req->path );
+      if( req->renamed_path == NULL && req->path != NULL ) {
+         
+         // done with this request
+         vdev_device_request_free( req );
+         free( req );
+      
+         return -ENOMEM;
+      }
+   }
+   
+   vdev_debug("CHANGE device: type '%s' at '%s' ('%s' %d:%d)\n", (S_ISBLK(req->mode) ? "block" : S_ISCHR(req->mode) ? "char" : "unknown"), req->renamed_path, req->path, major(req->dev), minor(req->dev) );
+   
+   if( req->renamed_path != NULL && vdev_device_has_metadata( req ) ) {
+   
+      // call all CHANGE actions 
+      rc = vdev_action_run_commands( req, req->state->acts, req->state->num_acts, 1 );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_action_run_commands(ADD %s, dev=(%u, %u)) rc = %d\n", req->renamed_path, major(req->dev), minor(req->dev), rc );
+      }  
+   }
+   
+   // done with this request
+   vdev_device_request_free( req );
+   free( req );
+   
+   return 0;
+}
+
+
+// workqueue call to vdev_device_change
+static int vdev_device_change_wq( struct vdev_wreq* wreq, void* cls ) {
+   
+   struct vdev_device_request* req = (struct vdev_device_request*)cls;
+   return vdev_device_change( req );
+}
+
+
 // enqueue a device request
 // NOTE: the workqueue takes ownership of the request.  The caller should not free it.
 // return 0 on success
@@ -1021,6 +1113,12 @@ int vdev_device_request_enqueue( struct vdev_wq* wq, struct vdev_device_request*
       case VDEV_DEVICE_REMOVE: {
          
          vdev_wreq_init( &wreq, vdev_device_remove_wq, req );
+         break;
+      }
+      
+      case VDEV_DEVICE_CHANGE: {
+         
+         vdev_wreq_init( &wreq, vdev_device_change_wq, req );
          break;
       }
       
