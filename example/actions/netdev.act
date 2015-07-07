@@ -2,4 +2,5 @@
 event=add
 OS_INTERFACE=
 OS_SUBSYSTEM=net
-command=exec "$VDEV_HELPERS/netdev.sh"
+command=$VDEV_HELPERS/netdev.sh
+daemonlet=true

@@ -1,4 +1,5 @@
 [vdev-action]
 event=any
 type=block
-command=exec "$VDEV_HELPERS/block.sh"
+command=$VDEV_HELPERS/block.sh
+daemonlet=true

@@ -1,4 +1,5 @@
 [vdev-action]
 event=any
 OS_SUBSYSTEM=video4linux
-command=exec "$VDEV_HELPERS/v4l.sh"
+command=$VDEV_HELPERS/v4l.sh
+daemonlet=true

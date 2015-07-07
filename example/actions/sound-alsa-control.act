@@ -2,4 +2,5 @@
 event=any
 path=^snd/.+$
 OS_SUBSYSTEM=sound
-command=exec "$VDEV_HELPERS/sound.sh"
+command=$VDEV_HELPERS/sound.sh
+daemonlet=true

@@ -2,4 +2,5 @@
 event=any
 OS_DEVTYPE=disk
 OS_SUBSYSTEM=block
-command=if [ "$VDEV_OS_DEVTYPE" != "partition" ]; then exec "$VDEV_HELPERS/disk.sh"; else exit 0; fi
+command=$VDEV_HELPERS/disk.sh
+daemonlet=true

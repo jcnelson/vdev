@@ -295,6 +295,7 @@ void usage(char const* program_name ) {
 }
 
 // entry point 
+// TODO: support using a sysfs device path directly
 int main( int argc, char** argv ) {
    
    // look for the character device with VDEV_MAJOR and VDEV_MINOR 
