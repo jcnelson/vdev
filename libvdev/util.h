@@ -96,7 +96,6 @@ extern int _VDEV_SYSLOG;
          } \
          else { \
             fprintf(stderr, VDEV_WHERESTR "DEBUG: " format, VDEV_WHEREARG, __VA_ARGS__ ); \
-            fflush(stderr); \
          } \
       } \
    } while(0)
@@ -110,7 +109,6 @@ extern int _VDEV_SYSLOG;
          } \
          else { \
             fprintf(stderr, VDEV_WHERESTR "INFO: " format, VDEV_WHEREARG, __VA_ARGS__ ); \
-            fflush(stderr); \
          } \
       } \
    } while(0)
@@ -124,7 +122,6 @@ extern int _VDEV_SYSLOG;
          } \
          else { \
             fprintf(stderr, VDEV_WHERESTR "WARN: " format, VDEV_WHEREARG, __VA_ARGS__); \
-            fflush(stderr); \
          } \
       } \
    } while(0)   
@@ -138,8 +135,15 @@ extern int _VDEV_SYSLOG;
          } \
          else { \
             fprintf(stderr, VDEV_WHERESTR "ERROR: " format, VDEV_WHEREARG, __VA_ARGS__); \
-            fflush(stderr); \
          } \
+      } \
+   } while(0)
+   
+   
+#define vdev_error_async_safe( msg ) \
+   do { \
+      if( _VDEV_ERROR_MESSAGES ) { \
+         write( STDERR_FILENO, "[vdev error async] " msg, strlen( "[vdev error async] " msg ) ); \
       } \
    } while(0)
    
