@@ -1,0 +1,198 @@
+#!/bin/dash
+
+# daemonlet wrapper around a helper script.
+# 
+# Protocol overview:
+# 
+# stdin:
+#    reads ASCII-encoded KEY=VALUE environment variables until it receives "done", indicating the end of a stanza.  Interpretes an empty string as EOF (and exits).
+#    
+# stdout:
+#    writes the exit status (as an ASCII string) indicating the return value of the daemonlet's main method
+# 
+# stderr:
+#    writes any error messages from the daemonlet
+
+
+# tell daemonlet scripts that they're running as daemonlets 
+VDEV_DAEMONLET=1
+
+set -u
+
+# current list of imported environment variables
+CUR_ENVIRON=""
+
+# dummy main, which the daemonlet overrides
+main() {
+   echo >&2 "No main() method defined"
+   return 255
+}
+
+
+# set certain commonly-used environment variables 
+daemonlet_default_environ() {
+      
+   VDEV_ACTION=""
+   VDEV_MOUNTPOINT=""
+   VDEV_PATH=""
+   VDEV_METADATA=""
+   VDEV_GLOBAL_METADATA=""
+   VDEV_CONFIG_FILE=""
+   VDEV_MAJOR=""
+   VDEV_MINOR=""
+   VDEV_MODE=""
+   VDEV_HELPERS=""
+   VDEV_LOGFILE=""
+   VDEV_INSTANCE=""
+
+   VDEV_OS_SYSFS_MOUNTPOINT=""
+   VDEV_OS_MODALIAS=""
+   VDEV_OS_DEVPATH=""
+   VDEV_OS_SUBSYSTEM=""
+   VDEV_OS_IFINDEX=""
+   VDEV_OS_SEQNUM=""
+   VDEV_OS_DRIVER=""
+}
+
+
+# read in the environment variables from vdevd (via the daemonlet's input pipe)
+# set all variables, and keep track of which variables were set so we can unset them later.
+# return 0 on success, and print the list of variables to stdout.
+# return 1 if we were told by vdevd to exit, or if the input pipe got closed (indicates we should die)
+# return 2 on malformed environment variable
+daemonlet_read_environ() {
+
+   local _OLDIFS _OLDOLDIFS _ENV_NAME_AND_VALUE _ENV_NAME _ENV_VALUE _ALL_ENV _COUNT _IDX
+   
+   _OLDOLDIFS="$IFS"
+   _ALL_ENV=""
+   _COUNT=0
+   _IDX=0
+   
+   while IFS= read -r _ENV_NAME_AND_VALUE; do 
+      
+      if [ -z "$_ENV_NAME_AND_VALUE" ]; then 
+         # pipe closed 
+         return 1
+      fi
+
+      if [ "$_ENV_NAME_AND_VALUE" = "done" ]; then 
+         # end of this stanza 
+         break
+      fi
+
+      _COUNT=$((_COUNT + 1))
+
+      _OLDIFS="$IFS"
+      IFS="="
+      set -- $_ENV_NAME_AND_VALUE
+      IFS="$_OLDIFS"
+
+      if [ $# -ge 2 ]; then 
+
+         _ENV_NAME="$1"
+         _ENV_VALUE="$2"
+
+         if [ $# -gt 2 ]; then 
+
+            # reconstruct value
+            _IDX=3
+            while [ $_IDX -le $# ]; do
+               
+               eval "_ENV_VALUE=\"\$_ENV_VALUE=\$$_IDX\""
+               _IDX=$((_IDX + 1)) 
+            done
+         fi
+
+         _ENV_VALUE="${_ENV_VALUE%%\"}"
+         _ENV_VALUE="${_ENV_VALUE##\"}"
+         
+         eval "$_ENV_NAME=\"$_ENV_VALUE\""
+         _ALL_ENV="$_ENV_NAME $_ALL_ENV"
+      
+      else 
+         
+         # no '=' in string 
+         return 2
+      fi
+      
+   done
+
+   if [ $_COUNT -eq 0 ]; then 
+      # dead
+      echo "$0 $$ dead" >> /tmp/daemonlet.log
+      return 1
+   fi
+
+   IFS="$_OLDOLDIFS"
+   
+   CUR_ENVIRON="$_ALL_ENV"
+   return 0
+}
+
+
+# unset all environment variables accumulated in the past daemonlet_read_environ call 
+# uses the CUR_ENVIRON global variable to find the list of imported environment variables
+# return 0 on success, and unset CUR_ENVIRON
+daemonlet_clear_environ() {
+
+   local _OLDIFS _ENV_NAME
+
+   _OLDIFS="$IFS"
+   IFS=" "
+   
+   set -- $CUR_ENVIRON
+
+   IFS="$_OLDIFS"
+
+   while [ $# -gt 0 ]; do
+
+      _ENV_NAME="$1"
+      shift 1
+      
+      eval "$_ENV_NAME=\"\""
+   done
+   
+   CUR_ENVIRON=""
+   return 0
+}
+
+
+# read in the daemonlet
+DAEMONLET="$1"
+eval ". \"$DAEMONLET\""
+
+# tell vdevd we're ready 
+echo ""
+
+# run its main method over and over, until we're told to die
+while true; do 
+
+   daemonlet_default_environ
+   
+   # import the device request from vdevd
+   daemonlet_read_environ
+   DAEMONLET_ENVIRON_RC=$?
+
+   if [ $DAEMONLET_ENVIRON_RC -eq 1 ]; then 
+      # were told to exit 
+      exit 0
+
+   elif [ $DAEMONLET_ENVIRON_RC -eq 2 ]; then 
+      # bad environment variable 
+      exit 1
+   fi
+
+   # process this request
+   main
+   DAEMONLET_MAIN_RC=$?
+
+   # send the status back to the daemon 
+   echo "$DAEMONLET_MAIN_RC"
+
+   # clear the request 
+   daemonlet_clear_environ
+done
+
+exit 0
+
