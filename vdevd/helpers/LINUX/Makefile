@@ -5,7 +5,7 @@ CXSRCS:= $(wildcard *.cpp)
 OBJ   := $(patsubst %.c,$(BUILD_VDEVD_HELPERS)/%.o,$(C_SRCS)) $(patsubst %.cpp,$(BUILD_VDEVD_HELPERS)/%.o,$(CXSRCS))
 LIB   :=
 
-HELPER_SCRIPTS := $(wildcard *.sh)
+HELPER_SCRIPTS := $(wildcard *.sh) daemonlet
 HELPERS := stat_optical stat_ata stat_input stat_scsi stat_v4l stat_net stat_usb stat_bus stat_path event-put $(HELPER_SCRIPTS)
 
 HELPERS_BUILD := $(patsubst %,$(BUILD_VDEVD_HELPERS)/%,$(HELPERS))
@@ -22,6 +22,10 @@ $(BUILD_VDEVD_HELPERS)/%.o: %.c
 	$(CC) $(CFLAGS) $(DEFS) $(INC) -o "$@" -c "$<"
 
 $(BUILD_VDEVD_HELPERS)/%.sh: %.sh
+	@mkdir -p "$(shell dirname "$@")"
+	cp -a "$<" "$@"
+
+$(BUILD_VDEVD_HELPERS)/daemonlet: daemonlet
 	@mkdir -p "$(shell dirname "$@")"
 	cp -a "$<" "$@"
 
