@@ -1,0 +1,8 @@
+[vdev-action]
+event=any
+OS_SEQNUM=
+OS_SUBSYSTEM=
+OS_DEVPATH=
+command=$VDEV_HELPERS/event-push.sh
+daemonlet=true
+async=true

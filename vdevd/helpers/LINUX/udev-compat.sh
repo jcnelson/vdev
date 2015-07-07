@@ -4,102 +4,29 @@
 # This should be run last, once the device has been initialized
 
 . "$VDEV_HELPERS/subr.sh"
-
-
-# Determine whether or not a string is prefixed with a given substring.
-# $1    the prefix
-# $2    the string in question
-# Return 0 if so
-# Return 1 if not
-has_prefix() {
-   
-   local _PREFIX _STRING _STRTMP _LEN1 _LEN2
-
-   _PREFIX="$1"
-   _STRING="$2"
-
-   _LEN1=${#_STRING}
-   
-   _STRTMP=${_STRING##$_PREFIX}
-
-   _LEN2=${#_STRTMP}
-
-   if [ $_LEN1 -eq $_LEN2 ]; then 
-      # prefix was not chomped
-      # this isn't a prefix 
-      return 1
-   else
-      return 0
-   fi
-}
-
-
-# Iterate through the list of tags added for a device.
-# Write them line by line to stdout.
-# $1    Device metadata directory; defaults to $VDEV_METADATA if not given 
-# Return 0 on success 
-enumerate_tags() {
-
-   local _TAG _METADATA
-
-   _METADATA="$1"
-   if [ -z "$_METADATA" ]; then 
-      _METADATA="$VDEV_METADATA"
-   fi
-
-   if ! [ -d "$_METADATA/tags" ]; then 
-      return 0
-   fi
-
-   while read -r _TAG; do 
-      
-      echo "$_TAG"
-   done <<EOF
-$(/bin/ls "$_METADATA/tags")
-EOF
-
-   return 0
-}
-
+. "$VDEV_HELPERS/subr-event.sh"
 
 # Enumerate udev properties.  This writes the "E" records in the device's equivalent of /run/udev/data/$DEVICE_ID to stdout.
 # $1    Device metadata directory; defaults to $VDEV_METADATA if not given 
 # Return 0 on success
-enumerate_udev_properties() {
+udev_enumerate_properties() {
    
-   local _METADATA
+   local _METADATA _LINE
    
    _METADATA="$1"
    if [ -z "$_METADATA" ]; then 
       _METADATA="$VDEV_METADATA"
    fi
 
-   /bin/cat "$_METADATA/properties" | \
-      /bin/sed -r -e 's/^VDEV_ATA/E:ID_ATA/g' | \
-      /bin/sed -r -e 's/^VDEV_BUS/E:ID_BUS/g' | \
-      /bin/sed -r -e 's/^VDEV_CCISS/E:ID_CCISS/g' | \
-      /bin/sed -r -e 's/^VDEV_DM/E:DM/g' | \
-      /bin/sed -r -e 's/^VDEV_FS/E:ID_FS/g' | \
-      /bin/sed -r -e 's/^VDEV_INPUT/E:ID_INPUT/g' | \
-      /bin/sed -r -e 's/^VDEV_MAJOR/E:MAJOR/g' | \
-      /bin/sed -r -e 's/^VDEV_MINOR/E:MINOR/g' | \
-      /bin/sed -r -e 's/^VDEV_NET/E:ID_NET/g' | \
-      /bin/sed -r -e 's/^VDEV_OPTICAL/E:ID_CDROM/g' | \
-      /bin/sed -r -e 's/^VDEV_OS_/E:/g' | \
-      /bin/sed -r -e 's/^VDEV_PART_ENTRY/E:ID_PART_ENTRY/g' | \
-      /bin/sed -r -e 's/^VDEV_PART_TABLE/E:ID_PART_TABLE/g' | \
-      /bin/sed -r -e 's/^VDEV_PERSISTENT_PATH/E:ID_PATH/g' | \
-      /bin/sed -r -e 's/^VDEV_REVISION/E:ID_REVISION/g' | \
-      /bin/sed -r -e 's/^VDEV_SCSI/E:ID_SCSI/g' | \
-      /bin/sed -r -e 's/^VDEV_SERIAL/E:ID_SERIAL/g' | \
-      /bin/sed -r -e 's/^VDEV_USB/E:ID_USB/g' | \
-      /bin/sed -r -e 's/^VDEV_TYPE/E:ID_TYPE/g' | \
-      /bin/sed -r -e 's/^VDEV_V4L/E:ID_V4L/g' | \
-      /bin/sed -r -e 's/^VDEV_WWN/E:ID_WWN/g' | \
-      /bin/sed -r -e 's/^XKB/E:XKB/g' | \
-      /bin/sed -r -e 's/^BACKSPACE/E:BACKSPACE/g' | \
-      /bin/sed -r -e 's/^KMAP/E:KMAP/g'
-   
+   if [ -f "$_METADATA/properties" ]; then 
+      
+      /bin/sed -r \
+         -e 's/^VDEV_OS_/E:/g' \
+         -e 's/^VDEV_PERSISTENT_/E:ID_/g' \
+         -e 's/^VDEV_/E:ID_/g' \
+      "$_METADATA/properties"
+   fi
+      
    return 0
 }
 
@@ -108,12 +35,13 @@ enumerate_udev_properties() {
 # $1    Device metadata directory: defaults to $VDEV_METADATA if not given 
 # $2    /dev mountpoint; defaults to $VDEV_MOUNTPOINT
 # Returns 0 on success
-enumerate_udev_symlinks() {
+udev_enumerate_symlinks() {
    
-   local _METADATA _MOUNTPOINT _LINE _STRIPPED_LINE
+   local _METADATA _MOUNTPOINT _LINE _STRIPPED_LINE _OLDIFS
 
    _METADATA="$1"
    _MOUNTPOINT="$2"
+   _OLDIFS="$IFS"
    
    if [ -z "$_METADATA" ]; then 
       _METADATA="$VDEV_METADATA"
@@ -127,7 +55,7 @@ enumerate_udev_symlinks() {
       return 0
    fi
 
-   while read _LINE; do
+   while IFS= read -r _LINE; do
    
       _STRIPPED_LINE="${_LINE##$_MOUNTPOINT}"
       _STRIPPED_LINE="${_STRIPPED_LINE##/}"
@@ -136,6 +64,7 @@ enumerate_udev_symlinks() {
       
    done < "$_METADATA/links"
 
+   IFS="$_OLDIFS"
 
    return 0
 }
@@ -144,9 +73,9 @@ enumerate_udev_symlinks() {
 # Enumerate udev tags.  This writes the "G" records in the device's equivalent of /run/udev/data/$DEVICE_ID to stdout.
 # $1    Device metadata directory; defaults to $VDEV_METADATA if not given 
 # Returns 0 on success 
-enumerate_udev_tags() {
+udev_enumerate_tags() {
 
-   local _METADATA _LINE
+   local _METADATA _LINE _OLDIFS
    
    _METADATA="$1"
    
@@ -154,32 +83,33 @@ enumerate_udev_tags() {
       _METADATA="$VDEV_METADATA"
    fi
 
-   enumerate_tags "$_METADATA" | \
-   while read _LINE; do 
-      
-      echo "G:$_LINE"
-   done 
-
-   return 0
-}
-
-
-# Get the current monotonic uptime in microseconds, i.e. for udev compatibility.
-# Print it to stdout--it's too big to return.
-now_monotonic_usec() {
+   _OLDIFS="$IFS"
    
-   local _UPTIME_SEC _UPTIME_USEC
-   
-   _UPTIME_USEC="$(/bin/cat "/proc/uptime" | /bin/sed -r 's/([0-9]+)\.([0-9]+)[ ]+.*/\1\20000/g')"
+   if [ -d "$_METADATA/tags" ]; then 
 
-   if [ -z "$_UPTIME_USEC" ]; then 
-      echo "0"
-   else
-      echo "$_UPTIME_USEC"
+      while IFS= read -r _TAG; do 
+         
+         echo "G:$_TAG"
+      done <<EOF
+$(/bin/ls "$_METADATA/tags")
+EOF
    fi
-
+   
+   IFS="$_OLDIFS"
+   
    return 0
 }
+
+
+# Get the current monotonic uptime in microseconds, i.e. for the udev database
+# Print it to stdout--it's too big to return.
+udev_monotonic_usec() {
+   
+   /bin/sed -r 's/([0-9]+)\.([0-9]+)[ ]+.*/I:\1\20000/g' "/proc/uptime"
+   return 0
+}
+
+
 
 # Generate a udev-compatible device database record, i.e. the file under /run/udev/data/$DEVICE_ID.
 # It will be stored under /dev/metadata/udev/data/$DEVICE_ID, which in turn can be symlinked to /run/udev
@@ -190,7 +120,7 @@ now_monotonic_usec() {
 # NOTE: the /dev/metadata/udev directory hierarchy must have been set up (e.g. by dev-setup.sh)
 # return 0 on success, and generate /dev/metadata/udev/data/$DEVICE_ID to contain the same information that /run/udev/data/$DEVICE_ID would contain
 # return non-zero on error
-generate_udev_data() {
+udev_generate_data() {
 
    local _DEVICE_ID _METADATA _GLOBAL_METADATA _MOUNTPOINT _UDEV_DATA_PATH _UDEV_DATA_PATH_TMP _RC _INIT_TIME_USEC
    
@@ -218,44 +148,35 @@ generate_udev_data() {
    _UDEV_DATA_PATH="$_GLOBAL_METADATA/udev/data/$_DEVICE_ID"
    _UDEV_DATA_PATH_TMP="$_GLOBAL_METADATA/udev/data/.$_DEVICE_ID.tmp"
    
-   enumerate_udev_symlinks "$_METADATA" "$_MOUNTPOINT" >> "$_UDEV_DATA_PATH_TMP"
+   udev_enumerate_symlinks "$_METADATA" "$_MOUNTPOINT" >> "$_UDEV_DATA_PATH_TMP"
    _RC=$?
 
    if [ $_RC -ne 0 ]; then 
 
       /bin/rm -f "$_UDEV_DATA_PATH_TMP"
-      vdev_error "enumerate_udev_symlinks rc = $_RC"
+      vdev_error "udev_enumerate_symlinks rc = $_RC"
       return $_RC
    fi 
 
-   _INIT_TIME_USEC="$(now_monotonic_usec)"
-   echo "I:$_INIT_TIME_USEC" >> "$_UDEV_DATA_PATH_TMP"
+   udev_monotonic_usec >> "$_UDEV_DATA_PATH_TMP"
+
+   udev_enumerate_properties "$_METADATA" >> "$_UDEV_DATA_PATH_TMP"
    _RC=$?
 
    if [ $_RC -ne 0 ]; then 
 
       /bin/rm -f "$_UDEV_DATA_PATH_TMP"
-      vdev_error "now_monotonic_usec rc = $_RC"
+      vdev_error "udev_enumerate_properties rc = $_RC"
       return $_RC
    fi 
 
-   enumerate_udev_properties "$_METADATA" >> "$_UDEV_DATA_PATH_TMP"
-   _RC=$?
-
-   if [ $_RC -ne 0 ]; then 
-
-      /bin/rm -f "$_UDEV_DATA_PATH_TMP"
-      vdev_error "enumerate_udev_properties rc = $_RC"
-      return $_RC
-   fi 
-
-   enumerate_udev_tags "$_METADATA" >> "$_UDEV_DATA_PATH_TMP"
+   udev_enumerate_tags "$_METADATA" >> "$_UDEV_DATA_PATH_TMP"
    _RC=$?
 
    if [ $_RC -ne 0 ]; then 
       
       /bin/rm -f "$_UDEV_DATA_PATH_TMP"
-      vdev_error "enumerate_udev_tags rc = $_RC"
+      vdev_error "udev_enumerate_tags rc = $_RC"
       return $_RC
    fi 
 
@@ -269,7 +190,7 @@ generate_udev_data() {
 # $2    The global metadata directory (defaults to $VDEV_GLOBAL_METADATA)
 # return 0 on success
 # return nonzero on error
-remove_udev_data() {
+udev_remove_data() {
    
    local _DEVICE_ID _GLOBAL_METADATA
    
@@ -303,14 +224,15 @@ remove_udev_data() {
 # NOTE: the /dev/metadata/udev directory hierarchy must have been set up (e.g. by dev-setup.sh)
 # return 0 on success 
 # return nonzero on error 
-generate_udev_links() {
+udev_generate_links() {
 
-   local _RC _DEVICE_ID _METADATA _GLOBAL_METADATA _MOUNTPOINT _LINE _STRIPPED_LINE _LINK_DIR
+   local _RC _DEVICE_ID _METADATA _GLOBAL_METADATA _MOUNTPOINT _LINE _STRIPPED_LINE _LINK_DIR _OLDIFS
 
    _DEVICE_ID="$1"
    _METADATA="$2"
    _GLOBAL_METADATA="$3"
    _MOUNTPOINT="$4"
+   _OLDIFS="$IFS" 
 
    if [ -z "$_DEVICE_ID" ]; then 
       _DEVICE_ID="$(vdev_device_id)"
@@ -332,7 +254,7 @@ generate_udev_links() {
       return 0
    fi
    
-   while read _LINE; do
+   while IFS= read -r _LINE; do
    
       _STRIPPED_LINE="${_LINE##$_MOUNTPOINT}"
       
@@ -374,6 +296,8 @@ generate_udev_links() {
       
    done < "$_METADATA/links"
 
+   IFS="$_OLDIFS"
+
    return $_RC
 }
 
@@ -384,13 +308,14 @@ generate_udev_links() {
 # $3    The device hierarchy mountpoint (defaults to $VDEV_MOUNTPOINT)
 # return 0 on success 
 # return nonzero on error
-remove_udev_links() {
+udev_remove_links() {
    
-   local _RC _DEVICE_ID _MOUNTPOINT _LINE _STRIPPED_LINE _LINK_DIR _METADATA
+   local _RC _DEVICE_ID _MOUNTPOINT _LINE _STRIPPED_LINE _LINK_DIR _METADATA _OLDIFS
 
    _DEVICE_ID="$1"
    _METADATA="$2"
    _MOUNTPOINT="$3"
+   _OLDIFS="$IFS"
 
    if [ -z "$_DEVICE_ID" ]; then 
       _DEVICE_ID="$(vdev_device_id)"
@@ -411,8 +336,7 @@ remove_udev_links() {
 
    _UDEV_DATA_PATH="$_METADATA/udev/data/$_DEVICE_ID"
 
-   /bin/cat "$_METADATA/links" | \
-   while read _LINE; do
+   while IFS= read -r _LINE; do
    
       _STRIPPED_LINE="${_LINE##$_MOUNTPOINT}"
       
@@ -436,8 +360,10 @@ remove_udev_links() {
          fi
       fi
 
-   done
+   done < "$_METADATA/links"
 
+   IFS="$_OLDIFS"
+   
    return 0
 }
 
@@ -450,13 +376,15 @@ remove_udev_links() {
 # $2    global metadata directory (defaults to $VDEV_GLOBAL_METADATA)
 # return 0 on success 
 # return nonzero on error 
-generate_udev_tags() {
+udev_generate_tags() {
    
-   local _RC _DEVICE_ID _METADATA _GLOBAL_METADATA _LINE _TAGDIR
+   local _RC _DEVICE_ID _METADATA _GLOBAL_METADATA _LINE _TAGDIR _OLDIFS
 
    _DEVICE_ID="$1"
    _METADATA="$2"
    _GLOBAL_METADATA="$3"
+   _OLDIFS="$IFS"
+   _RC=0
    
    if [ -z "$_DEVICE_ID" ]; then 
       _DEVICE_ID="$(vdev_device_id)"
@@ -469,33 +397,38 @@ generate_udev_tags() {
    if [ -z "$_GLOBAL_METADATA" ]; then 
       _GLOBAL_METADATA="$VDEV_GLOBAL_METADATA"
    fi
+   
+   if [ -d "$_METADATA/tags" ]; then 
+      while IFS= read -r _LINE; do 
+         
+         _TAGDIR="$_GLOBAL_METADATA/udev/tags/$_LINE"
+         
+         if ! [ -d "$_TAGDIR" ]; then 
 
-   enumerate_tags "$_METADATA" | \
-   while read _LINE; do 
-      
-      _TAGDIR="$_GLOBAL_METADATA/udev/tags/$_LINE"
-       
-      if ! [ -d "$_TAGDIR" ]; then 
+            /bin/mkdir -p "$_TAGDIR"
+            _RC=$?
 
-         /bin/mkdir -p "$_TAGDIR"
-         _RC=$?
+            if [ $_RC -ne 0 ]; then 
+
+               vdev_warn "mkdir $_TAGDIR failed"
+               break
+            fi
+         fi
+
+         echo "" > "$_TAGDIR/$_DEVICE_ID"
+         RC=$?
 
          if [ $_RC -ne 0 ]; then 
 
-            vdev_warn "mkdir $_TAGDIR failed"
+            vdev_warn "create $_TAGDIR/$_DEVICE_ID failed"
             break
          fi
-      fi
-
-      echo "" > "$_TAGDIR/$_DEVICE_ID"
-      RC=$?
-
-      if [ $_RC -ne 0 ]; then 
-
-         vdev_warn "create $_TAGDIR/$_DEVICE_ID failed"
-         break
-      fi
-   done
+      done <<EOF
+$(/bin/ls "$_METADATA/tags")
+EOF
+   fi
+   
+   IFS="$_OLDIFS"
    
    return $_RC
 }
@@ -505,12 +438,13 @@ generate_udev_tags() {
 # $1    Device ID (defaults to the result of vdev_device_id)
 # $2    Device metadata directory (defaults to $VDEV_METADATA)
 # return 0 on success
-remove_udev_tags() {
+udev_remove_tags() {
    
-   local _RC _DEVICE_ID _METADATA _LINE _TAGDIR
+   local _RC _DEVICE_ID _METADATA _LINE _TAGDIR _OLDIFS
 
    _DEVICE_ID="$1"
    _METADATA="$2"
+   _OLDIFS="$IFS"
    
    if [ -z "$_DEVICE_ID" ]; then 
       _DEVICE_ID="$(vdev_device_id)"
@@ -520,161 +454,101 @@ remove_udev_tags() {
       _METADATA="$VDEV_METADATA"
    fi
 
-   enumerate_tags "$_METADATA" | \
-   while read _LINE; do 
-      
-      _TAGDIR="$_METADATA/udev/tags"
-       
-      if ! [ -d "$_TAGDIR" ]; then 
-         continue 
-      else
-
-         /bin/rm -f "$_TAGDIR/$_DEVICE_ID"
-         /bin/rmdir "$_TAGDIR" || true
-      fi
-   done
-   
-   return 0
-}
-
-
-# get the hwdb prefix from an input class 
-# $1    the input class 
-input_class_to_hwdb_prefix() {
-
-   local _INPUT_CLASS _HWDB_PREFIX
-
-   _INPUT_CLASS="$1"
-
-   case $_INPUT_CLASS in 
-      
-      kbd)
+   if [ -d "$_METADATA/tags" ]; then 
+      while IFS= read -r _LINE; do 
          
-         _HWDB_PREFIX="keyboard"
-         ;;
-
-      mouse|joystick)
-
-         _HWDB_PREFIX="mouse"
-         ;;
-
-      *)
+         _TAGDIR="$_METADATA/udev/tags"
          
-         _HWDB_PREFIX="$_INPUT_CLASS"
-         ;;
-   esac
+         if ! [ -d "$_TAGDIR" ]; then 
+            continue 
+         else
 
-   echo "$_HWDB_PREFIX"
-   return 0
-}
-
-
-# use the hwdb to store extra properties for this device 
-# $1    Path to the hardware database root directory 
-# return 0 on success
-add_hwdb_properties() {
-
-   local _HWDB_PATH 
-
-   _HWDB_PATH="$1"
-
-   HWDB_ARGS="-h $_HWDB_PATH"
-   
-   if [ -n "$VDEV_OS_MODALIAS" ]; then 
-      
-      if [ "$VDEV_OS_SUBSYSTEM" = "input" ]; then 
-         
-         # use the input class as the prefix 
-         INPUT_CLASS="$(/bin/cat "$VDEV_METADATA/properties" | /bin/grep "VDEV_INPUT_CLASS=" | /bin/sed -r 's/VDEV_INPUT_CLASS=//g')"
-
-         if [ -n "$INPUT_CLASS" ]; then 
-            PREFIX="$(input_class_to_hwdb_prefix "$INPUT_CLASS")"
-
-            HWDB_ARGS="$HWDB_ARGS -P $PREFIX"
+            /bin/rm -f "$_TAGDIR/$_DEVICE_ID"
+            /bin/rmdir "$_TAGDIR" || true
          fi
-      fi
-
-      HWDB_ARGS="$HWDB_ARGS $VDEV_OS_MODALIAS"
-   
-   elif [ -n "$VDEV_OS_DEVPATH" ]; then 
-      
-      if [ "$VDEV_OS_SUBSYSTEM" = "usb" ] || [ "$VDEV_OS_SUBSYSTEM" = "usb_device" ]; then 
-         
-         HWDB_ARGS="$HWDB_ARGS -D $VDEV_OS_DEVPATH -S $VDEV_OS_SUBSYSTEM"
-      
-      else
-
-         # not enough info to search the hwdb
-         return 0
-      fi
-   
-   else
-   
-      # not enough info to search the hwdb
-      return 0
-   fi
-   
-   if [ -n "$HWDB_ARGS" ]; then 
-
-      while read -r PROP_NAME_AND_VALUE; do 
-         
-         OLDIFS="$IFS"
-         IFS="="
-         
-         set -- "$PROP_NAME_AND_VALUE"
-         
-         PROP_NAME="$1"
-         PROP_VALUE="$2"
-         
-         IFS="$OLD_IFS"
-
-         if [ -n "$PROP_NAME" ] && [ -n "$PROP_VALUE" ]; then 
-
-            # put the property
-            vdev_add_property "$PROP_NAME" "$PROP_VALUE" "$VDEV_METADATA"
-         fi
-         
       done <<EOF
-$("$VDEV_HELPERS/hwdb.sh" $HWDB_ARGS)
+$(/bin/ls "$_METADATA/tags")
 EOF
    fi
+   
+   IFS="$_OLDIFS"
+   
+   return 0
+}
 
+
+# convert an event's text into a udev-compatible event text 
+# $1    the action (defaults to $VDEV_ACTION)
+# $2    the sysfs device path (defaults to $VDEV_OS_DEVPATH)
+# $3    the subsystem name (defaults to $VDEV_OS_SUBSYSTEM)
+# $4    the sequence number from the kernel (defaults to $VDEV_OS_SEQNUM)
+# $5    the metadata directory for this device (defaults to $VDEV_METADATA)
+# Also pulls in VDEV_PATH, VDEV_MAJOR, VDEV_MINOR, VDEV_OS_IFINDEX, VDEV_OS_DRIVER from the caller environment, if they are non-empty
+# (VDEV_PATH will be treated as empty if it is "UNKNOWN").
+# returns 0 on success
+udev_event_generate_text() {
+
+   event_generate_text "$1" "$2" "$3" "$4" "$5" | \
+   /bin/sed -r \
+      -e 's/^VDEV_OS_//g' \
+      -e 's/^VDEV_PERSISTENT_/ID_/g' \
+      -e 's/^VDEV_/ID_/g'
+   
    return 0
 }
 
 
 # entry point
-# if our path is still "UNKNOWN", then generate a device ID and go with that 
-if [ "$VDEV_PATH" = "UNKNOWN" ]; then 
-   
-   VDEV_METADATA="$VDEV_GLOBAL_METADATA/dev"/"$(vdev_device_id)"
-   /bin/mkdir -p "$VDEV_METADATA"
-fi
+# return 0 on success
+main() {
 
-if [ "$VDEV_ACTION" = "add" ]; then 
+   local _DEVICE_ID 
 
-   VDEV_HWDB_PATH="$VDEV_MOUNTPOINT/metadata/hwdb"
-
-   # insert extra properties, if we have a hwdb
-   if [ -d "$VDEV_HWDB_PATH" ]; then 
+   # if our path is still "UNKNOWN", then generate a device ID and go with that for metadata
+   if [ "$VDEV_PATH" = "UNKNOWN" ]; then 
       
-      add_hwdb_properties "$VDEV_HWDB_PATH"
-   else 
-
-      vdev_warn "Could not find hardware database ($VDEV_HWDB_PATH)"
+      VDEV_METADATA="$VDEV_GLOBAL_METADATA/dev"/"$(vdev_device_id)"
+      /bin/mkdir -p "$VDEV_METADATA"
    fi
 
-   # add udev data
-   generate_udev_data || vdev_fail 10 "Failed to generate udev data for $VDEV_PATH"
-   generate_udev_links || vdev_fail 11 "Failed to generate udev links for $VDEV_PATH"
-   generate_udev_tags || vdev_fail 12 "Failed to generate udev tags for $VDEV_PATH"
+   _DEVICE_ID="$(vdev_device_id)"
 
-elif [ "$VDEV_ACTION" = "remove" ]; then 
+   if [ "$VDEV_ACTION" = "add" ]; then 
+      
+      # add udev data
+      udev_generate_data "$_DEVICE_ID" "$VDEV_METADATA" "$VDEV_GLOBAL_METADATA" "$VDEV_MOUNTPOINT" || vdev_error "Failed to generate udev data for $VDEV_PATH"
+      udev_generate_links "$_DEVICE_ID" "$VDEV_METADATA" "$VDEV_GLOBAL_METADATA" "$VDEV_MOUNTPOINT" || vdev_error "Failed to generate udev links for $VDEV_PATH"
+      udev_generate_tags "$_DEVICE_ID" "$VDEV_METADATA" "$VDEV_GLOBAL_METADATA" || vdev_error "Failed to generate udev tags for $VDEV_PATH"
 
-   # remove udev data 
-   remove_udev_data 
-   remove_udev_links
-   remove_udev_tags
+   elif [ "$VDEV_ACTION" = "remove" ]; then 
+
+      # remove udev data 
+      udev_remove_data "$_DEVICE_ID" "$VDEV_GLOBAL_METADATA" || vdev_error "Failed to remove udev data for $VDEV_PATH"
+      udev_remove_links "$_DEVICE_ID" "$VDEV_METADATA" "$VDEV_MOUNTPOINT" || vdev_error "Failed to remove udev links for $VDEV_PATH"
+      udev_remove_tags "$_DEVICE_ID" "$VDEV_METADATA" || vdev_error "Failed to remove udev tags for $VDEV_PATH"
+   fi
+
+
+   # require sequence number and devpath, at least 
+   if [ -z "$VDEV_OS_SEQNUM" ] || [ -z "$VDEV_OS_DEVPATH" ] || [ -z "$VDEV_OS_SUBSYSTEM" ]; then 
+      return 0
+   fi
+
+   # clear path if UNKNOWN
+   if [ "$VDEV_PATH" = "UNKNOWN" ]; then 
+      VDEV_PATH=
+   fi
+
+   # propagate to each libudev-compat event queue
+   "$VDEV_HELPERS/event-put" -s "$VDEV_GLOBAL_METADATA/udev/events/global" <<EOF
+$(udev_event_generate_text "$VDEV_ACTION" "$VDEV_OS_DEVPATH" "$VDEV_OS_SUBSYSTEM" "$VDEV_OS_SEQNUM" "$VDEV_METADATA")
+EOF
+
+   return $?
+}
+
+
+if [ $VDEV_DAEMONLET -eq 0 ]; then 
+   main 
+   exit $?
 fi
-
-exit 0
