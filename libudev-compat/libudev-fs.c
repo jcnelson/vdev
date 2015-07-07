@@ -26,7 +26,7 @@
 #ifdef TEST 
 #define UDEV_FS_EVENTS_DIR      "/tmp/events"
 #else
-#define UDEV_FS_EVENTS_DIR      "/dev/events"
+#define UDEV_FS_EVENTS_DIR      "/dev/metadata/udev/events"
 #endif 
 
 // how many monitors can there be per process?
@@ -1186,19 +1186,49 @@ int main( int argc, char** argv ) {
          }
          
          int pid = getpid();
+         struct udev_list_entry *list_entry = NULL;
          
+         printf("[%d] [%d] ACTION:     '%s'\n", pid, num_events, udev_device_get_action( dev ) );
+         printf("[%d] [%d] SEQNUM:      %llu\n", pid, num_events, udev_device_get_seqnum( dev ) );
+         printf("[%d] [%d] USEC:        %llu\n", pid, num_events, udev_device_get_usec_since_initialized( dev ) );
          printf("[%d] [%d] DEVNODE:    '%s'\n", pid, num_events, udev_device_get_devnode( dev ) );
          printf("[%d] [%d] DEVPATH:    '%s'\n", pid, num_events, udev_device_get_devpath( dev ) );
          printf("[%d] [%d] SYSNAME:    '%s'\n", pid, num_events, udev_device_get_sysname( dev ) );
          printf("[%d] [%d] SYSPATH:    '%s'\n", pid, num_events, udev_device_get_syspath( dev ) );
-         printf("[%d] [%d] MAJOR:      '%s'\n", pid, num_events, udev_device_get_property_value( dev, "MAJOR" ) );
-         printf("[%d] [%d] MINOR:      '%s'\n", pid, num_events, udev_device_get_property_value( dev, "MINOR" ) );
-         printf("[%d] [%d] USEC:       '%s'\n", pid, num_events, udev_device_get_property_value( dev, "USEC_INITIALIZED" ) );
-         printf("[%d] [%d] SEQNUM:     '%s'\n", pid, num_events, udev_device_get_property_value( dev, "SEQNUM" ) );
+         printf("[%d] [%d] SUBSYSTEM:  '%s'\n", pid, num_events, udev_device_get_subsystem( dev ) );
+         printf("[%d] [%d] DEVTYPE:    '%s'\n", pid, num_events, udev_device_get_devtype( dev ) );
+         printf("[%d] [%d] SYSNUM:     '%s'\n", pid, num_events, udev_device_get_sysnum( dev ) );
+         printf("[%d] [%d] DRIVER:     '%s'\n", pid, num_events, udev_device_get_driver( dev ) );
+         printf("[%d] [%d] DEVNUM:      %d:%d\n", pid, num_events, major( udev_device_get_devnum( dev ) ), minor( udev_device_get_devnum( dev ) ) );
          printf("[%d] [%d] IFINDEX:    '%s'\n", pid, num_events, udev_device_get_property_value( dev, "IFINDEX" ) );
          printf("[%d] [%d] DEVMODE:    '%s'\n", pid, num_events, udev_device_get_property_value( dev, "DEVMODE" ) );
          printf("[%d] [%d] DEVUID:     '%s'\n", pid, num_events, udev_device_get_property_value( dev, "DEVUID" ) );
-         printf("[%d] [%d] DEVGID:     '%s'\n", pid, num_events, udev_device_get_property_value( dev, "DEVGID" ) );
+         printf("[%d] [%d] DEVGID:     '%s'\n", pid, num_events, udev_device_get_property_value( dev, "DEVGID" ) );         
+         
+         list_entry = udev_device_get_devlinks_list_entry( dev );
+         udev_list_entry_foreach( list_entry, udev_list_entry_get_next( list_entry )) {
+          
+            printf("[%d] [%d] devlink:    '%s'\n", pid, num_events, udev_list_entry_get_name( list_entry ) );
+         }
+         
+         list_entry = udev_device_get_properties_list_entry( dev );
+         udev_list_entry_foreach( list_entry, udev_list_entry_get_next( list_entry )) {
+            
+            printf("[%d] [%d] property:   '%s' = '%s'\n", pid, num_events, udev_list_entry_get_name( list_entry ), udev_list_entry_get_value( list_entry ) );
+         }
+         
+         list_entry = udev_device_get_tags_list_entry( dev );
+         udev_list_entry_foreach( list_entry, udev_list_entry_get_next( list_entry )) {
+            
+            printf("[%d] [%d] tag:        '%s'\n", pid, num_events, udev_list_entry_get_name( list_entry ) );
+         }
+         
+         list_entry = udev_device_get_sysattr_list_entry( dev );
+         udev_list_entry_foreach( list_entry, udev_list_entry_get_next( list_entry )) {
+            
+            printf("[%d] [%d] sysattr:    '%s'\n", pid, num_events, udev_list_entry_get_name( list_entry ) );
+         }
+         
          printf("\n");
          
          udev_device_unref( dev );
