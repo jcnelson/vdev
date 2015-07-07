@@ -165,7 +165,7 @@ static int vdev_remove_unplugged_device( char const* path, void* cls ) {
          
          vdev_debug("Remove unplugged device '%s'\n", path );
          
-         device_path = path + strlen( state->mountpoint );
+         device_path = path + strlen( state->config->mountpoint );
          
          to_delete = VDEV_CALLOC( struct vdev_device_request, 1 );
          if( to_delete == NULL ) {
@@ -341,6 +341,7 @@ int vdev_start( struct vdev_state* vdev ) {
 int vdev_parse_device_request( struct vdev_state* state, struct vdev_device_request* vreq, char* line ) {
    
    int rc = 0;
+   int stat_rc;
    char* tok = NULL;
    char* tokstr = line;
    char* tok_ctx = NULL;
@@ -350,9 +351,12 @@ int vdev_parse_device_request( struct vdev_state* state, struct vdev_device_requ
    dev_t major = 0;
    dev_t minor = 0;
    char name[4097];
+   char fullpath[ PATH_MAX+1 ];
    char keyvalue_buf[4097];
    char* key = NULL;
    char* value = NULL;
+   
+   struct stat sb;
    
    // type 
    tok = strtok_r( tokstr, " \t", &tok_ctx );
@@ -478,6 +482,19 @@ int vdev_parse_device_request( struct vdev_state* state, struct vdev_device_requ
       }
    }
    
+   // finally, does this device exist already?
+   snprintf( fullpath, PATH_MAX, "%s/%s", state->config->mountpoint, name );
+   stat_rc = stat( fullpath, &sb );
+   
+   if( stat_rc == 0 ) {
+      
+      vdev_device_request_set_exists( vreq, true );
+   }
+   else {
+      
+      vdev_device_request_set_exists( vreq, false );
+   }
+   
    return rc;
 }
 
@@ -597,6 +614,7 @@ int vdev_load_device_requests( struct vdev_state* state, char* text_buf, size_t 
 // return 0 on success
 // return -ENOMEM on OOM 
 // return non-zero on non-zero exit status
+// TODO: "unlimited" output buffer space--like a pipe
 int vdev_preseed_run( struct vdev_state* vdev ) {
    
    int rc = 0;
@@ -856,6 +874,8 @@ int vdev_signal_wq_flushed( struct vdev_state* state ) {
 
 // stop vdev 
 // NOTE: if this fails, there's not really a way to recover
+// return 0 on success
+// return non-zero if we failed to stop the work queue
 int vdev_stop( struct vdev_state* vdev ) {
    
    int rc = 0;
@@ -876,10 +896,16 @@ int vdev_stop( struct vdev_state* vdev ) {
       return rc;
    }
    
+   // stop all actions' daemonlets
+   vdev_action_daemonlet_stop_all( vdev->acts, vdev->num_acts );
+   
    return rc;
 }
 
-// free up vdev 
+// free up vdev.
+// only call after vdev_stop().
+// return 0 on success, and print out benchmarks 
+// return -EINVAL if we're still running.
 int vdev_shutdown( struct vdev_state* vdev, bool unlink_pidfile ) {
    
    if( vdev->running ) {
@@ -889,6 +915,13 @@ int vdev_shutdown( struct vdev_state* vdev, bool unlink_pidfile ) {
    // remove the PID file, if we have one 
    if( vdev->config->pidfile_path != NULL && unlink_pidfile ) {
       unlink( vdev->config->pidfile_path );
+   }
+   
+   // print benchmarks...
+   vdev_debug("%s", "Action benchmarks:\n");
+   for( unsigned int i = 0; i < vdev->num_acts; i++ ) {
+      
+      vdev_action_log_benchmarks( &vdev->acts[i] );
    }
    
    vdev_action_free_all( vdev->acts, vdev->num_acts );

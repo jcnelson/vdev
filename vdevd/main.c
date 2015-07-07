@@ -35,6 +35,9 @@ int main( int argc, char** argv ) {
    
    memset( &vdev, 0, sizeof(struct vdev_state) );
    
+   // ignore SIGPIPE from daemonlets 
+   signal( SIGPIPE, SIG_IGN );
+   
    // set up global vdev state
    rc = vdev_init( &vdev, argc, argv );
    if( rc != 0 ) {
@@ -145,7 +148,7 @@ int main( int argc, char** argv ) {
    
    if( !is_parent || vdev.config->foreground || vdev.config->once ) {
          
-      // child, or foreground, or running once.  start handling (initial) device events
+      // child, or foreground, or running once.  start handling (coldplug) device events
       rc = vdev_start( &vdev );
       if( rc != 0 ) {
          
@@ -165,15 +168,12 @@ int main( int argc, char** argv ) {
       }
          
       // main loop: get events from the OS and process them.
-      // wake up the parent once we finish the initial devices
+      // wake up the parent once we finish the coldplugged devices
       rc = vdev_main( &vdev, flush_fd );
       if( rc != 0 ) {
          
          vdev_error("vdev_main rc = %d\n", rc );
       }
-      
-      // quiesce requests
-      vdev_stop( &vdev );
       
       // if running once, find and remove all devices not processed initially.
       // use the metadata directory to figure this out
@@ -186,6 +186,9 @@ int main( int argc, char** argv ) {
          }
       }
       
+      // quiesce requests
+      vdev_stop( &vdev );
+      
       // clean up
       // keep the pidfile unless we're running once (in which case, don't touch it)
       vdev_shutdown( &vdev, !vdev.config->once );
@@ -195,7 +198,7 @@ int main( int argc, char** argv ) {
    }
    else {
       
-      // wait for the child to finish processing the initial devices 
+      // wait for the child to finish processing the coldplugged devices 
       nr = read( device_quiesce_pipe[0], &rc, sizeof(rc) );
       
       if( nr < 0 || rc != 0 ) {

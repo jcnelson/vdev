@@ -24,6 +24,7 @@
 
 #include "libvdev/util.h"
 #include "libvdev/param.h"
+#include "libvdev/config.h"
 
 #include "device.h"
 
@@ -49,6 +50,8 @@
 #define VDEV_ACTION_IF_EXISTS_MASK      "mask"
 #define VDEV_ACTION_IF_EXISTS_RUN       "run"
 
+#define VDEV_ACTION_DAEMONLET           "daemonlet"
+
 enum vdev_action_if_exists {
    VDEV_IF_EXISTS_ERROR = 1,
    VDEV_IF_EXISTS_MASK,
@@ -57,6 +60,9 @@ enum vdev_action_if_exists {
 
 // vdev action to take on an event 
 struct vdev_action {
+   
+   // action name 
+   char* name;
    
    // what kind of request triggers this?
    vdev_device_request_t trigger;
@@ -83,6 +89,16 @@ struct vdev_action {
    
    // how to handle the case where the device already exists 
    int if_exists;
+   
+   // is the action's command implemented as a daemonlet?  If so, hold onto its runtime state 
+   bool is_daemonlet;
+   int daemonlet_stdin;
+   int daemonlet_stdout;
+   pid_t daemonlet_pid;
+   
+   // action runtime statistics 
+   uint64_t num_successful_calls;
+   uint64_t cumulative_time_millis;
 };
 
 typedef struct vdev_action vdev_action;
@@ -95,12 +111,15 @@ int vdev_action_free( struct vdev_action* act );
 int vdev_action_free_all( struct vdev_action* act_list, size_t num_acts );
 
 int vdev_action_load( char const* path, struct vdev_action* act );
-int vdev_action_load_file( FILE* f, struct vdev_action* act );
 
 int vdev_action_load_all( char const* dir, struct vdev_action** acts, size_t* num_acts );
 
 int vdev_action_create_path( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts, char** path );
 int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts, bool exists );
+
+int vdev_action_daemonlet_stop_all( struct vdev_action* actions, size_t num_actions );
+
+int vdev_action_log_benchmarks( struct vdev_action* action );
 
 C_LINKAGE_END
 
