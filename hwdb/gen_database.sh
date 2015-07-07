@@ -6,6 +6,8 @@
 # - coreutils
 # - findutils
 
+MAX_DIR_LEN=2
+
 # determine whether or not a string's first non-whitespace character is a '#'
 # return 0 if so 
 # return 1 if not
@@ -51,12 +53,13 @@ is_modalias_regex() {
 # extract a hardware database file to a given directory, read from stdin.
 # Construct a trie on disk, using directories as non-leaf nodes to identify 
 # substrings within the modalias regex.
+# For quicker searches, ensure that each directory contains no more than $MAX_DIR_LEN characters
 # $1    The output directory 
 # Return 0 on success
 # return nonzero on failure
 extract_hwdb() {
 
-   local _MODALIAS_REGEX _PROP _LINE _OUT_DIR _TRIE_PATH _READING_PROPS _ALL_PROPS _OLDIFS _PROP_NAME
+   local _MODALIAS_REGEX _PROP _LINE _OUT_DIR _TRIE_PATH _READING_PROPS _ALL_PROPS _OLDIFS _PROP_NAME _EXPR
 
    _OUT_DIR="$1"
 
@@ -70,7 +73,7 @@ extract_hwdb() {
    _ALL_PROPS=
    _OLDIFS="$IFS"
 
-   while read _LINE; do
+   while read -r _LINE; do
       
       if [ -z "$_LINE" ]; then 
          # no longer reading properties--empty line 
@@ -79,7 +82,7 @@ extract_hwdb() {
          _READING_PROPS=
 
          if [ -n "$_ALL_PROPS" ]; then 
-            echo "VDEV_HWDB_PROPERTIES=\"$_ALL_PROPS\"" >> "$_OUT_DIR/$_TRIE_PATH/properties"
+            # echo "VDEV_HWDB_PROPERTIES=\"$_ALL_PROPS\"" >> "$_OUT_DIR/$_TRIE_PATH/properties"
             _ALL_PROPS=
          fi
          
@@ -95,9 +98,13 @@ extract_hwdb() {
 
          # modalias regex? as in, *not* indented?
          if is_modalias_regex "$_LINE"; then 
-         
+
+            # ensure that the directory name has no more than MAX_DIR_LEN characters.
+            # insert : where appropriate.
+            _EXPR="s/([^:]{$MAX_DIR_LEN})/\1:/g"
+            
             # replace : with / to "unprefix" it
-            _TRIE_PATH="$(echo "$_LINE" | /bin/sed -r 's/:/\//g')"
+            _TRIE_PATH="$(echo "$_LINE" | /bin/sed -r -e $_EXPR -e 's/:/\//g')"
             
             /bin/mkdir -p "$_OUT_DIR/$_TRIE_PATH"
             
