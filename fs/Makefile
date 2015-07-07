@@ -1,10 +1,10 @@
 include ../buildconf.mk
 
-C_SRCS:= $(wildcard *.c)
+C_SRCS:= $(wildcard *.c) $(wildcard ../libvdev/*.c)
 CPP_SRCS := $(wildcard *.cpp)
 
 DEFS  := $(DEFS) -D_FILE_OFFSET_BITS=64
-LIB   := -lvdev -lfuse -lfskit_fuse -lfskit -lpstat
+LIB   := -lfuse -lfskit_fuse -lfskit -lpstat
 OBJ   := $(patsubst %.c,$(BUILD_VDEVFS)/%.o,$(C_SRCS)) \
 	      $(patsubst %.cpp,$(BUILD_VDEVFS)/%.o,$(CPP_SRCS))
 
