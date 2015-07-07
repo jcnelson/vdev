@@ -24,7 +24,8 @@ USRSHAREDIR		?= $(DESTDIR)/usr/share
 PKGCONFIGDIR   ?= $(DESTDIR)/usr/lib/pkgconfig
 ETCDIR			?= $(DESTDIR)/etc
 
-# libvdev 
+# libvdev
+LIBVDEV_ROOT := $(ROOT_DIR)/libvdev 
 BUILD_LIBVDEV := $(BUILD_LIBDIR)
 BUILD_LIBVDEV_HEADERS := $(BUILD_INCLUDEDIR)/libvdev
 BUILD_LIBVDEV_DIRS := $(BUILD_LIBVDEV) $(BUILD_LIBVDEV_HEADERS)
@@ -68,7 +69,7 @@ CPPFLAGS   := -Wall -g -fPIC -fstack-protector -fstack-protector-all -pthread -W
 LDFLAGS    :=
 INC      := -I. -I$(ROOT_DIR) -I$(BUILD_INCLUDEDIR)
 DEFS     := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS -D_VDEV_OS_$(OS)
-LIBINC   := -L$(BUILD_LIBVDEV)
+LIBINC   := 
 CC       := gcc
 CPP      := g++
 
