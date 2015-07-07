@@ -14,14 +14,19 @@
 #   $PARAM=$VALUE is an OS-specific parameter to be passed as a
 #      VDEV_OS_${PARAM} environment variable to vdev helpers
 #
+# It is okay to create device nodes here, but be sure to output the above information
+# for it as well (so vdevd knows to run actions for it, instead of stumble over it).
+# 
 # Requires /proc and /sys to be mounted
 
 VDEV_MOUNTPOINT="$1"
 VDEV_CONFIG_FILE="$2"
 
-# mount the squashfs hardware database
+# mount the squashfs hardware database.
+# generate the loopback device file needed to do so--create it, and inform vdevd to set it up.
 # $1    hardware database file
 # $2    the name of the loopback device to create
+# TODO: exponential back-off, in case we race
 attach_hwdb() {
 
    local _HWDB_PATH _HWDB_LOOP _LOOP_MINOR
@@ -44,6 +49,8 @@ attach_hwdb() {
    RC=$?
    
    if [ $RC -ne 0 ]; then 
+      
+      /bin/rm -f "$VDEV_MOUNTPOINT/$_HWDB_LOOP"
       return $RC
    fi 
    
@@ -53,19 +60,12 @@ attach_hwdb() {
    if [ $RC -ne 0 ]; then 
       
       /sbin/losetup -d "$VDEV_MOUNTPOINT/$_HWDB_LOOP"
+      /bin/rm -f "$VDEV_MOUNTPOINT/$_HWDB_LOOP"
       return $RC
    fi 
 
-   # make sure we still process the loop device
-   /bin/rm "$VDEV_MOUNTPOINT/$_HWDB_LOOP"
-   RC=$?
-
-   if [ $RC -ne 0 ]; then 
-      
-      /bin/umount "$VDEV_MOUNTPOINT/metadata/hwdb"
-      /sbin/losetup -d "$VDEV_MOUNTPOINT/$_HWDB_LOOP"
-      return $RC
-   fi
+   # make sure vdevd still processes the loop device
+   echo "b $_HWDB_LOOP 7 $_LOOP_MINOR"
 
    return 0
 }
@@ -180,8 +180,9 @@ umask 022
 # add /dev/core 
 /bin/ln -sf /proc/kcore "$VDEV_MOUNTPOINT/core"
 
-# feed /dev/null into vdev
+# feed /dev/null into vdev, and make it locally
 echo "c null 1 3"
+/bin/mknod "$VDEV_MOUNTPOINT/null" c 1 3
 
 # add /dev/stdin, /dev/stdout, /dev/stderr
 /bin/ln -sf /proc/self/fd/0 "$VDEV_MOUNTPOINT/stdin"
@@ -199,15 +200,17 @@ fi
 test -d "$VDEV_MOUNTPOINT/shm" || /bin/ln -sf /run/shm "$VDEV_MOUNTPOINT/shm"
 
 # add events 
-test -d "$VDEV_MOUNTPOINT/events" || /bin/mkdir -p "$VDEV_MOUNTPOINT/events"
+for dirp in "events" "events/global"; do
+   test -d "$VDEV_MOUNTPOINT/$dirp" || /bin/mkdir -p "$VDEV_MOUNTPOINT/$dirp"
+done
 
 # add vdevd's metadata directories 
 for dirp in "metadata/dev" "metadata/hwdb"; do
    test -d "$VDEV_MOUNTPOINT/$dirp" || /bin/mkdir -p "$VDEV_MOUNTPOINT/$dirp"
 done
 
-# add udev compatibility 
-for dirp in "metadata/udev/tags" "metadata/udev/data" "metadata/udev/links"; do
+# add udev compatibility, including udev-formatted events
+for dirp in "metadata/udev/tags" "metadata/udev/data" "metadata/udev/links" "metadata/udev/events/global"; do
    test -d "$VDEV_MOUNTPOINT/$dirp" || /bin/mkdir -p "$VDEV_MOUNTPOINT/$dirp"
 done
 
@@ -216,7 +219,7 @@ HWDB_VAR="$(/bin/fgrep "hwdb=" "$VDEV_CONFIG_FILE")"
 LOOP_VAR="$(/bin/fgrep "hwdb_loop=" "$VDEV_CONFIG_FILE" | /bin/egrep "=loop[0-9]+$")"
 
 VDEV_HWDB_PATH=
-LOOP_NAME="loop0"
+LOOP_NAME=
 
 if [ -n "$HWDB_VAR" ]; then 
    eval "$HWDB_VAR"
@@ -227,6 +230,12 @@ if [ -n "$LOOP_VAR" ]; then
    eval "$LOOP_VAR"
    LOOP_NAME="$hwdb_loop"
 fi
+
+if [ -z "$LOOP_NAME" ]; then 
+   # pick the next free one 
+   # TODO: exponential back-off, in case we race
+   LOOP_NAME="$(/sbin/losetup -f | /bin/sed -r "s/[^/]*\///g")"
+fi 
 
 if [ -n "$VDEV_HWDB_PATH" ] && [ -x /sbin/losetup ]; then 
    

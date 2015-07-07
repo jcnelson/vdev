@@ -15,18 +15,12 @@ VDEV_IFNAMES_PATH=
 
 if [ -n "$IFNAMES_VAR" ]; then 
    eval "$IFNAMES_VAR"
-   VDEV_HWDB_PATH="$ifnames"
+   VDEV_IFNAMES_PATH="$ifnames"
 fi
-
 
 # make sure the file exists
 test -e "$VDEV_IFNAMES_PATH" || exit 0
-test -f "$VDEV_IFNAMES_PATH" || vdev_fail 1 "Could not find ifnames file $VDEV_IFNAMES_PATH"
-
-# only bother with adding 
-if [ "$VDEV_ACTION" = "remove" ]; then 
-   exit 0
-fi
+test -f "$VDEV_IFNAMES_PATH" || vdev_fail 0 "Could not find ifnames file $VDEV_IFNAMES_PATH"
 
 IP=
 
@@ -116,7 +110,7 @@ if_mac() {
    _MAC="$1"
 
    $IP link | /bin/grep -B 1 -i "$_MAC" | \
-   while read _IGNORED1 _IFNAME _IGNORED2; do
+   while read -r _IGNORED1 _IFNAME _IGNORED2; do
       
       echo $_IFNAME | /bin/sed -r 's/://g'
       break
@@ -137,8 +131,7 @@ if_devpath() {
    
    _DEVPATH="$1"
    
-   # TODO: while-loop with ls here-document
-   for _SYSFS_IFNAME in $(/bin/ls "$VDEV_OS_SYSFS_MOUNTPOINT/class/net/"); do 
+   while read -r _SYSFS_IFNAME; do
       
       _IF_DEVPATH=$(/bin/readlink "$VDEV_OS_SYSFS_MOUNTPOINT/class/net/$_SYSFS_IFNAME" | /bin/sed -r 's/^(..\/)+//g')
       _IF_DEVPATH="/$_IF_DEVPATH"
@@ -149,88 +142,107 @@ if_devpath() {
          echo "$_SYSFS_IFNAME"
          break
       fi
-   done
-
+   done <<EOF 
+$(/bin/ls "$VDEV_OS_SYSFS_MOUNTPOINT/class/net/")
+EOF
+   
    return
 }
 
 
-LINECNT=0
+# entry point 
+main() {
+   
+   local LINECNT IFNAME ID_TYPE ID_ARG IFNAME_ORIG RC 
 
-# process ifnames
-while read IFNAME ID_TYPE ID_ARG; do
+   LINECNT=0
    
-   IFNAME_ORIG=
-   
-   LINECNT=$((LINECNT+1))
-   
-   # skip comments 
-   if [ -n "$(echo $IFNAME | /bin/egrep "^#")" ]; then 
-      continue 
-   fi 
-
-   # skip blank lines 
-   if [ -z "$IFNAME" ]; then 
-      continue 
+   # only bother with adding 
+   if [ "$VDEV_ACTION" = "remove" ]; then 
+      return 0
    fi
 
-   # skip invalid 
-   if [ -z "$IFNAME" -o -z "$ID_TYPE" -o -z "$ID_ARG" ]; then 
-      vdev_warn "Failed to parse line $LINECNT of $VDEV_IFNAMES_PATH"
-      continue
-   fi
-   
-   # match identifier type
-   case "$ID_TYPE" in 
+   # process ifnames
+   while read -r IFNAME ID_TYPE ID_ARG; do
       
-      mac)
+      IFNAME_ORIG=
+      
+      LINECNT=$((LINECNT+1))
+      
+      # skip comments 
+      if [ -n "$(echo $IFNAME | /bin/egrep "^#")" ]; then 
+         continue 
+      fi 
 
-         # find the interface with this MAC address
-         if_mac "$ID_ARG"
-         IFNAME_ORIG=$(if_mac "$ID_ARG")
+      # skip blank lines 
+      if [ -z "$IFNAME" ]; then 
+         continue 
+      fi
 
-         ;;
-
-      devpath)
-
-         # find the interface with this sysfs device path
-         IFNAME_ORIG=$(if_devpath "$ID_ARG")
-         
-         ;;
-
-      *)
-         
-         # unsupported 
-         vdev_error "Unsupported interface identifier '$ID_TYPE'"
-         
+      # skip invalid 
+      if [ -z "$IFNAME" -o -z "$ID_TYPE" -o -z "$ID_ARG" ]; then 
+         vdev_warn "Failed to parse line $LINECNT of $VDEV_IFNAMES_PATH"
          continue
-         ;;
-   esac
-
-
-   if [ -z "$IFNAME_ORIG" ]; then 
+      fi
       
-      # couldn't match ID_ARG to an existing interface
-      continue
-   fi
+      # match identifier type
+      case "$ID_TYPE" in 
+         
+         mac)
 
-   if [ "$IFNAME_ORIG" != "$VDEV_OS_INTERFACE" ]; then
+            # find the interface with this MAC address
+            if_mac "$ID_ARG"
+            IFNAME_ORIG=$(if_mac "$ID_ARG")
+
+            ;;
+
+         devpath)
+
+            # find the interface with this sysfs device path
+            IFNAME_ORIG=$(if_devpath "$ID_ARG")
+            
+            ;;
+
+         *)
+            
+            # unsupported 
+            vdev_error "Unsupported interface identifier '$ID_TYPE'"
+            
+            continue
+            ;;
+      esac
+
+
+      if [ -z "$IFNAME_ORIG" ]; then 
+         
+         # couldn't match ID_ARG to an existing interface
+         continue
+      fi
+
+      if [ "$IFNAME_ORIG" != "$VDEV_OS_INTERFACE" ]; then
+         
+         # the existing interface is not the one we're interested in
+         continue
+      fi
+
+      # do the rename 
+      rename_if $IFNAME $IFNAME_ORIG
+      RC=$?
       
-      # the existing interface is not the one we're interested in
-      continue
-   fi
-
-   # do the rename 
-   rename_if $IFNAME $IFNAME_ORIG
-   RC=$?
-   
-   if [ $RC -ne 0 ]; then 
+      if [ $RC -ne 0 ]; then 
+         
+         # failed to rename 
+         vdev_warn "Failed to rename '$IFNAME_ORIG' to '$IFNAME'"
+         continue 
+      fi
       
-      # failed to rename 
-      vdev_warn "Failed to rename '$IFNAME_ORIG' to '$IFNAME'"
-      continue 
-   fi
-   
-done < $VDEV_IFNAMES_PATH
+   done < $VDEV_IFNAMES_PATH
 
-exit 0
+   return 0
+}
+
+
+if [ $VDEV_DAEMONLET -eq 0 ]; then 
+   main 
+   exit $?
+fi

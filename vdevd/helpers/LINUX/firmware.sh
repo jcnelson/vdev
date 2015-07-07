@@ -3,6 +3,20 @@
 . "$VDEV_HELPERS/subr.sh"
 
 
+# load firmware dir 
+FIRMWARE_VAR="$(/bin/fgrep "firmware=" "$VDEV_CONFIG_FILE")"
+VDEV_FIRMWARE_DIR=
+
+if [ -n "$FIRMWARE_VAR" ]; then 
+   eval "$FIRMWARE_VAR"
+   VDEV_FIRMWARE_DIR="$firmware"
+fi
+
+if [ -z "$VDEV_FIRMWARE_DIR" ] || ! [ -d "$VDEV_FIRMWARE_DIR" ]; then 
+
+   vdev_error "Firmware directory not found at $VDEV_FIRMWARE_DIR"
+   return 1
+fi
 
 # load firmware for a device 
 # $1   the sysfs device path 
@@ -36,31 +50,32 @@ firmware_load() {
 }
 
 
-# if instructed to load firmware, do so
-if [ -n "$VDEV_OS_FIRMWARE" -a -n "$VDEV_OS_DEVPATH" ]; then 
-   
-   # load firmware dir 
-   FIRMWARE_VAR="$(/bin/fgrep "firmware=" "$VDEV_CONFIG_FILE")"
-   VDEV_FIRMWARE_DIR=
+# entry point
+# return 0 on success 
+# return 1 if we couldn't load the firmware
+main() {
 
-   if [ -n "$FIRMWARE_VAR" ]; then 
-      eval "$FIRMWARE_VAR"
-      VDEV_FIRMARE_DIR="$firmware"
+   local FIRMWARE_VAR VDEV_FIRMARE_DIR _RC 
+   
+   # if instructed to load firmware, do so
+   if [ -n "$VDEV_OS_FIRMWARE" -a -n "$VDEV_OS_DEVPATH" ]; then 
+      
+      firmware_load "$VDEV_OS_DEVPATH" "$VDEV_FIRMWARE_DIR/$VDEV_OS_FIRMWARE"
+      
+      _RC=$?
+
+      if [ $_RC -ne 0 ]; then 
+         vdev_error "Failed to load formware $VDEV_FIRMWARE_DIR/$VDEV_OS_FIRMWARE for $VDEV_OS_DEVPATH"
+         return 1
+      fi
+      
    fi
-   
-   if [ -z "$VDEV_FIRMARE_DIR" ] || ! [ -d "$VDEV_FIRMARE_DIR" ]; then 
 
-      vdev_fail 1 "Firmware directory not found at $VDEV_FIRMARE_DIR"
-   fi
-
-   firmware_load "$VDEV_OS_DEVPATH" "$VDEV_FIRMARE_DIR/$VDEV_OS_FIRMWARE"
-   
-   _RC=$?
-
-   if [ $_RC -ne 0 ]; then 
-      vdev_error "Failed to load formware '$VDEV_FIRMARE_DIR/$VDEV_OS_FIRMWARE' for '$VDEV_OS_DEVPATH'"
-   fi
-   
+   return 0
+}
+ 
+  
+if [ $VDEV_DAEMONLET -eq 0 ]; then 
+   main 
+   exit $?
 fi
-
-exit 0

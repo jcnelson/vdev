@@ -3,6 +3,9 @@
 # Helper to query the hardware database (if it exists), and extract useful properties from it.
 # NOTE: does not use vdev's subr.sh--this program can run independently.
 
+set +u
+
+MAX_DIR_LEN=2
 LOOKUP_PREFIX=
 DEVPATH=
 HWDB_DIR=
@@ -123,8 +126,7 @@ if [ -z "$MODALIAS" ]; then
 fi
 
 # search prefix 
-PREFIX=
-
+PREFIX=""
 if [ -n "$LOOKUP_PREFIX" ]; then 
    PREFIX="$LOOKUP_PREFIX:$MODALIAS"
 else
@@ -136,19 +138,28 @@ fi
 # the longest prefix, and chomp it off the prefix.
 # Directory names are interpreted as regexes.
 
-# break the modalias up by : 
+# break the modalias up by :, and then split into groups no longer than $MAX_DIR_LEN.
+# to do so, insert : every $MAX_DIR_LEN characters 
+EXPR="s/([^:]{$MAX_DIR_LEN})/\1:/g"
+PREFIX="$(echo "$PREFIX" | /bin/sed -r $EXPR)"
+
 OLDIFS="$IFS"
 IFS=":"
 set -- $PREFIX
 IFS="$OLDIFS"
 
 HWDB_PATH="$HWDB_DIR"
-NO_MATCH=
-BEST_REGEX_MATCH=
+ALL_MATCH=0
+BEST_REGEX_MATCH=""
 
 while [ $# -gt 0 ]; do
+
+   # stop looking if we're at the leaf, and the last regex ended in *
+   if [ $ALL_MATCH -eq 1 ] && [ -f "$HWDB_PATH/properties" ]; then 
+      break
+   fi
    
-   BEST_REGEX_MATCH=
+   BEST_REGEX_MATCH=""
    BEST_REGEX_MATCH_LEN=0
 
    PREFIX="$1"
@@ -163,21 +174,38 @@ while [ $# -gt 0 ]; do
       # append a * to match the trailing modalias, if we need to 
       MATCH_REGEX_NOSTAR="${MATCH_REGEX%\*}"
       if [ ${#MATCH_REGEX_NOSTAR} -eq ${#MATCH_REGEX} ]; then
-
+      
+         # exact match
+         ALL_MATCH=0
          MATCH_REGEX="${MATCH_REGEX}*"
+      else 
+         
+         # MATCH_REGEX ends in *
+         ALL_MATCH=1
       fi
       
       case $PREFIX in
          
          $MATCH_REGEX)
             
-            # match! remember the longest
-            if [ ${#HWDB_REGEX} -gt $BEST_REGEX_MATCH_LEN ]; then 
+            # match! remember the longest, but prefer exact over any
+            if [ $ALL_MATCH -eq 1 ] && [ ${#HWDB_REGEX} -gt $BEST_REGEX_MATCH_LEN ]; then 
+               
+               BEST_REGEX_MATCH="$HWDB_REGEX"
+               BEST_REGEX_MATCH_LEN=${#BEST_REGEX_MATCH}
+
+            elif [ $ALL_MATCH -eq 0 ] && [ ${#HWDB_REGEX} -ge $BEST_REGEX_MATCH_LEN ]; then 
+
                
                BEST_REGEX_MATCH="$HWDB_REGEX"
                BEST_REGEX_MATCH_LEN=${#BEST_REGEX_MATCH}
             fi
 
+            # if there are properties here, then enumerate them
+            if [ $ALL_MATCH -eq 1 ] && [ -f "$HWDB_PATH/$HWDB_REGEX/properties" ]; then
+               
+               /bin/cat "$HWDB_PATH/$HWDB_REGEX/properties"
+            fi
             ;;
       esac
    done << EOF
@@ -185,47 +213,11 @@ $(/bin/ls "$HWDB_PATH")
 EOF
 
    if [ -z "$BEST_REGEX_MATCH" ]; then 
-      # no match 
-      NO_MATCH=1
+      # no more matches 
       break
    fi
 
    HWDB_PATH="$HWDB_PATH/$BEST_REGEX_MATCH"
 done
-
-if [ $NO_MATCH ]; then
-   exit 0
-fi
-
-PROPS_PATH="$HWDB_PATH/properties"
-
-if [ -f "$PROPS_PATH" ]; then (
-
-   # subshell, since we'll source the properties 
-   # NOTE: should define VDEV_HWDB_PROPERTIES
-   . "$PROPS_PATH"
-
-   if [ -z "$VDEV_HWDB_PROPERTIES" ]; then 
-      echo >&2 "Malformed hwdb entry $PROPS_PATH: no VDEV_HWDB_PROPERTIES defined!"
-      exit 1
-   fi
-
-   OLDIFS="$IFS"
-   IFS=" "
-   set -- $VDEV_HWDB_PROPERTIES
-   IFS="$OLDIFS"
-
-   while [ $# -gt 0 ]; do
-
-      # set all properties
-      PROPNAME="$1"
-      shift 1
-
-      eval "PROPVALUE=\$$PROPNAME"
-
-      echo "$PROPNAME=$PROPVALUE"
-   done
-
-) fi
 
 exit 0

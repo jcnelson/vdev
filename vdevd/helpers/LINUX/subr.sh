@@ -44,15 +44,18 @@ vdev_symlink() {
 #  $1  vdev device metadata directory
 vdev_rmlinks() {
 
-   local _METADATA _LINKNAME 
+   local _METADATA _LINKNAME _OLDIFS
    
    _METADATA="$1"
+   _OLDIFS="$IFS"
 
-   while read _LINKNAME; do
+   while IFS= read -r _LINKNAME; do
 
       /bin/rm -f "$_LINKNAME"
 
    done < "$_METADATA/links"
+
+   _OLDIFS="$IFS"
    
    return 0
 }
@@ -134,7 +137,8 @@ vdev_drivers() {
    _SYSFS_PATH="$1"
 
    # strip trailing '/'
-   _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[/]+$//g")
+   _SYSFS_PATH="${_SYSFS_PATH%%/}"
+   # _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[/]+$//g")
    
    while [ -n "$_SYSFS_PATH" ]; do
       
@@ -142,7 +146,9 @@ vdev_drivers() {
       test -L "$_SYSFS_PATH/driver" && /bin/readlink "$_SYSFS_PATH/driver" | /bin/sed -r "s/[^/]*\///g"
 
       # search parent 
-      _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g" | /bin/sed -r "s/[/]+$//g")
+      # _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g" | /bin/sed -r "s/[/]+$//g")
+      _SYSFS_PATH="$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g")"
+      _SYSFS_PATH="${_SYSFS_PATH%%/}"
       
    done
 }
@@ -158,15 +164,18 @@ vdev_subsystems() {
    _SYSFS_PATH="$1"
 
    # strip trailing '/'
-   _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[/]+$//g")
-   
+   _SYSFS_PATH="${_SYSFS_PATH%%/}"
+   # _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[/]+$//g")
+
    while [ -n "$_SYSFS_PATH" ]; do
       
       # subsystem name is the base path name of the link target of $_SYSFS_PATH/subsystem
       test -L "$_SYSFS_PATH/subsystem" && /bin/readlink "$_SYSFS_PATH/subsystem" | /bin/sed -r "s/[^/]*\///g"
 
       # search parent 
-      _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g" | /bin/sed -r "s/[/]+$//g")
+      # _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g" | /bin/sed -r "s/[/]+$//g")
+      _SYSFS_PATH="$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g")"
+      _SYSFS_PATH="${_SYSFS_PATH%%/}"
       
    done
 }
@@ -229,7 +238,8 @@ vdev_device_parent() {
 
    
    # strip trailing '/'
-   _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[/]+$//g")
+   # _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[/]+$//g")
+   _SYSFS_PATH="${_SYSFS_PATH%%/}"
    
    while [ -n "$_SYSFS_PATH" ]; do
 
@@ -241,7 +251,9 @@ vdev_device_parent() {
 
       
       # search parent 
-      _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g" | /bin/sed -r "s/[/]+$//g")
+      # _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g" | /bin/sed -r "s/[/]+$//g")
+      _SYSFS_PATH="$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g")"
+      _SYSFS_PATH="${_SYSFS_PATH%%/}"
       
    done
 
@@ -285,7 +297,8 @@ vdev_getattrs() {
    _RC=1
    
    # strip trailing '/'
-   _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[/]+$//g")
+   # _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[/]+$//g")
+   _SYSFS_PATH="${_SYSFS_PATH%%/}"
 
    while [ -n "$_SYSFS_PATH" ]; do 
 
@@ -296,7 +309,10 @@ vdev_getattrs() {
       fi
 
       # search parent 
-      _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g" | /bin/sed -r "s/[/]+$//g")
+      # _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g" | /bin/sed -r "s/[/]+$//g")
+      _SYSFS_PATH="$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g")"
+      _SYSFS_PATH="${_SYSFS_PATH%%/}"
+      
       _RC=0
    done
 
@@ -319,7 +335,11 @@ vdev_add_tag() {
    _TAGNAME="$1"
    _METADATA="$2"
    _GLOBAL_METADATA="$3"
-   _DEVICE_ID="$4"
+   _DEVICE_ID=""
+
+   if [ $# -ge 4 ]; then 
+      _DEVICE_ID="$4"
+   fi
 
    if [ -z "$_METADATA" ]; then 
       _METADATA="$VDEV_METADATA"
@@ -368,11 +388,6 @@ vdev_add_property() {
 
    echo "$_PROP_KEY=$_PROP_VALUE" >> "$_METADATA/properties"
    
-   #if ! [ -e "$_METADATA/properties/$_PROP_KEY" ]; then 
-   #   /bin/mkdir -p "$_METADATA/properties"
-   #   echo "$_PROP_VALUE" > "$_METADATA/properties/$_PROP_KEY"
-   #fi
-   
    return $_RC
 }
 
@@ -386,7 +401,7 @@ vdev_add_property() {
 # return 2 if we failed to parse a KEY=VALUE string
 vdev_add_properties() {
    
-   local _METADATA _GLOBAL_METADATA _PROP _PROP_VALUE _RC
+   local _METADATA _PROP _PROP_VALUE _RC
    
    _METADATA="$1"
    _RC=0
@@ -479,5 +494,56 @@ vdev_cleanup() {
    fi
 
    vdev_rmlinks "$_METADATA"
+   return 0
+}
+
+
+# unset a list of environment variables--i.e. set them to empty
+# all positional arguments are their names 
+# return 0 on success 
+vdev_unset() {
+
+   local _ENV_NAME
+
+   while [ $# -gt 0 ]; do
+
+      _ENV_NAME="$1"
+      shift 1
+
+      eval "$_ENV_NAME=\"\""
+   done
+
+   return 0
+}
+
+
+# evaluate a list of environment variables, safely 
+# $1    the expression that generates a newline-delimited list of environment variables to import 
+# return 0 on success
+vdev_eval() {
+   
+   local _EXPR _OLDIFS _ENV_NAME_AND_VALUE _ENV_NAME _ENV_VALUE
+
+   _EXPR="$1"
+   
+   while read -r _ENV_NAME_AND_VALUE; do 
+      
+      _OLDIFS="$IFS"
+      IFS="="
+      set -- $_ENV_NAME_AND_VALUE
+      IFS="$_OLDIFS"
+      
+      if [ $# -ne 2 ]; then 
+         break
+      fi
+      
+      _ENV_NAME="$1"
+      _ENV_VALUE="$2"
+      
+      eval "$_ENV_NAME=$_ENV_VALUE"
+   done <<EOF
+$($_EXPR)
+EOF
+   
    return 0
 }
