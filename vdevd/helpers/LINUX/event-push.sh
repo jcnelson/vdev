@@ -18,7 +18,7 @@ main() {
    fi
 
    # propagate to each event queue
-   "$VDEV_HELPERS/event-put" -s "$VDEV_MOUNTPOINT/events/global" 4<<EOF
+   "$VDEV_HELPERS/event-put" -s "$VDEV_MOUNTPOINT/events/global" <<EOF
 $(event_generate_text "$VDEV_ACTION" "$VDEV_OS_DEVPATH" "$VDEV_OS_SUBSYSTEM" "$VDEV_OS_SEQNUM" "$VDEV_METADATA")
 EOF
    return $?
