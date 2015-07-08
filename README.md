@@ -9,7 +9,7 @@ More information is available in the [design document](http://judecnelson.blogsp
 
 Project Goals
 -------------
-* **Portable Architecture**.  Vdev is designed to be portable across (modern) *nix.  It can interface with both the kernels and synthetic device event sources, such as another vdev instance, or an existing /dev tree.  It can be statically linked and can compile with multiple libc's.
+* **Portable Architecture**.  Vdev is designed to be portable across (modern) *nix.  It can interface with both the kernel and synthetic device event sources, such as another vdev instance, or an existing /dev tree.  It can be statically linked and can compile with multiple libc's.
 * **Event-driven**.  Vdev's core logic is built around reacting to events from its back-end event source.  It creates and removes device files and metadata in response to devices being plugged in or unplugged.
 * **Scriptable**.  Vdev aims to keep device management policy and mechanisms as separate as possible.  It offers an easy-to-understand programming model for matching a device event to a sequence administrator-defined programs to run.
 * **Advanced Access Control**.  Vdev comes with an optional userspace filesystem that lets the administrator control how individual processes see the files under /dev.  The criteria include not only the process's effective UID and GID, but also the process image's inode number, absolute path, binary checksum, sets of open files, seat assignment, and so on.  *Any* process information can be used to control access.
