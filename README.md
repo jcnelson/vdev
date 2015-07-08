@@ -3,23 +3,24 @@ vdev: a virtual device manager and filesystem
 
 **This system is a work-in-progress.  If you would like to help, please see the [Issue Tracker](https://github.com/jcnelson/vdev/issues)**.
 
-vdev is a userspace device manager and filesystem that exposes attached devices as device files for UNIX-like operating systems.  It differs from FreeBSD's devfs or Linux's udev, eudev, and mdev in that it offers an optional filesystem interface that implements a *per-process view of /dev* in a portable manner, providing the necessary functionality for the host administrator to control device node visibility and access based on arbitrary criteria (e.g. process UID, process session, process seat, etc.).
+Vdev is a userspace device manager and filesystem that exposes attached devices as device files for UNIX-like operating systems.  It differs from FreeBSD's devfs or Linux's udev, eudev, and mdev in that it offers an optional filesystem interface that implements a *per-process view of /dev* in a portable manner, providing the necessary functionality for the host administrator to control device node visibility and access based on arbitrary criteria (e.g. process UID, process session, process seat, etc.).
 
 More information is available in the [design document](http://judecnelson.blogspot.com/2015/01/introducing-vdev.html).
 
 Project Goals
 -------------
-* **Portable Architecture**.  Vdev is designed to be portable across (modern) *nix.  It can interface with both OS kernels and non-OS sources, such as another vdev instance, or modifications to an existing /dev tree.  It can be statically linked and can compile with multiple libc's.
-* **Event-driven**.  Vdev's core logic is built around reacting to events from it's back-end event sources.  It creates and removes device files and metadata in response to devices being detected or removed.
+* **Portable Architecture**.  Vdev is designed to be portable across (modern) *nix.  It can interface with both the kernels and synthetic device event sources, such as another vdev instance, or an existing /dev tree.  It can be statically linked and can compile with multiple libc's.
+* **Event-driven**.  Vdev's core logic is built around reacting to events from its back-end event source.  It creates and removes device files and metadata in response to devices being plugged in or unplugged.
 * **Scriptable**.  Vdev aims to keep device management policy and mechanisms as separate as possible.  It offers an easy-to-understand programming model for matching a device event to a sequence administrator-defined programs to run.
 * **Advanced Access Control**.  Vdev comes with an optional userspace filesystem that lets the administrator control how individual processes see the files under /dev.  The criteria include not only the process's effective UID and GID, but also the process image's inode number, absolute path, binary checksum, sets of open files, seat assignment, and so on.  *Any* process information can be used to control access.
 * **Container Friendly**.  Vdev can run in containers and chroots, and offers the administrator an easy-to-understand way to restrict, reorder, and rewrite the device events the contained vdevd will observe.  Importantly, the Linux port of vdev does *not* rely on netlink sockets to propagate events to client programs.
-* **Backwards Compatible**.  Vdev works with existing device management frameworks on the host OS.  The Linux port in particular offers backwards compatibility with udev's /dev symlinks and persistent names, and ships with a "libudev-compat" library to that is ABI-compatible with libudev 219.
+* **Backwards Compatible**.  Vdev works with existing device management frameworks on the host OS.  The Linux port in particular comes with scripts to maintain a /dev tree that is backwards-compatible with udev, and comes with a "libudev-compat" library that is ABI-compatible with libudev 219.  The Linux port's udev-compatibility scripts generate and propagate device events and maintain device information in /run/udev, and libudev-compat allows libudev-dependent programs to continue working without modification.
 
 Project Non-Goals
 -----------------
 * **Init system integration**.  Vdev is meant to run with full functionality regardless of which init system, daemon manager, service manager, plumbing layer, etc. the user runs, since they address orthogonal concerns.  It will coexist with and complement them, but neither forcibly replace them nor require them to be present.
 * **New client libraries, language bindings, or D-bus APIs**.  Vdev will exprose all of the necessary state and device metadata via the /dev filesystem directly.  Any wrappers that present this information via higher-level APIs (such as libudev) will be supported only to provide backwards compatibility.
+* **Devtmpfs dependency**.  The Linux port of vdev does *not* require devtmpfs.
 
 Dependencies
 -----------
