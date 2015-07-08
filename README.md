@@ -13,8 +13,8 @@ Project Goals
 * **Event-driven**.  Vdev's core logic is built around reacting to events from it's back-end event sources.  It creates and removes device files and metadata in response to devices being detected or removed.
 * **Scriptable**.  Vdev aims to keep device management policy and mechanisms as separate as possible.  It offers an easy-to-understand programming model for matching a device event to a sequence administrator-defined programs to run.
 * **Advanced Access Control**.  Vdev comes with an optional userspace filesystem that lets the administrator control how individual processes see the files under /dev.  The criteria include not only the process's effective UID and GID, but also the process image's inode number, absolute path, binary checksum, sets of open files, seat assignment, and so on.  *Any* process information can be used to control access.
-* **Container Friendly**.  Vdev can run in containers and chroots, and offers the administrator an easy-to-understand way to restrict, reorder, and rewrite the device events the container will observe.  Unlike udev, the Linux port of vdev does not rely on netlink sockets to propagate events to client programs.
-* **Backwards Compatible**.  Vdev works with existing device management frameworks on the host OS.  The Linux port in particular offers backwards compatibility with udev's /dev structure, and ships with a "libudev-compat" library to that is ABI-compatible with libudev 219.
+* **Container Friendly**.  Vdev can run in containers and chroots, and offers the administrator an easy-to-understand way to restrict, reorder, and rewrite the device events the contained vdevd will observe.  Importantly, the Linux port of vdev does *not* rely on netlink sockets to propagate events to client programs.
+* **Backwards Compatible**.  Vdev works with existing device management frameworks on the host OS.  The Linux port in particular offers backwards compatibility with udev's /dev symlinks and persistent names, and ships with a "libudev-compat" library to that is ABI-compatible with libudev 219.
 
 Project Non-Goals
 -----------------
