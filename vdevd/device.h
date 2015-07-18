@@ -93,7 +93,7 @@ int vdev_device_request_add_param( struct vdev_device_request* req, char const* 
 int vdev_device_request_set_exists( struct vdev_device_request* req, bool exists );
 
 // environment variables 
-int vdev_device_request_to_env( struct vdev_device_request* req, char*** env, size_t* num_env );
+int vdev_device_request_to_env( struct vdev_device_request* req, char*** env, size_t* num_env, int is_daemonlet );
 
 // add a device request to the work queue
 int vdev_device_request_enqueue( struct vdev_wq* wq, struct vdev_device_request* req );

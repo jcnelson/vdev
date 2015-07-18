@@ -538,7 +538,7 @@ int vdev_action_run_sync( struct vdev_device_request* vreq, char const* command,
    size_t num_env = 0;
    
    // convert to environment variables
-   rc = vdev_device_request_to_env( vreq, &req_env, &num_env );
+   rc = vdev_device_request_to_env( vreq, &req_env, &num_env, 0 );
    if( rc != 0 ) {
       
       vdev_error("vdev_device_request_to_env(%s) rc = %d\n", vreq->path, rc );
@@ -594,7 +594,7 @@ int vdev_action_run_async( struct vdev_device_request* req, char const* command 
    char** env = NULL;
    size_t num_env = 0;
    
-   rc = vdev_device_request_to_env( req, &env, &num_env );
+   rc = vdev_device_request_to_env( req, &env, &num_env, 0 );
    if( rc != 0 ) {
       
       // NOTE: must be async-safe!
@@ -711,36 +711,6 @@ static int vdev_action_daemonlet_clean( struct vdev_action* act ) {
    
    return 0;
 }
-
-
-// calculate the time till a deadline 
-// return 0 on success
-// return -EAGAIN if the deadline has been exceeded
-static int vdev_action_daemonlet_join_timeout( struct timespec* deadline, struct timespec* timeout ) {
-   
-   struct timespec now;
-   clock_gettime( CLOCK_MONOTONIC, &now );
-   
-   if( now.tv_sec > deadline->tv_sec || (now.tv_sec == deadline->tv_sec && now.tv_nsec > deadline->tv_nsec) ) {
-      
-      // timed out.
-      return -EAGAIN;
-   }
-   else {
-      
-      // next deadline
-      timeout->tv_sec = deadline->tv_sec - now.tv_sec;
-      timeout->tv_nsec = deadline->tv_nsec - now.tv_nsec;
-      
-      if( timeout->tv_nsec < 0 ) {
-         timeout->tv_nsec += 1000000000L;
-         timeout->tv_sec--;
-      }
-   }
-   
-   return 0;
-}
-
 
 // start up a daemonlet, using the daemonlet helper program at $VDEV_HELPERS/daemonlet.
 // return 0 on success, and fill in the relevant information to act.
@@ -1182,7 +1152,7 @@ int vdev_action_run_daemonlet( struct vdev_device_request* vreq, struct vdev_act
    }
    
    // generate the environment...
-   rc = vdev_device_request_to_env( vreq, &req_env, &num_env );
+   rc = vdev_device_request_to_env( vreq, &req_env, &num_env, 1 );
    if( rc != 0 ) {
       
       vdev_error("vdev_device_request_to_env(%s) rc = %d\n", vreq->path, rc );
@@ -1190,7 +1160,7 @@ int vdev_action_run_daemonlet( struct vdev_device_request* vreq, struct vdev_act
    }
    
    
-   vdev_debug("run daemonlet: '%s'\n", act->name );
+   vdev_debug("run daemonlet (async=%d): '%s'\n", act->async, act->name );
    
    for( unsigned int i = 0; i < num_env; i++ ) {
       vdev_debug("daemonlet env: '%s'\n", req_env[i] );
@@ -1214,7 +1184,7 @@ int vdev_action_run_daemonlet( struct vdev_device_request* vreq, struct vdev_act
    if( rc > 0 ) {
       
       // feed daemonlet flag 
-      rc = vdev_write_uninterrupted( act->daemonlet_stdin, "VDEV_DAEMONLET=1\ndone\n", strlen("VDEV_DAEMONLET=1\ndone\n") );
+      rc = vdev_write_uninterrupted( act->daemonlet_stdin, "done\n", strlen("done\n") );
       if( rc < 0 ) {
          
          vdev_error("vdev_write_uninterrupted(%d) to daemonlet '%s' rc = %d\n", act->daemonlet_stdin, act->name, rc );
@@ -1246,6 +1216,8 @@ int vdev_action_run_daemonlet( struct vdev_device_request* vreq, struct vdev_act
    // wait for a status code reply 
    rc = vdev_action_daemonlet_read_int64( act->daemonlet_stdout, &daemonlet_rc );
    if( rc < 0 ) {
+      
+      vdev_error("vdev_action_daemonlet_read_int64('%s') rc = %d\n", act->name, rc );
       
       // no return code 
       // stop the daemonlet; will try restarting it on the next action

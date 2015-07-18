@@ -134,9 +134,10 @@ static char const* vdev_device_request_mode_to_string( mode_t mode ) {
 
 // convert a device request to a list of null-terminated KEY=VALUE environment variable strings 
 // put the resulting vector into **ret_env, and put the number of variables into *num_env 
+// if is_daemonlet is set, then set VDEV_DAEMONLET=1
 // return 0 on success 
 // return negative on error 
-int vdev_device_request_to_env( struct vdev_device_request* req, char*** ret_env, size_t* num_env ) {
+int vdev_device_request_to_env( struct vdev_device_request* req, char*** ret_env, size_t* num_env, int is_daemonlet ) {
    
    // type --> VDEV_ACTION
    // path --> VDEV_PATH (if non-null)
@@ -150,7 +151,7 @@ int vdev_device_request_to_env( struct vdev_device_request* req, char*** ret_env
    // logfile --> VDEV_LOGFILE
    // vdev instance nonce --> VDEV_INSTANCE
    // config file --> VDEV_CONFIG_FILE
-   // daemonlet --> VDEV_DAEMONLET (0 by default)
+   // daemonlet --> VDEV_DAEMONLET (0 by default, 1 if is_daemonlet is non-zero)
    
    size_t num_vars = 15 + sglib_vdev_params_len( req->params );
    int i = 0;
@@ -161,6 +162,14 @@ int vdev_device_request_to_env( struct vdev_device_request* req, char*** ret_env
    char* vdev_path = req->renamed_path;
    char metadata_dir[ PATH_MAX + 1 ];
    char global_metadata_dir[ PATH_MAX + 1 ];
+   char const* is_daemonlet_str = NULL;
+   
+   if( is_daemonlet != 0 ) {
+      is_daemonlet_str = "1";
+   }
+   else {
+      is_daemonlet_str = "0";
+   }
    
    memset( metadata_dir, 0, PATH_MAX+1 );
    memset( global_metadata_dir, 0, PATH_MAX+1 );
@@ -307,7 +316,7 @@ int vdev_device_request_to_env( struct vdev_device_request* req, char*** ret_env
    
    i++;
    
-   rc = vdev_device_request_make_env_str( "VDEV_DAEMONLET", "0", &env[i] );
+   rc = vdev_device_request_make_env_str( "VDEV_DAEMONLET", is_daemonlet_str, &env[i] );
    if( rc != 0 ) {
       
       VDEV_FREE_LIST( env );
