@@ -30,6 +30,8 @@ add_capability_link() {
 # return 2 if our optical helper fails 
 main() {
 
+   local OPTICAL_DATA
+   
    # removing? blow away the symlinks 
    if [ "$VDEV_ACTION" = "remove" ]; then 
 
@@ -45,7 +47,7 @@ main() {
    fi
 
    # set up capability environment variables 
-   eval $($VDEV_HELPERS/stat_optical "$VDEV_MOUNTPOINT/$VDEV_PATH")
+   OPTICAL_DATA=$($VDEV_HELPERS/stat_optical "$VDEV_MOUNTPOINT/$VDEV_PATH")
    STAT_RC=$?
 
    # verify that we stat'ed the optical device...
@@ -53,6 +55,9 @@ main() {
       vdev_error "Not an optical device"
       return 2
    fi 
+
+   # import 
+   eval "$OPTICAL_DATA"
 
    # always add 'cdrom'
    vdev_symlink "$VDEV_PATH" "$VDEV_MOUNTPOINT/cdrom" "$VDEV_METADATA"

@@ -17,11 +17,12 @@ fi
 # return 10 on unknown action 
 main() {
 
-   local DM_QUERY DM_NAME DM_UUID
+   local DM_QUERY DM_NAME DM_UUID BLKID_DATA
    local UUID LABEL PARTUUID PARTLABEL PTUUID PTTYPE TYPE
    local LVM2_LV_KERNEL_MAJOR LVM2_LV_KERNEL_MINOR LVM2_VG_NAME LVM2_VG_FULL_NAME LVM2_VG_FMT
    local ALL_PROPS VDEV_PART_TABLE_TYPE VDEV_PART_TABLE_UUID VDEV_FS_TYPE VDEV_DM_NAME VDEV_DM_UUID
    local VDEV_PROPERTIES
+   local RC
 
    VDEV_PROPERTIES=""
 
@@ -73,10 +74,23 @@ main() {
    PTUUID=""
    PTTYPE=""
    TYPE=""
+   BLKID_DATA=""
 
    if [ -x /sbin/blkid ]; then
-      eval "$(/sbin/blkid -o export "$VDEV_MOUNTPOINT/$VDEV_PATH")"
-      #vdev_eval "/sbin/blkid -o export "$VDEV_MOUNTPOINT/$VDEV_PATH""
+      
+      # eval "$(/sbin/blkid -o export "$VDEV_MOUNTPOINT/$VDEV_PATH")"
+      BLKID_DATA="$(vdev_blkid "$VDEV_MOUNTPOINT/$VDEV_PATH")"
+      RC=$?
+
+      if [ $RC -ne 0 ]; then 
+         vdev_error "blkid $VDEV_MOUNTPOINT/$VDEV_PATH rc = $RC"
+         return $RC
+      else 
+
+         # import 
+         eval "$BLKID_DATA"
+      fi
+      
    else
       vdev_warn "Could not find blkid in /sbin/blkid.  Symlinks in $VDEV_MOUNTPOINT/disk/by-* will not be created."
    fi

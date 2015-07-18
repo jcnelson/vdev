@@ -517,33 +517,52 @@ vdev_unset() {
 }
 
 
-# evaluate a list of environment variables, safely 
-# $1    the expression that generates a newline-delimited list of environment variables to import 
-# return 0 on success
-vdev_eval() {
-   
-   local _EXPR _OLDIFS _ENV_NAME_AND_VALUE _ENV_NAME _ENV_VALUE
+# helper wrapper around blkid, since busybox's blkid has different 
+# options than util-linux's blkid.
+# prints out environment variables like util-linux's "-p -o export" options, which the caller can eval.
+# $1 path to the device node 
+# return blkid's status on success.
+vdev_blkid() {
 
-   _EXPR="$1"
-   
-   while read -r _ENV_NAME_AND_VALUE; do 
-      
-      _OLDIFS="$IFS"
-      IFS="="
-      set -- $_ENV_NAME_AND_VALUE
-      IFS="$_OLDIFS"
-      
-      if [ $# -ne 2 ]; then 
-         break
+   local _PATH _VARS _OLDIFS _VARENT _EXPR _RC
+   _RC=0
+
+   _PATH="$1"
+
+   # if /sbin/blkid is a symlink, assume it's busybox 
+   if [ -L "/sbin/blkid" ]; then 
+
+      _VARS="$(/sbin/blkid "$_PATH")"
+      _RC=$?
+
+      if [ $_RC -ne 0 ]; then 
+         return $_RC
       fi
-      
-      _ENV_NAME="$1"
-      _ENV_VALUE="$2"
-      
-      eval "$_ENV_NAME=$_ENV_VALUE"
-   done <<EOF
-$($_EXPR)
-EOF
-   
-   return 0
+
+      # output format includes "/dev/XXX: ".  strip this.
+      _VARS=${_VARS##$_PATH: }
+
+      # consume each variable.
+      # values are always quoted.
+      while [ ${#_VARS} -gt 0 ]; do
+
+         _VARENT="$(echo "$_VARS" | /bin/sed -r 's/^([^ =]+)="([^"]+)" .+$/\1="\2"/g')"
+
+         _EXPR="s/$_VARENT//g"
+
+         _VARENT=${_VARENT## }
+         
+         _VARS="$(echo "$_VARS" | /bin/sed -r "$_EXPR")"
+
+         echo "$_VARENT"
+      done
+
+   else
+
+      # assume it's util-linux's blkid 
+      /sbin/blkid -p -o export "$_PATH"
+      _RC=$?
+   fi
+
+   return $_RC
 }

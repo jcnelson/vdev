@@ -68,7 +68,7 @@ store_properties() {
 # return 2 if input helper fails
 main() {
 
-   local SYSFS_PATH VDEV_INPUT_PROPERTIES STAT_RC VDEV_PATH_PROPERTIES VDEV_PROPERTIES VDEV_PERSISTENT_PATH VDEV_PERSISTENT_PATH_TAG INPUT_CLASS CLASSLESS_EVDEV BUS SERIAL IFNO BY_ID
+   local SYSFS_PATH VDEV_INPUT_PROPERTIES STAT_RC VDEV_PATH_PROPERTIES VDEV_PROPERTIES VDEV_PERSISTENT_PATH VDEV_PERSISTENT_PATH_TAG INPUT_CLASS CLASSLESS_EVDEV BUS SERIAL IFNO BY_ID INPUT_DATA
       
    # full sysfs path
    SYSFS_PATH="$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH"
@@ -91,14 +91,17 @@ main() {
    VDEV_INPUT_CLASS=""
    VDEV_INPUT_KEY=""
    
-   eval "$("$VDEV_HELPERS/stat_input" "$VDEV_MOUNTPOINT/$VDEV_PATH")"
+   INPUT_DATA="$("$VDEV_HELPERS/stat_input" "$VDEV_MOUNTPOINT/$VDEV_PATH")"
    STAT_RC=$?
 
    # succeeded?
    if [ $STAT_RC -ne 0 ]; then 
-      vdev_error "stat_input $VDEV_PATH exit code $STAT_RC"
+      vdev_error "$VDEV_HELPERS/stat_input $VDEV_PATH exit code $STAT_RC"
       return 20
    fi
+
+   # import 
+   eval "$INPUT_DATA"
    
    VDEV_INPUT_PROPERTIES="$VDEV_PROPERTIES"
 
@@ -109,16 +112,19 @@ main() {
    VDEV_PERSISTENT_PATH=""
    VDEV_PERSISTENT_PATH_TAG=""
    
-   eval "$("$VDEV_HELPERS/stat_path" "$VDEV_MOUNTPOINT/$VDEV_PATH")"
+   INPUT_DATA="$("$VDEV_HELPERS/stat_path" "$VDEV_MOUNTPOINT/$VDEV_PATH")"
    STAT_RC=$?
 
    # succeeded?
    if [ $STAT_RC -ne 0 ]; then
       
       vdev_unset $VDEV_INPUT_PROPERTIES
-      vdev_error "stat_path $VDEV_PATH exit code $STAT_RC"
+      vdev_error "$VDEV_HELPERS/stat_path $VDEV_PATH exit code $STAT_RC"
       return 20
    fi
+
+   # import 
+   eval "$INPUT_DATA"
 
    if [ -n "$VDEV_PROPERTIES" ]; then 
       VDEV_PATH_PROPERTIES="$VDEV_PROPERTIES"
@@ -201,7 +207,18 @@ main() {
    # so, is this a USB device?
    if [ -n "$(echo "$VDEV_OS_DEVPATH" | /bin/grep 'usb')" ]; then 
 
-      eval "$("$VDEV_HELPERS/stat_usb" "$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH")"
+      INPUT_DATA="$("$VDEV_HELPERS/stat_usb" "$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH")"
+      STAT_RC=$?
+
+      if [ $STAT_RC -ne 0 ]; then 
+         
+         vdev_error "$VDEV_HELPERS/stat_usb $VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH exit code $STAT_RC"
+         vdev_unset $VDEV_PATH_PROPERTIES $VDEV_INPUT_PROPERTIES
+         return 20
+      fi
+
+      # import 
+      eval "$INPUT_DATA"
 
       if [ -n "$VDEV_USB_SERIAL" ]; then 
 

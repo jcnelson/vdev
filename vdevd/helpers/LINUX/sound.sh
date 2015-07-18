@@ -9,7 +9,7 @@
 # return 10 on unknown action
 main() {
 
-   local STAT_RC VDEV_PERSISTENT_PATH VDEV_PROPERTIES BUS SERIAL
+   local STAT_RC VDEV_PERSISTENT_PATH VDEV_PROPERTIES BUS SERIAL SOUND_DATA
    
    VDEV_PROPERTIES=""
    BUS=""
@@ -32,14 +32,20 @@ main() {
    # if we're dealing with ALSA controlC[0-9] files, set up persistent paths 
    if [ -n "$(echo $VDEV_PATH | /bin/egrep "controlC[0-9]+")" ]; then 
 
-      eval "$($VDEV_HELPERS/stat_path "$VDEV_MOUNTPOINT/$VDEV_PATH")"
+      SOUND_DATA="$($VDEV_HELPERS/stat_path "$VDEV_MOUNTPOINT/$VDEV_PATH")"
       STAT_RC=$?
 
       # verify that we got a persistent path 
-      if [ $STAT_RC -eq 0 -a -n "$VDEV_PERSISTENT_PATH" ]; then
+      if [ $STAT_RC -eq 0 ]; then 
          
-         # install the path 
-         vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/snd/by-path/$VDEV_PERSISTENT_PATH" "$VDEV_METADATA"
+         # import 
+         eval "$SOUND_DATA"
+         
+         if [ -n "$VDEV_PERSISTENT_PATH" ]; then
+ 
+            # install the path 
+            vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/snd/by-path/$VDEV_PERSISTENT_PATH" "$VDEV_METADATA"
+         fi
 
       elif [ $STAT_RC -ne 0 ]; then 
 
@@ -53,7 +59,7 @@ main() {
    # if this is a USB device, then add by-id persistent path 
    if [ -n "$(vdev_subsystems "$SYSFS_PATH" | /bin/grep 'usb')" ]; then 
       
-      eval $($VDEV_HELPERS/stat_usb "$SYSFS_PATH")
+      SOUND_DATA="$($VDEV_HELPERS/stat_usb "$SYSFS_PATH")"
       STAT_RC=$?
       
       # did we get USB info?
@@ -64,6 +70,9 @@ main() {
 
       elif [ -n "$VDEV_USB_SERIAL" ]; then 
 
+         # import 
+         eval "$SOUND_DATA"
+         
          BUS="usb"      
          SERIAL="$VDEV_USB_SERIAL"
 

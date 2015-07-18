@@ -16,7 +16,7 @@ main() {
    local DISK_TYPE DISK_ID DISK_SERIAL DISK_WWN DISK_NAME PART_NAME 
    local VDEV_BUS VDEV_ATA VDEV_SCSI VDEV_CCIS VDEV_USB VDEV_SERIAL VDEV_SERIAL_SHORT VDEV_REVISION
    local VDEV_PROPERTIES
-   local HELPER STAT_RET 
+   local HELPER STAT_RET HELPER_DATA 
    
    # blkid
    local UUID LABEL PARTUUID PARTLABEL PTUUID PTTYPE TYPE USAGE WWN
@@ -250,6 +250,7 @@ main() {
    fi
 
    HELPER=
+   HELPER_DATA=
    STAT_RET=0
    VDEV_ATA_WWN=""
 
@@ -261,23 +262,29 @@ main() {
          HELPER="stat_ata"
 
          # (S)ATA disk
-         eval "$($VDEV_HELPERS/stat_ata "$VDEV_MOUNTPOINT/$VDEV_PATH")"
+         HELPER_DATA="$($VDEV_HELPERS/stat_ata "$VDEV_MOUNTPOINT/$VDEV_PATH")"
          STAT_RET=$?
 
-         # disk id is the serial number
-         DISK_ID="$VDEV_ATA_SERIAL"
-         DISK_SERIAL="$VDEV_ATA_SERIAL"
+         if [ $STAT_RET -eq 0 ]; then 
 
-         # disk wwn is given by stat_ata 
-         DISK_WWN="$VDEV_ATA_WWN"
-         
-         # vdev properties 
-         VDEV_ATA="1"
-         VDEV_BUS="ata"
-         VDEV_TYPE="$VDEV_ATA_TYPE"
-         VDEV_SERIAL="$VDEV_ATA_SERIAL"
-         VDEV_SERIAL_SHORT="$VDEV_ATA_SERIAL_SHORT"
-         VDEV_REVISION="$VDEV_ATA_REVISION"
+            # success!
+            eval "$HELPER_DATA"
+
+            # disk id is the serial number
+            DISK_ID="$VDEV_ATA_SERIAL"
+            DISK_SERIAL="$VDEV_ATA_SERIAL"
+
+            # disk wwn is given by stat_ata 
+            DISK_WWN="$VDEV_ATA_WWN"
+            
+            # vdev properties 
+            VDEV_ATA="1"
+            VDEV_BUS="ata"
+            VDEV_TYPE="$VDEV_ATA_TYPE"
+            VDEV_SERIAL="$VDEV_ATA_SERIAL"
+            VDEV_SERIAL_SHORT="$VDEV_ATA_SERIAL_SHORT"
+            VDEV_REVISION="$VDEV_ATA_REVISION"
+         fi
          
          ;;
 
@@ -286,25 +293,29 @@ main() {
          HELPER="stat_scsi"
          
          # generic SCSI disk 
-         eval "$($VDEV_HELPERS/stat_scsi -d "$VDEV_MOUNTPOINT/$VDEV_PATH")"
-         # vdev_eval "$VDEV_HELPERS/stat_scsi -d "$VDEV_MOUNTPOINT/$VDEV_PATH""
+         HELPER_DATA="$($VDEV_HELPERS/stat_scsi -d "$VDEV_MOUNTPOINT/$VDEV_PATH")"
          STAT_RET=$?
-         if [ "$VDEV_SCSI" != "1" ]; then 
-            
-            # not a scsi disk
-            STAT_RET=255
-            
-         else
 
-            # generic SCSI disk 
-            # disk ID is the serial number
-            DISK_ID="$VDEV_SCSI_SERIAL"
-            DISK_SERIAL="$VDEV_SCSI_SERIAL"
-            
-            # vdev properties       
-            VDEV_SCSI="1"
-            VDEV_BUS="scsi"
-            VDEV_SCSI="$VDEV_SCSI_SERIAL"
+         if [ $STAT_RET -eq 0 ]; then 
+
+            # success!
+            if [ "$VDEV_SCSI" != "1" ]; then 
+               
+               # not a scsi disk
+               STAT_RET=255
+               
+            else
+
+               # generic SCSI disk 
+               # disk ID is the serial number
+               DISK_ID="$VDEV_SCSI_SERIAL"
+               DISK_SERIAL="$VDEV_SCSI_SERIAL"
+               
+               # vdev properties       
+               VDEV_SCSI="1"
+               VDEV_BUS="scsi"
+               VDEV_SCSI="$VDEV_SCSI_SERIAL"
+            fi
          fi
          ;;
 
@@ -313,18 +324,20 @@ main() {
          HELPER="stat_scsi"
 
          # HP smart raid 
-         eval "$($VDEV_HELPERS/stat_scsi -d "$VDEV_MOUNTPOINT/$VDEV_PATH")"
-         # vdev_eval "$VDEV_HELPERS/stat_scsi -d "$VDEV_MOUNTPOINT/$VDEV_PATH""
+         HELPER_DATA="$($VDEV_HELPERS/stat_scsi -d "$VDEV_MOUNTPOINT/$VDEV_PATH")"
          STAT_RET=$?
          
-         # disk ID is the serial number
-         DISK_ID="$VDEV_SCSI_SERIAL"
-         DISK_SERIAL="$VDEV_SCSI_SERIAL"
-         
-         # vdev properties 
-         VDEV_CCISS="1"
-         VDEV_BUS="scsi"
-         VDEV_SERIAL="$VDEV_SCSI_SERIAL"
+         if [ $STAT_RET -eq 0 ]; then 
+
+            # disk ID is the serial number
+            DISK_ID="$VDEV_SCSI_SERIAL"
+            DISK_SERIAL="$VDEV_SCSI_SERIAL"
+            
+            # vdev properties 
+            VDEV_CCISS="1"
+            VDEV_BUS="scsi"
+            VDEV_SERIAL="$VDEV_SCSI_SERIAL"
+         fi
          
          ;;
 
@@ -333,19 +346,21 @@ main() {
          HELPER="stat_usb"
          
          # USB disk
-         eval "$($VDEV_HELPERS/stat_usb "$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH")"
-         # vdev_eval "$VDEV_HELPERS/stat_usb "$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH""
+         HELPER_DATA="$($VDEV_HELPERS/stat_usb "$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH")"
          STAT_RET=$?
 
-         # disk id is the serial number
-         DISK_ID="$VDEV_USB_SERIAL"
-         DISK_SERIAL="$VDEV_USB_SERIAL"
+         if [ $STAT_RET -eq 0 ]; then 
 
-         # vdev properties 
-         VDEV_USB="1"
-         VDEV_BUS="usb"
-         VDEV_SERIAL="$VDEV_USB_SERIAL"
+            # disk id is the serial number
+            DISK_ID="$VDEV_USB_SERIAL"
+            DISK_SERIAL="$VDEV_USB_SERIAL"
 
+            # vdev properties 
+            VDEV_USB="1"
+            VDEV_BUS="usb"
+            VDEV_SERIAL="$VDEV_USB_SERIAL"
+         fi
+         
          ;;
 
       ieee1394) 
@@ -397,6 +412,9 @@ main() {
       return 2
    fi
 
+   # success! import the extra metadata
+   eval "$HELPER_DATA"
+
    # put label into place
    DISK_NAME="$DISK_TYPE-$DISK_ID"
 
@@ -441,11 +459,11 @@ main() {
    PART_ENTRY_OFFSET=""
    PART_ENTRY_SIZE=""
    PART_ENTRY_DISK=""
-
-   # TODO: busybox blkid?
+   
    if [ -x /sbin/blkid ]; then 
       if [ -z "$(echo "$VDEV_PATH" | /bin/egrep "sr.*")" ]; then 
-         eval "$(/sbin/blkid -p -o export "$VDEV_MOUNTPOINT/$VDEV_PATH")"
+         # eval "$(/sbin/blkid -p -o export "$VDEV_MOUNTPOINT/$VDEV_PATH")"
+         eval "$(vdev_blkid "$VDEV_MOUNTPOINT/$VDEV_PATH")"
       fi
    else
       vdev_warn "Could not find blkid in /sbin/blkid.  $VDEV_MOUNTPOINT/disk/by-*/ symlinks will not be added."
@@ -493,7 +511,6 @@ main() {
    if [ -x /sbin/pvs ]; then 
       PVS="/sbin/pvs --nameprefixes --noheadings $VDEV_MOUNTPOINT/$VDEV_PATH"
       eval "$($PVS -o pv_uuid 2>"$VDEV_MOUNTPOINT/null")"
-      #vdev_eval "$PVS -o pv_uuid"
       PVS_RC=$?
    else
       vdev_warn "Could not find pvs in /sbin/pvs.  LVM physical volume symlinks in $VDEV_MOUNTPOINT/disk/by-id will not be created."

@@ -9,7 +9,7 @@
 # return 10 if the action is unknown
 main() {
 
-   local BUS INDEX VENDOR MODEL TYPE ID PATH TYPE_PLUS_INDEX TYPE INDEX VDEV_PERSISTENT_PATH RC VDEV_PROPERTIES
+   local BUS INDEX VENDOR MODEL TYPE ID PATH TYPE_PLUS_INDEX TYPE INDEX VDEV_PERSISTENT_PATH RC VDEV_PROPERTIES V4L_DATA
 
    # removing? just blow the links away 
    if [ "$VDEV_ACTION" = "remove" ]; then 
@@ -51,7 +51,16 @@ main() {
    # is this a USB device?
    if [ -n "$(echo "$VDEV_OS_DEVPATH" | /bin/grep 'usb')" ]; then 
 
-      eval $($VDEV_HELPERS/stat_usb "$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH")
+      V4L_DATA="$($VDEV_HELPERS/stat_usb "$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH")"
+      RC=$?
+
+      if [ $RC -ne 0 ]; then 
+         vdev_error "$VDEV_HELPERS/stat_usb $VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH exit code $RC"
+         return 20
+      fi
+
+      # import 
+      eval "$V4L_DATA"
       
       test -n "$VDEV_USB_VENDOR" || exit 1
       test -n "$VDEV_USB_MODEL" || exit 1
@@ -70,10 +79,13 @@ main() {
 
    # by-path 
    VDEV_PERSISTENT_PATH=
-   eval $($VDEV_HELPERS/stat_path "$VDEV_MOUNTPOINT/$VDEV_PATH")
+   V4L_DATA="$($VDEV_HELPERS/stat_path "$VDEV_MOUNTPOINT/$VDEV_PATH")"
    RC=$?
 
    [ $RC -ne 0 ] && vdev_fail 1 "$VDEV_HELPERS/stat_path $VDEV_MOUNTPOINT/$VDEV_PATH exit status $RC"
+
+   # import 
+   eval "$V4L_DATA"
 
    # did we get a path?
    [ -z "$VDEV_PERSISTENT_PATH" ] && exit 0
