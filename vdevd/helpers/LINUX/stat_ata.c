@@ -480,7 +480,7 @@ int main(int argc, char **argv ) {
    fd = open(node, O_RDONLY|O_NONBLOCK|O_CLOEXEC);
    if (fd < 0) {
       fprintf(stderr, "unable to open '%s'\n", node);
-      return 1;
+      exit(1);
    }
 
    rc = disk_identify(fd, identify.byte, &is_packet_device);
@@ -516,7 +516,7 @@ int main(int argc, char **argv ) {
          int errsv = -errno;
          fprintf( stderr, "HDIO_GET_IDENTITY failed for '%s': errno = %d\n", node, errsv);
          close(fd);
-         return 2;
+         exit(2);
       }
    }
 
