@@ -19,8 +19,14 @@ if [ -n "$IFNAMES_VAR" ]; then
 fi
 
 # make sure the file exists
-test -e "$VDEV_IFNAMES_PATH" || exit 0
-test -f "$VDEV_IFNAMES_PATH" || vdev_fail 0 "Could not find ifnames file $VDEV_IFNAMES_PATH"
+if ! [ -e "$VDEV_IFNAMES_PATH" ]; then 
+   exit 0
+fi
+
+if ! [ -f "$VDEV_IFNAMES_PATH" ]; then 
+   vdev_error "Could not find ifnames file $VDEV_IFNAMES_PATH"
+   exit 1
+fi
 
 IP=
 
@@ -31,7 +37,8 @@ elif [ -x /bin/ip ]; then
 fi
 
 if [ -z "$IP" ]; then 
-   vdev_fail 0 "Could not find iproute2.  Network interfaces will not be configured."
+   vdev_error "Could not find iproute2.  Network interfaces will not be configured."
+   exit 1
 fi
 
 

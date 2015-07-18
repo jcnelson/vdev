@@ -109,25 +109,6 @@ vdev_error() {
    fi 
 }
 
-
-# log a message to vdev's log and exit 
-#   $1 is the exit code 
-#   $2 is the (optional) message
-vdev_fail() {
-
-   local _CODE _MSG 
-   
-   _CODE="$1"
-   _MSG="$2"
-
-   if [ -n "$_MSG" ]; then
-      vdev_log "$VDEV_PROGNAME '$VDEV_PATH': $_MSG"
-   fi
-
-   exit $_CODE
-}
-
-
 # print the list of device drivers in a sysfs device path 
 #   $1  sysfs device path
 vdev_drivers() {

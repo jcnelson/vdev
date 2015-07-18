@@ -82,7 +82,10 @@ main() {
    V4L_DATA="$($VDEV_HELPERS/stat_path "$VDEV_MOUNTPOINT/$VDEV_PATH")"
    RC=$?
 
-   [ $RC -ne 0 ] && vdev_fail 1 "$VDEV_HELPERS/stat_path $VDEV_MOUNTPOINT/$VDEV_PATH exit status $RC"
+   if [ $RC -ne 0 ]; then 
+      vdev_error "$VDEV_HELPERS/stat_path $VDEV_MOUNTPOINT/$VDEV_PATH exit status $RC"
+      return 1
+   fi
 
    # import 
    eval "$V4L_DATA"
