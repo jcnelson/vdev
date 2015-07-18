@@ -1697,6 +1697,7 @@ main_finish:
       while( i > 0 && tag[i-1] == '_' ) {
          i--;
       }
+      
       tag[i] = '\0';
 
       // replaces ID_PATH and ID_PATH_TAG
@@ -1712,6 +1713,13 @@ main_finish:
    }
    else {
       
-      exit(255);
+      // no path 
+      vdev_property_add( "VDEV_PERSISTENT_PATH", "" );
+      vdev_property_add( "VDEV_PERSISTENT_PATH_TAG", "" );
+      
+      vdev_property_print();
+      vdev_property_free_all();
+      
+      exit(0);
    }
 }
