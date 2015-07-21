@@ -18,6 +18,10 @@ fi
 /bin/mkdir -p /run/vdev/
 /sbin/vdevd -c /etc/vdev/vdevd.conf -l /run/vdev/vdevd.boot.log -p /run/vdevd.boot.pid /dev
 
+if [ -d /dev/metadata/udev ] && ! [ -e /run/udev ]; then 
+   /bin/ln -s /dev/metadata/udev /run/udev || true 
+fi
+
 # If the rootdelay parameter has been set, we wait a bit for devices
 # like usb/firewire disks to settle.
 if [ "$ROOTDELAY" ]; then
