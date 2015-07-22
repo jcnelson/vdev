@@ -10,11 +10,9 @@ The steps to compile and prepare vdevd for testing are as follows:
 
     $ git clone https://github.com/jcnelson/vdev vdev
     $ cd vdev
-    $ make -C libvdev
-    $ sudo make -C libvdev install DESTDIR=/usr/local
     $ make -C vdevd
 
-As a result of these commands, you will have checked out the latest copy of vdev's source code, built and installed `libvdev` (to /usr/local/lib and /usr/local/include), and compiled the hotplug daemon `vdevd`.
+As a result of these commands, you will have checked out the latest copy of vdev's source code, and built and installed the hotplug daemon `vdevd`.
 
 Step 2: Set up a Fake /dev
 --------------------------
@@ -36,8 +34,6 @@ From the root of the source code repository you checked out in step 1, the comma
     $ sudo vdevd/vdevd -v2 -c example/vdevd.conf -l /tmp/vdev.log --once vdev-test/
 
 `vdevd` should print out some runtime setup information to your console, run for a few seconds, and exit normally.  If you run `ls vdev-test/`, you should see a bunch of device files.  All debugging information will have been written to `/tmp/vdev.log`.
-
-Tip: If that fails, you probably need to run `ldconfig` so that your system becomes aware of `libvdev`.  Then run this step again.
 
 Step 4: Inspect the Fake /dev and Logfile
 -----------------------------------------
