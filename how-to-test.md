@@ -106,7 +106,7 @@ By default, `vdevd` will `fork()` and `exec()` the `command` for each device req
 The programming model for daemonlet commands is as follows:
 1. `vdevd` will `fork()` and `exec()` the command directly.  It will *not* invoke the system shell to run it.
 2. `vdevd` will write a sequence of newline-terminated strings to the command's `stdin`, followed by an empty newline string.  These strings encode the request's environment variables, and are in the form `NAME=VALUE\n'.
-3. The `command` is expected to write an ASCII-encoded exit code to `stdout` to indicate the success/failure of processing the request.  `0` indicates success, and non-zero indicates failure.
+3. The `command` is expected to write an ASCII-encoded exit code to `stdout` to indicate the success/failure of processing the request.  0 indicates success, and non-zero indicates failure.
 
 If the `command` crashes or misbehaves, `vdevd` will log as such and attempt to restart it.
 
