@@ -104,6 +104,7 @@ Once a device event is encountered that matches all of an action's fields, `vdev
 By default, `vdevd` will `fork()` and `exec()` the `command` for each device request in the system shell.  However, as an optimization, `vdevd` can run the command as a *daemonlet*.  This means that the `command` will be expected to stay resident once it proceses a device request, and receive and process subsequent device requests from `vdevd` instead of simply exiting after each one.  Doing so saves `vdevd` from having to `fork()` and `exec()` the same command over and over again for common types of devices, and lets it avoid having to repeatly incur long `command` start-up times.  It also allows the administrator to define stateful or long-running actions that can work on sets of devices.
 
 The programming model for daemonlet commands is as follows:
+
 1. `vdevd` will `fork()` and `exec()` the command directly.  It will *not* invoke the system shell to run it.
 2. `vdevd` will write a sequence of newline-terminated strings to the command's `stdin`, followed by an empty newline string.  These strings encode the request's environment variables, and are in the form `NAME=VALUE\n`.
 3. The `command` is expected to write an ASCII-encoded exit code to `stdout` to indicate the success/failure of processing the request.  0 indicates success, and non-zero indicates failure.
