@@ -115,6 +115,7 @@ Appendix B: Booting with vdevd
 -------------------------------
 
 **NOTE: These instructions are Debian- and Devuan-specific, and very hacky.  Use at your own risk.**
+
 **WARNING: Readers are expected to know how to fix a broken initramfs and a broken bootsystem if they try this.**
 
 Running `make && sudo make install` will get you most of the way towards installing vdev.  But to use it, you will need to disable udev, enable vdev, and rebuild your initramfs to include vdev instead of udev.
