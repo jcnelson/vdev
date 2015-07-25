@@ -77,24 +77,39 @@ Once a device event is encountered that matches all of an action's fields, `vdev
 * `rename_command`:  This is a shell command to run to generate the path to the device file to create.  It will be evaluated after the device event matches the action, but before the device file is created.  The command must write the desired path to stdout.  Its output will be truncated at 4,096 characters (which is `PATH_MAX` on most filesystems).  Note that not all devices have paths given by the kernel.
 * `command`:  This is the shell command to run once the device file has been successfully created.  Unless specified otherwise, `vdevd` will run this as a subprocess--it will wait until the command has completed before processing the next action.
 * `async`:  If set to "True", this tells `vdevd` to continue processing the action immediately after running its `command`.  This is useful for long-running device setup tasks, where it is undesirable to block `vdevd`.
+* `daemonlet`:  If set to "True", this tells `vdevd` to run the command as a *daemonlet*.  See "Advanced Device Handling" below for a description of what this means.
 
 **Caveat**:  `vdevd` matches a device event against actions according to their files' lexographic order.  Moreover, it processes device events sequentially, in the order in which they arrive.  This is also true for the Linux port--the kernel's SEQNUM field is ignored at this time (but is passed on to actions).
 
 `vdevd` communicates device information to action commands using environment variables.  When a `command` or `rename_command` runs, the following environment variables will be set:
 
-* `$VDEV_MOUNTPOINT`:  This is the absolute path to the directory in which the device files will be created.  For example, this is usually `/dev`.
 * `$VDEV_ACTION`:  This is the `event` field of the action (i.e. "add", "remove", "change", or "any").
-* `$VDEV_PATH`:  If the device is given a path (either by the kernel or the `rename_command` output), this is the path to the device file *relative* to `$VDEV_MOUNTPOINT`.  The absolute path to the device file can be found by `$VDEV_MOUNTPOINT/$VDEV_PATH`.  Note that not all devices have device files (such as batteries, PCI buses, etc.).
-* `$VDEV_METADATA`:  If the device is given a path (either by the kernel or the `rename_command` output), this is the absolute path to the directory to contain the device's metadata.
+* `$VDEV_DAEMONLET`: If set to 1, then the command is being invoked as a daemonlet (see the "Advanced Device Handling" subsection below).
+* `$VDEV_CONFIG_FILE`: This is the absolute path to the configuration file `vdevd` is using.
+* `$VDEV_HELPERS`:  This is the absolute path to the directory containing `vdevd`'s helper programs.
+* `$VDEV_INSTANCE`:  This is a randomly-generated string that corresponds to this running intance of `vdevd`.  It will be different on each invocation of `vdevd`.
+* `$VDEV_GLOBAL_METADATA`:  The absolute path to the metadata directory into which `vdevd` writes metadata (e.g. `/dev/metadata`).
+* `$VDEV_LOGFILE`:  If specified, this is the path to `vdevd`'s logfile.
 * `$VDEV_MAJOR`:  If the device event corresponds to a block or character device, this is the device file's major number.
+* `$VDEV_METADATA`:  If the device is given a path (either by the kernel or the `rename_command` output), this is the absolute path to the directory to contain the device's metadata.
 * `$VDEV_MINOR`:  If the device event corresponds to a block or character device, this is the device file's minor number.
 * `$VDEV_MODE`:  If the device event corresponds to a block or character device, this is the string "block" or "char" (respectively).
-* `$VDEV_HELPERS`:  This is the absolute path to the directory containing `vdevd`'s helper programs.
-* `$VDEV_LOGFILE`:  If specified, this is the path to `vdevd`'s logfile.
-* `$VDEV_INSTANCE`:  This is a randomly-generated string that corresponds to this running intance of `vdevd`.  It will be different on each invocation of `vdevd`.
-* `$VDEV_FIRMWARE_DIR`:  If given in `vdevd`'s config file, this is the path to the directory containing firmware files (on most Linux systems, this is `/lib/firmware` or `/usr/lib/firmware`).
-* `$VDEV_IFNAMES_PATH`:  If given in `vdevd`'s config file, this is the path to the file that contains metadata for generating persistent interface names.  See `example/ifname.conf`.
+* `$VDEV_MOUNTPOINT`:  This is the absolute path to the directory in which the device files will be created.  For example, this is usually `/dev`.
 * `$VDEV_OS_*`:  Any OS-specific device attributes will be encoded by name, prefixed with `VDEV_OS_`.  For example, on Linux, the SUBSYSTEM field in the device's `uevent` packet will be exported as `$VDEV_OS_SUBSYSTEM`.  Similarly, the DEVPATH field in a device's `uevent` packet will be exported as `$VDEV_OS_DEVPATH`.
+* `$VDEV_PATH`:  If the device is given a path (either by the kernel or the `rename_command` output), this is the path to the device file *relative* to `$VDEV_MOUNTPOINT`.  The absolute path to the device file can be found by `$VDEV_MOUNTPOINT/$VDEV_PATH`.  Note that not all devices have device files (such as batteries, PCI buses, etc.).
+
+
+**Advanced Device Handling**
+
+By default, `vdevd` will `fork()` and `exec()` the `command` for each device request in the system shell.  However, as an optimization, `vdevd` can run the command as a *daemonlet*.  This means that the `command` will be expected to stay resident once it proceses a device request, and receive and process subsequent device requests from `vdevd` instead of simply exiting after each one.  Doing so saves `vdevd` from having to `fork()` and `exec()` the same command over and over again for common types of devices, and lets it avoid having to repeatly incur long `command` start-up times.  It also allows the administrator to define stateful or long-running actions that can work on sets of devices.
+
+The programming model for daemonlet commands is as follows:
+1. `vdevd` will `fork()` and `exec()` the command directly.  It will *not* invoke the system shell to run it.
+2. `vdevd` will write a sequence of newline-terminated strings to the command's `stdin`, followed by an empty newline string.  These strings encode the request's environment variables, and are in the form `NAME=VALUE\n'.
+3. The `command` is expected to write an ASCII-encoded exit code to `stdout` to indicate the success/failure of processing the request.  `0` indicates success, and non-zero indicates failure.
+
+If the `command` crashes or misbehaves, `vdevd` will log as such and attempt to restart it.
+
 
 Appendix B: Booting with vdevd
 -------------------------------
