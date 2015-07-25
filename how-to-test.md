@@ -114,22 +114,23 @@ If the `command` crashes or misbehaves, `vdevd` will log as such and attempt to 
 Appendix B: Booting with vdevd
 -------------------------------
 
-**CURRENTLY BROKEN.  DO NOT ATTEMPT.  WE ARE MIGRATING TO .DEB PACKAGES.**
+**NOTE: These instructions are Debian- and Devuan-specific, and very hacky.  Use at your own risk.**
+**WARNING: Readers are expected to know how to fix a broken initramfs and a broken bootsystem if they try this.**
 
-To boot with vdevd, you must not only install vdevd, but also build an initramfs image with it.  You must install the initramfs image manually, and back up the original initramfs so you can use it to boot in case the vdevd-based one fails for some reason.  **Proceed at your own risk.  You are expected to know how to fix your initramfs, init system, and bootloader if something goes wrong.**
+Running `make && sudo make install` will get you most of the way towards installing vdev.  But to use it, you will need to disable udev, enable vdev, and rebuild your initramfs to include vdev instead of udev.
 
-You can install vdevd with the following commands:
-    
-    $ sudo make -C vdevd install
-    $ sudo make -C example install
+On Debian and most Debian-derived distributions, it is possible to generate an initramfs image with this command:
 
-Please note that the "install" target in example/ will **disable udev** on your system, using update-rc.d(8).
+    $ cd example/ && make initramfs
 
-To build the initramfs, run:
+This will generate an initramfs image in `example/`, which can be installed with your bootloader of choice.
 
-    $ make -C example initramfs
+To enable vdev and disable udev in the init system, the command is 
 
-This will generate an initramfs with vdev at example/initrd-`uname -r`.  You are responsible for installing it via your bootloader of choice.
+    $ cd example/ && make initscript-install
+
+I'm still working on the packaging scripts that will do all of this automatically.
+
 
 Misc
 ----
