@@ -25,6 +25,11 @@ main() {
       return 0
    fi
 
+   # skip loop devices, unless they're in use 
+   if [ -z "$(/sbin/losetup -ln | /bin/grep "$VDEV_PATH")" ]; then 
+      return 0
+   fi
+
    # insert extra properties, if we have a hwdb and sufficient device information
    hwdb_enumerate "$VDEV_OS_MODALIAS" "$VDEV_OS_DEVPATH" "$VDEV_OS_SUBSYSTEM" "$VDEV_METADATA" "$VDEV_OS_SYSFS_MOUNTPOINT" | \
    while read -r _PROP_NAME_AND_VALUE; do 
