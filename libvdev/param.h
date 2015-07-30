@@ -38,7 +38,7 @@ struct vdev_param_t {
 
 typedef struct vdev_param_t vdev_params;
 
-#define VDEV_PARAM_CMP( dp1, dp2 ) (strcmp( dp1->key, dp2->key ))
+#define VDEV_PARAM_CMP( dp1, dp2 ) (strcmp( (dp1)->key, (dp2)->key ))
 
 C_LINKAGE_BEGIN
 
