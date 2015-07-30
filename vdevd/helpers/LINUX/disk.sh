@@ -14,12 +14,12 @@
 main() {
 
    local DISK_TYPE DISK_ID DISK_SERIAL DISK_WWN DISK_NAME PART_NAME 
-   local VDEV_BUS VDEV_ATA VDEV_SCSI VDEV_CCIS VDEV_USB VDEV_SERIAL VDEV_SERIAL_SHORT VDEV_REVISION
+   local VDEV_BUS VDEV_ATA VDEV_SCSI VDEV_CCIS VDEV_USB VDEV_SERIAL VDEV_USB_SERIAL VDEV_SERIAL_SHORT VDEV_REVISION
    local VDEV_PROPERTIES
    local HELPER STAT_RET HELPER_DATA 
    
    # blkid
-   local UUID LABEL PARTUUID PARTLABEL PTUUID PTTYPE TYPE USAGE WWN
+   local UUID LABEL PARTUUID PARTLABEL PTUUID PTTYPE TYPE USAGE WWN BLKID_DATA
    local PART_ENTRY_SCHEME PART_ENTRY_UUID PART_ENTRY_TUPE PART_ENTRY_NUMBER PART_ENTRY_OFFSET PART_ENTRY_SIZE PART_ENTRY_DISK
    
    # properties 
@@ -28,6 +28,9 @@ main() {
 
    # partition data 
    local PARENT_DEVICE_PATH SERIALIZED_PARENT_DEVICE_PATH PARENT_METADATA_DIR PARENT_PROPERTIES EXISTING
+
+   # pvs 
+   local PVS_DATA
    
    # if we're removing this disk, just blow away its symlinks
    if [ "$VDEV_ACTION" = "remove" ]; then 
@@ -459,11 +462,21 @@ main() {
    PART_ENTRY_OFFSET=""
    PART_ENTRY_SIZE=""
    PART_ENTRY_DISK=""
+   BLKID_DATA=""
    
    if [ -x /sbin/blkid ]; then 
       if [ -z "$(echo "$VDEV_PATH" | /bin/egrep "sr.*")" ]; then 
-         # eval "$(/sbin/blkid -p -o export "$VDEV_MOUNTPOINT/$VDEV_PATH")"
-         eval "$(vdev_blkid "$VDEV_MOUNTPOINT/$VDEV_PATH")"
+         
+         BLKID_DATA="$(vdev_blkid "$VDEV_MOUNTPOINT/$VDEV_PATH")"
+         STAT_RET=$?
+
+         if [ $STAT_RET -ne 0 ]; then
+
+            vdev_warn "/sbin/blkid failed on $VDEV_MOUNTPOINT/$VDEV_PATH, exit status $STAT_RET"
+         else
+
+            eval "$BLKID_DATA"
+         fi
       fi
    else
       vdev_warn "Could not find blkid in /sbin/blkid.  $VDEV_MOUNTPOINT/disk/by-*/ symlinks will not be added."
@@ -510,16 +523,21 @@ main() {
 
    if [ -x /sbin/pvs ]; then 
       PVS="/sbin/pvs --nameprefixes --noheadings $VDEV_MOUNTPOINT/$VDEV_PATH"
-      eval "$($PVS -o pv_uuid 2>"$VDEV_MOUNTPOINT/null")"
+      PVS_DATA="$($PVS -o pv_uuid 2>"$VDEV_MOUNTPOINT/null")"
       PVS_RC=$?
    else
       vdev_warn "Could not find pvs in /sbin/pvs.  LVM physical volume symlinks in $VDEV_MOUNTPOINT/disk/by-id will not be created."
    fi
 
-   if [ $PVS_RC -eq 0 ] && [ -n "$LVM2_PV_UUID" ]; then 
+   if [ $PVS_RC -eq 0 ]; then 
       
-      # this is a PV
-      vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/disk/by-id/lvm-pv-uuid-$LVM2_PV_UUID" "$VDEV_METADATA"
+      eval "$PVS_DATA"
+
+      if [ -n "$LVM2_PV_UUID" ]; then 
+      
+         # this is a PV
+         vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/disk/by-id/lvm-pv-uuid-$LVM2_PV_UUID" "$VDEV_METADATA"
+      fi
    fi
 
    # set ownership and bits 
