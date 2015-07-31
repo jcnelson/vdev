@@ -45,7 +45,7 @@ To build and install everything, with default options:
     $ make
     $ sudo make install 
 
-To build and install just vdevd, type:
+To build and install just vdevd (with no configuration), type:
 
     $ make -C vdevd OS=$OS_TYPE
     $ sudo make -C vdevd install
@@ -55,6 +55,16 @@ Substitute $OS_TYPE with:
 * "OPENBSD" to build for OpenBSD (coming soon)
 
 $OS_TYPE defaults to "LINUX".
+
+To build and install vdevd's default recommended configuration, type:
+
+    $ make -C example
+    $ sudo make -C example install 
+
+To build and install vdevd's hardware database, type:
+
+    $ make -C hwdb 
+    $ sudo make -C hwdb install
 
 To build and install just vdevfs, type:
 
