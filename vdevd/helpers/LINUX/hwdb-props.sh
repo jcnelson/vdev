@@ -14,6 +14,11 @@ main() {
       return 0
    fi
 
+   # skip loop devices and RAM block devices
+   if [ -n "$(echo "$VDEV_PATH" | /bin/egrep "^loop[0-9]+|ram[0-9]+$")"  ]; then 
+      return 0
+   fi
+
    if [ "$VDEV_PATH" = "UNKNOWN" ]; then 
       
       # unknown device path.  generate a metadata directory at least.
@@ -22,11 +27,6 @@ main() {
    fi
 
    if ! hwdb_available; then 
-      return 0
-   fi
-
-   # skip loop devices, unless they're in use 
-   if [ -z "$(/sbin/losetup -ln | /bin/grep "$VDEV_PATH")" ]; then 
       return 0
    fi
 
