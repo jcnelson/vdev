@@ -56,15 +56,20 @@ Substitute $OS_TYPE with:
 
 $OS_TYPE defaults to "LINUX".
 
-To build and install vdevd's default recommended configuration, type:
+To build and install just vdevd's default recommended configuration, type:
 
     $ make -C example
     $ sudo make -C example install 
 
-To build and install vdevd's hardware database, type:
+To build and install just vdevd's hardware database, type:
 
     $ make -C hwdb 
     $ sudo make -C hwdb install
+
+To build and install just libudev-compat, type:
+
+    $ make -C libudev-compat 
+    $ sudo make -C libudev-compat install
 
 To build and install just vdevfs, type:
 
