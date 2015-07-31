@@ -57,7 +57,7 @@ main() {
 
    if [ "$VDEV_PATH" = "UNKNOWN" ]; then 
       # use device-id metadata directory
-      VDEV_METADATA="$VDEV_GLOBAL_METADATA"/"$(vdev_device_id)"
+      VDEV_METADATA="$VDEV_GLOBAL_METADATA/dev"/"$(vdev_device_id)"
       /bin/mkdir -p "$VDEV_METADATA"
       VDEV_PATH=""
    fi
