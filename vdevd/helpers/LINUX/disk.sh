@@ -126,7 +126,7 @@ main() {
             # part of a USB device
             REMOVABLE_FILE="$SYSFS_PATH/removable"
             
-            if [ -f "$REMOVABLE_FILE" ] && [ -n "$(/bin/cat "$REMOVABLE_FILE" | /bin/grep "0")" ]; then 
+            if ! [ -f "$REMOVABLE_FILE" ] || [ -n "$(/bin/fgrep "0" "$REMOVABLE_FILE")" ]; then 
 
                # non-removable USB mass storage in a (S)ATA enclosure 
                DISK_TYPE="ata"
