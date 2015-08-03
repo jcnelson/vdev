@@ -1,7 +1,8 @@
 #!/bin/dash
 
 # vdev helper for setting up symlinks to disks and partitions 
-# works for ATA, SATA, and USB disks
+# works for ATA, SATA, SCSI, CCIS, MMC, Memstick, and USB disks, and their partitions.
+# TODO: refactor into disk-$TYPE.sh helpers, and have disk.sh source them and invoke them as needed.
 
 . "$VDEV_HELPERS/subr.sh"
 
@@ -14,7 +15,7 @@
 main() {
 
    local DISK_TYPE DISK_ID DISK_SERIAL DISK_WWN DISK_NAME PART_NAME 
-   local VDEV_BUS VDEV_ATA VDEV_SCSI VDEV_CCIS VDEV_USB VDEV_SERIAL VDEV_USB_SERIAL VDEV_SERIAL_SHORT VDEV_REVISION
+   local VDEV_BUS VDEV_ATA VDEV_SCSI VDEV_CCIS VDEV_USB VDEV_IEEE1394 VDEV_LOOP VDEV_VIRTIO VDEV_MMC VDEV_SERIAL VDEV_USB_SERIAL VDEV_SERIAL_SHORT VDEV_REVISION
    local VDEV_PROPERTIES
    local HELPER STAT_RET HELPER_DATA 
    
@@ -26,6 +27,9 @@ main() {
    local VDEV_PART_ENTRY_TYPE VDEV_PART_TABLE_TYPE VDEV_PART_ENTRY_SCHEME VDEV_PART_ENTRY_UUID VDEV_PART_ENTRY_DISK VDEV_PART_ENTRY_NUMBER VDEV_PART_ENTRY_OFFSET VDEV_PART_ENTRY_SIZE
    local VDEV_FS_TYPE VDEV_FS_USAGE VDEV_TYPE VDEV_WWN ALL_PROPS VDEV_ATA_WWN
 
+   # parent device query
+   local PROP_KEY PROP_VALUE PROP_KEY_AND_VALUE
+   
    # partition data 
    local PARENT_DEVICE_PATH SERIALIZED_PARENT_DEVICE_PATH PARENT_METADATA_DIR PARENT_PROPERTIES EXISTING
 
@@ -67,6 +71,11 @@ main() {
    VDEV_SCSI=""
    VDEV_CCIS=""
    VDEV_USB=""
+   VDEV_MMC=""
+   VDEV_IEEE1394=""
+   VDEV_LOOP=""
+   VDEV_VIRTIO=""
+   
    VDEV_SERIAL=""
    VDEV_SERIAL_SHORT=""
    VDEV_REVISION=""
@@ -180,8 +189,9 @@ main() {
       fi
 
    elif ! [ -e "$SYSFS_PATH/whole_disk" ]; then 
-
-      # find the parent device 
+      
+      # partition.
+      # find the parent device.
       PARENT_DEVICE_PATH="$(vdev_device_parent "$SYSFS_PATH")"
       RC=$?
 
@@ -210,6 +220,10 @@ main() {
       
       # make sure we can query non-existent variables...
       set +u
+
+      PROP_KEY=
+      PROP_VALUE=
+      PROP_KEY_AND_VALUE=
       
       # load all parent metadata, but don't override stuff vdevd gave us
       while read -r PROP_KEY_AND_VALUE; do 
@@ -219,11 +233,19 @@ main() {
          set -- $PROP_KEY_AND_VALUE
          IFS="$OLDIFS"
 
-         if [ $# -lt 1 ]; then 
+         if [ $# -lt 2 ]; then 
             continue
          fi
 
          PROP_KEY="$1"
+         PROP_VALUE="$2"
+         
+         # join remaining parts 
+         shift 2
+         while [ $# -gt 0 ]; do 
+            PROP_VALUE="$PROP_VALUE=$1"
+            shift 1
+         done
          
          EXISTING=
          eval "EXISTING=\$$PROP_KEY"
@@ -231,7 +253,7 @@ main() {
             continue 
          fi
          
-         eval "$PROP_KEY_AND_VALUE"
+         eval "$PROP_KEY=\"$PROP_VALUE\""
       done < "$PARENT_PROPERTIES"
 
       set -u
@@ -372,6 +394,7 @@ main() {
          # DISK_SERIAL already set above
          VDEV_BUS="ieee1934"
          VDEV_SERIAL="$DISK_SERIAL"
+         VDEV_IEEE1394="1"
          
          ;;
 
@@ -393,11 +416,18 @@ main() {
          fi
          
          VDEV_SERIAL="$DISK_SERIAL"
+         VDEV_MMC="1"
+         
          ;;
 
       loop)
       
-         # nothing to do 
+         VDEV_LOOP="1"
+         ;;
+
+      virtio)
+
+         VDEV_VIRTIO="1"
          ;;
          
       *)
@@ -472,6 +502,7 @@ main() {
 
          if [ $STAT_RET -ne 0 ]; then
 
+            # exit 2 means that we didn't get any information (this is okay by us)
             vdev_warn "/sbin/blkid failed on $VDEV_MOUNTPOINT/$VDEV_PATH, exit status $STAT_RET"
          else
 
@@ -559,6 +590,7 @@ main() {
 
    ALL_PROPS="VDEV_BUS VDEV_SERIAL VDEV_SERIAL_SHORT VDEV_REVISION VDEV_PART_ENTRY_DISK VDEV_PART_ENTRY_NUMBER VDEV_PART_ENTRY_OFFSET VDEV_PART_ENTRY_SIZE VDEV_PART_ENTRY_SCHEME VDEV_PART_ENTRY_TYPE VDEV_PART_TABLE_TYPE VDEV_PART_ENTRY_UUID VDEV_FS_TYPE VDEV_FS_USAGE VDEV_TYPE VDEV_MAJOR VDEV_MINOR VDEV_OS_SUBSYSTEM VDEV_OS_DEVTYPE VDEV_OS_DEVPATH VDEV_OS_DEVNAME $VDEV_PROPERTIES"
 
+   # identify type as a type-specific flag
    case "$DISK_TYPE" in
 
       ata)
@@ -580,6 +612,26 @@ main() {
       cciss)
 
          ALL_PROPS="VDEV_CCISS $ALL_PROPS"
+         ;;
+
+      ieee1394)
+
+         ALL_PROPS="VDEV_IEEE1394 $ALL_PROPS"
+         ;;
+         
+      mmc|memstick)
+
+         ALL_PROPS="VDEV_MMC $ALL_PROPS"
+         ;;
+
+      loop)
+
+         ALL_PROPS="VDEV_LOOP $ALL_PROPS"
+         ;;
+
+      virtio)
+
+         ALL_PROPS="VDEV_VIRTIO $ALL_PROPS"
          ;;
 
    esac
