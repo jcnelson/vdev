@@ -1569,6 +1569,10 @@ int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_acti
             else {
                
                // mask non-zero exit statuses 
+               uint64_t start_millis = 1000L * start.tv_sec + (start.tv_nsec / 1000000L);
+               uint64_t end_millis = 1000L * end.tv_sec + (end.tv_nsec / 1000000L);
+               
+               vdev_debug("Benchmark: action %s failed (exit %d) in %lu millis\n", acts[i].name, rc, (unsigned long)(end_millis - start_millis) );
                rc = 0;
             }
          }
@@ -1581,6 +1585,9 @@ int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_acti
             uint64_t end_millis = 1000L * end.tv_sec + (end.tv_nsec / 1000000L);
             
             acts[i].cumulative_time_millis += (end_millis - start_millis);
+            
+            // log timings directly, for finer granularity...
+            vdev_debug("Benchmark: action %s succeeded in %lu millis\n", acts[i].name, (unsigned long)(end_millis - start_millis) );
          }
       }
    }
