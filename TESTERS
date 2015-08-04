@@ -1,7 +1,24 @@
-Jude Nelson
-Scooby (pre-alpha early boot testing, hotplug testing, hardware database testing)
-lepoitr (pre-alpha vdevd testing)
-John Carline (pre-alpha vdevd testing)
-Anto (pre-alpha early boot testing)
-Didier Kryn (pre-alpha vdevd testing; musl libc testing; static linkage testing)
-Jack L. Frost, aka fbt@fleshless.org (pre-alpha vdevd testing with /dev/snd/by-id, as well as testing the hardware database build)
+Scooby
+* pre-alpha early boot testing
+* hotplug testing
+* hardware database testing
+* LVM testing
+* performance testing
+
+lepoitr
+* pre-alpha vdevd testing
+
+John Carline
+* pre-alpha vdevd testing
+
+Anto
+* pre-alpha early boot testing
+
+Didier Kryn
+* pre-alpha vdevd testing
+* musl libc testing
+* static linkage testing
+
+Jack L. Frost, aka fbt@fleshless.org 
+* pre-alpha vdevd testing with /dev/snd/by-id
+* hardware database build testing
