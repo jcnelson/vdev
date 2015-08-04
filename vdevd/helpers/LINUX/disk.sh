@@ -550,8 +550,10 @@ main() {
 
    # is this a physical volume?
    PVS_RC=0
+   PVS_DATA=""
    LVM2_PV_UUID=""
 
+   # TODO: don't scan the whole /dev
    if [ -x /sbin/pvs ]; then 
       PVS="/sbin/pvs --nameprefixes --noheadings $VDEV_MOUNTPOINT/$VDEV_PATH"
       PVS_DATA="$($PVS -o pv_uuid 2>"$VDEV_MOUNTPOINT/null")"
