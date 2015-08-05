@@ -371,6 +371,7 @@ main() {
          HELPER="stat_usb"
          
          # USB disk
+         VDEV_USB_SERIAL=""
          HELPER_DATA="$($VDEV_HELPERS/stat_usb "$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH")"
          STAT_RET=$?
 
