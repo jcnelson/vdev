@@ -9,29 +9,29 @@ Step 1: Compile and Install vdev
 --------------------------------
 
 
-The steps to check out, compile and install vdev and host-specific configuration files are as follows:
+The steps to check out, compile and install vdev,libudev-compat, and host-specific configuration files are as follows.  These steps will replace udevd with equivalent functionality.
 
 **WARNING:** These steps will disable udev.
 
     $ git clone https://github.com/jcnelson/vdev
     $ cd vdev
-    $ make -C libvdev
-    $ sudo make -C libvdev install
     $ make -C vdevd
     $ sudo make -C vdevd install
+    $ make -C libudev-compat 
+    $ sudo make -C libudev-compat installed
     $ sudo update-rc.d udev disable
     $ sudo update-rc.d udev-finish disable
     $ make -C example
     $ sudo make -C example install
 
-As a result of these commands, you will have installed `vdevd` to `/sbin/vdevd`, vdev's helpers to `/lib/vdev/`, vdev's host-specific configuration to `/etc/vdev/`, vdev's System V init script to `/etc/init.d/`, and vdev's support library to `/lib/libvdev.so`.
+As a result of these commands, you will have installed `vdevd` to `/sbin/vdevd`, vdev's helpers to `/lib/vdev/`, vdev's host-specific configuration to `/etc/vdev/`, vdev's System V init script to `/etc/init.d/`, and libudev-compat to `/lib/libudev.so.1.5.1`.
 
 NB: The host-specific parts of the configuration includes `/etc/vdev/ifnames.conf`, which encodes the persistent network interface names.
 
 Step 2: Generate an Initramfs
 -----------------------------
 
-To boot with vdev in an initramfs, you must additionally generate an initramfs image that contains it.  This can only be done after vdev has been installed.  To do so, run:
+To boot with vdev in an initramfs, you must additionally generate an initramfs image that contains it.  This can only be done after vdev has been installed.  Please be aware that this is **Debian-specific**.  To do so, run:
 
     $ make initramfs
 
