@@ -94,6 +94,14 @@ else
    echo "WARN: could not find dmsetup in /sbin/dmsetup.  Device mapper symlinks will not be created."
 fi
 
+# hardware database 
+if [ -f /lib/vdev/hwdb/hwdb.squashfs ]; then 
+   mkdir -p $DESTDIR/lib/vdev/hwdb
+   cp -a /lib/vdev/hwdb/hwdb.squashfs $DESTDIR/lib/vdev/hwdb
+else
+   echo "WARN: could not find hardware database in /lib/vdev/hwdb.  Some hardware metadata may not be generated."
+fi
+
 # GNU tools (not the busybox equivalents)
 copy_exec /bin/sed
 copy_exec /bin/grep 
