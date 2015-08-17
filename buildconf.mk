@@ -65,13 +65,13 @@ INSTALL_HWDB := $(LIBDIR)/vdev/hwdb
 
 # compiler
 CFLAGS     := -Wall -std=c99 -g -fPIC -fstack-protector -fstack-protector-all -pthread -Wno-unused-variable -Wno-unused-but-set-variable
-CPPFLAGS   := -Wall -g -fPIC -fstack-protector -fstack-protector-all -pthread -Wno-unused-variable -Wno-unused-but-set-variable
+CXXFLAGS   := -Wall -g -fPIC -fstack-protector -fstack-protector-all -pthread -Wno-unused-variable -Wno-unused-but-set-variable
 LDFLAGS    :=
 INC      := -I. -I$(ROOT_DIR) -I$(BUILD_INCLUDEDIR)
 DEFS     := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS -D_VDEV_OS_$(OS)
 LIBINC   := 
-CC       := gcc
-CPP      := g++
+CC       ?= cc
+CXX      ?= c++
 
 # build setup
 BUILD_DIRS   := $(sort $(BUILD_VDEVD_DIRS) \
