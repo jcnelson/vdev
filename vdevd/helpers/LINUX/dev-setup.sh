@@ -117,8 +117,8 @@ feed_static_nodes_kmod() {
     fi
 
     # look up major/minor 
-    major=$(echo $arg | /bin/sed -r 's/^([^:]+):.*/\1/g')
-    minor=$(echo $arg | /bin/sed -r 's/^[^:]+:(.*)/\1/g')
+    major=$(echo $arg | /bin/sed 's/^\([^:]\+\):.*/\1/g')
+    minor=$(echo $arg | /bin/sed 's/^[^:]\+:\(.*\)/\1/g')
 
     # look up devpath and subsystem
     sys_link=
@@ -143,10 +143,10 @@ feed_static_nodes_kmod() {
     
     else
 
-      devpath=$(/bin/readlink "$sys_link" | /bin/sed -r 's/\.\.\///g')
+      devpath=$(/bin/readlink "$sys_link" | /bin/sed 's/\.\.\///g')
       devpath="/$devpath"
 
-      subsystem=$(/bin/readlink "/sys/$devpath/subsystem" | /bin/sed -r "s/[^/]*\///g")
+      subsystem=$(/bin/readlink "/sys/$devpath/subsystem" | /bin/sed "s/[^/]*\///g")
     fi
 
     # build up params list 
@@ -234,7 +234,7 @@ fi
 if [ -z "$LOOP_NAME" ]; then 
    # pick the next free one 
    # TODO: exponential back-off, in case we race
-   LOOP_NAME="$(/sbin/losetup -f | /bin/sed -r "s/[^/]*\///g")"
+   LOOP_NAME="$(/sbin/losetup -f | /bin/sed "s/[^/]*\///g")"
 fi 
 
 if [ -n "$VDEV_HWDB_PATH" ] && [ -x /sbin/losetup ]; then 

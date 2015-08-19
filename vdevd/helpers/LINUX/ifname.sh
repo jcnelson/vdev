@@ -119,7 +119,7 @@ if_mac() {
    $IP link | /bin/grep -B 1 -i "$_MAC" | \
    while read -r _IGNORED1 _IFNAME _IGNORED2; do
       
-      echo $_IFNAME | /bin/sed -r 's/://g'
+      echo $_IFNAME | /bin/sed 's/://g'
       break
    done
 
@@ -140,7 +140,7 @@ if_devpath() {
    
    while read -r _SYSFS_IFNAME; do
       
-      _IF_DEVPATH=$(/bin/readlink "$VDEV_OS_SYSFS_MOUNTPOINT/class/net/$_SYSFS_IFNAME" | /bin/sed -r 's/^(..\/)+//g')
+      _IF_DEVPATH=$(/bin/readlink "$VDEV_OS_SYSFS_MOUNTPOINT/class/net/$_SYSFS_IFNAME" | /bin/sed 's/^\(..\/\)\+//g')
       _IF_DEVPATH="/$_IF_DEVPATH"
       
       if [ "$_IF_DEVPATH" = "$_DEVPATH/net/$_SYSFS_IFNAME" ]; then 

@@ -90,7 +90,7 @@ EOF
 # print it to stdout
 event_print_monotonic_usec() {
    
-   /bin/sed -r 's/([0-9]+)\.([0-9]+)[ ]+.*/USEC_INITIALIZED=\1\20000/g' "/proc/uptime"
+   /bin/sed 's/\([0-9]\+\)\.\([0-9]\+\)[ ]\+.*/USEC_INITIALIZED=\1\20000/g' "/proc/uptime"
    return 0
 }
 

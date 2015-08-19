@@ -20,7 +20,7 @@ udev_enumerate_properties() {
 
    if [ -f "$_METADATA/properties" ]; then 
       
-      /bin/sed -r \
+      /bin/sed \
          -e 's/^VDEV_OS_/E:/g' \
          -e 's/^VDEV_PERSISTENT_/E:ID_/g' \
          -e 's/^VDEV_/E:ID_/g' \
@@ -105,7 +105,7 @@ EOF
 # Print it to stdout--it's too big to return.
 udev_monotonic_usec() {
    
-   /bin/sed -r 's/([0-9]+)\.([0-9]+)[ ]+.*/I:\1\20000/g' "/proc/uptime"
+   /bin/sed 's/\([0-9]\+\)\.\([0-9]\+\)[ ]\+.*/I:\1\20000/g' "/proc/uptime"
    return 0
 }
 
@@ -340,7 +340,7 @@ udev_remove_links() {
    
       _STRIPPED_LINE="${_LINE##$_MOUNTPOINT}"
       
-      _LINK_DIR="$(echo "$_STRIPPED_LINE" | /bin/sed -r 's/\//\\x2f/g')"
+      _LINK_DIR="$(echo "$_STRIPPED_LINE" | /bin/sed 's/\//\\x2f/g')"
 
       if [ -z "$_LINK_DIR" ]; then 
          vdev_warn "Empty link: $_LINE"
@@ -489,7 +489,7 @@ EOF
 udev_event_generate_text() {
 
    event_generate_text "$1" "$2" "$3" "$4" "$5" | \
-   /bin/sed -r \
+   /bin/sed \
       -e 's/^VDEV_OS_//g' \
       -e 's/^VDEV_PERSISTENT_/ID_/g' \
       -e 's/^VDEV_/ID_/g'

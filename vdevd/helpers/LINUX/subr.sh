@@ -22,7 +22,7 @@ vdev_symlink() {
       _METADATA="$VDEV_METADATA"
    fi
 
-   _DIRNAME=$(echo $_LINK_TARGET | /bin/sed -r "s/[^/]+$//g")
+   _DIRNAME=$(echo $_LINK_TARGET | /bin/sed  "s/[^/]\+$//g")
 
    test -d $_DIRNAME || /bin/mkdir -p "$_DIRNAME"
 
@@ -119,16 +119,14 @@ vdev_drivers() {
 
    # strip trailing '/'
    _SYSFS_PATH="${_SYSFS_PATH%%/}"
-   # _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[/]+$//g")
    
    while [ -n "$_SYSFS_PATH" ]; do
       
       # driver name is the base path name of the link target of $_SYSFS_PATH/driver
-      test -L "$_SYSFS_PATH/driver" && /bin/readlink "$_SYSFS_PATH/driver" | /bin/sed -r "s/[^/]*\///g"
+      test -L "$_SYSFS_PATH/driver" && /bin/readlink "$_SYSFS_PATH/driver" | /bin/sed "s/[^/]*\///g"
 
       # search parent 
-      # _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g" | /bin/sed -r "s/[/]+$//g")
-      _SYSFS_PATH="$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g")"
+      _SYSFS_PATH="$(echo "$_SYSFS_PATH" | /bin/sed "s/[^/]\+$//g")"
       _SYSFS_PATH="${_SYSFS_PATH%%/}"
       
    done
@@ -146,16 +144,14 @@ vdev_subsystems() {
 
    # strip trailing '/'
    _SYSFS_PATH="${_SYSFS_PATH%%/}"
-   # _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[/]+$//g")
 
    while [ -n "$_SYSFS_PATH" ]; do
       
       # subsystem name is the base path name of the link target of $_SYSFS_PATH/subsystem
-      test -L "$_SYSFS_PATH/subsystem" && /bin/readlink "$_SYSFS_PATH/subsystem" | /bin/sed -r "s/[^/]*\///g"
+      test -L "$_SYSFS_PATH/subsystem" && /bin/readlink "$_SYSFS_PATH/subsystem" | /bin/sed "s/[^/]*\///g"
 
-      # search parent 
-      # _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g" | /bin/sed -r "s/[/]+$//g")
-      _SYSFS_PATH="$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g")"
+      # search parent      
+      _SYSFS_PATH="$(echo "$_SYSFS_PATH" | /bin/sed "s/[^/]\+$//g")"
       _SYSFS_PATH="${_SYSFS_PATH%%/}"
       
    done
@@ -192,7 +188,7 @@ vdev_device_id() {
 
    elif [ -n "$VDEV_OS_SUBSYSTEM" ] && [ -n "$VDEV_OS_DEVPATH" ]; then 
       
-      _SYSNAME="$(echo "$VDEV_OS_DEVPATH" | /bin/sed -r 's/[^/]*\///g')"
+      _SYSNAME="$(echo "$VDEV_OS_DEVPATH" | /bin/sed 's/[^/]*\///g')"
       
       _DEVICE_ID="+${VDEV_OS_SUBSYSTEM}:${_SYSNAME}"
    fi
@@ -219,7 +215,6 @@ vdev_device_parent() {
 
    
    # strip trailing '/'
-   # _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[/]+$//g")
    _SYSFS_PATH="${_SYSFS_PATH%%/}"
    
    while [ -n "$_SYSFS_PATH" ]; do
@@ -232,8 +227,7 @@ vdev_device_parent() {
 
       
       # search parent 
-      # _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g" | /bin/sed -r "s/[/]+$//g")
-      _SYSFS_PATH="$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g")"
+      _SYSFS_PATH="$(echo "$_SYSFS_PATH" | /bin/sed "s/[^/]\+$//g")"
       _SYSFS_PATH="${_SYSFS_PATH%%/}"
       
    done
@@ -278,7 +272,6 @@ vdev_getattrs() {
    _RC=1
    
    # strip trailing '/'
-   # _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[/]+$//g")
    _SYSFS_PATH="${_SYSFS_PATH%%/}"
 
    while [ -n "$_SYSFS_PATH" ]; do 
@@ -290,8 +283,7 @@ vdev_getattrs() {
       fi
 
       # search parent 
-      # _SYSFS_PATH=$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g" | /bin/sed -r "s/[/]+$//g")
-      _SYSFS_PATH="$(echo "$_SYSFS_PATH" | /bin/sed -r "s/[^/]+$//g")"
+      _SYSFS_PATH="$(echo "$_SYSFS_PATH" | /bin/sed "s/[^/]\+$//g")"
       _SYSFS_PATH="${_SYSFS_PATH%%/}"
       
       _RC=0
@@ -457,7 +449,7 @@ vdev_serialize_path() {
    
    _PATH="$1"
 
-   echo "$_PATH" | /bin/sed -r 's/\//\\x2f/g'
+   echo "$_PATH" | /bin/sed 's/\//\\x2f/g'
 }
 
 
@@ -527,13 +519,13 @@ vdev_blkid() {
       # values are always quoted.
       while [ ${#_VARS} -gt 0 ]; do
 
-         _VARENT="$(echo "$_VARS" | /bin/sed -r 's/^([^ =]+)="([^"]+)" .+$/\1="\2"/g')"
+         _VARENT="$(echo "$_VARS" | /bin/sed 's/^\([^ =]\+\)="\([^"]\+\)" .\+$/\1="\2"/g'
 
          _EXPR="s/$_VARENT//g"
 
          _VARENT=${_VARENT## }
          
-         _VARS="$(echo "$_VARS" | /bin/sed -r "$_EXPR")"
+         _VARS="$(echo "$_VARS" | /bin/sed "$_EXPR")"
 
          echo "$_VARENT"
       done

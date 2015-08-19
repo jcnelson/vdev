@@ -35,9 +35,9 @@ main() {
    PATH=
 
    # get the type and index
-   TYPE_PLUS_INDEX=$(echo "$VDEV_PATH" | /bin/sed -r 's/.*\/([^/]+)/\1/g')
+   TYPE_PLUS_INDEX="$(echo "$VDEV_PATH" | /bin/sed 's/.*\/\([^/]\+\)/\1/g')"
 
-   TYPE=$(echo $TYPE_PLUS_INDEX | /bin/sed -r 's/[0-9]+$//g')
+   TYPE="$(echo $TYPE_PLUS_INDEX | /bin/sed 's/[0-9]\+$//g')"
    INDEX=
 
    if [ -f "$VDEV_OS_SYSFS_MOUNTPOINT/$VDEV_OS_DEVPATH/index" ]; then 

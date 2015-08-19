@@ -140,8 +140,8 @@ fi
 
 # break the modalias up by :, and then split into groups no longer than $MAX_DIR_LEN.
 # to do so, insert : every $MAX_DIR_LEN characters 
-EXPR="s/([^:]{$MAX_DIR_LEN})/\1:/g"
-PREFIX="$(echo "$PREFIX" | /bin/sed -r $EXPR)"
+EXPR="s/\([^:]\{${MAX_DIR_LEN}\}\)/\1:/g"
+PREFIX="$(echo "$PREFIX" | /bin/sed $EXPR)"
 
 OLDIFS="$IFS"
 IFS=":"
