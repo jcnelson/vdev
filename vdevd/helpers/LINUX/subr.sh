@@ -194,7 +194,7 @@ vdev_device_id() {
    fi
 
    if [ -n "$_DEVICE_ID" ]; then 
-      echo -n "$_DEVICE_ID"
+      "$VDEV_HELPERS/echo_n" "$_DEVICE_ID"
       return 0
    else 
       return 1
@@ -519,7 +519,7 @@ vdev_blkid() {
       # values are always quoted.
       while [ ${#_VARS} -gt 0 ]; do
 
-         _VARENT="$(echo "$_VARS" | /bin/sed 's/^\([^ =]\+\)="\([^"]\+\)" .\+$/\1="\2"/g'
+         _VARENT="$(echo "$_VARS" | /bin/sed 's/^\([^ =]\+\)="\([^"]\+\)" .\+$/\1="\2"/g')"
 
          _EXPR="s/$_VARENT//g"
 

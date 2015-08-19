@@ -6,7 +6,7 @@ OBJ   := $(patsubst %.c,$(BUILD_VDEVD_HELPERS)/%.o,$(C_SRCS)) $(patsubst %.cpp,$
 LIB   :=
 
 HELPER_SCRIPTS := $(wildcard *.sh) daemonlet
-HELPERS := stat_optical stat_ata stat_input stat_scsi stat_v4l stat_net stat_usb stat_bus stat_path event-put $(HELPER_SCRIPTS)
+HELPERS := stat_optical stat_ata stat_input stat_scsi stat_v4l stat_net stat_usb stat_bus stat_path event-put echo_n $(HELPER_SCRIPTS)
 
 HELPERS_BUILD := $(patsubst %,$(BUILD_VDEVD_HELPERS)/%,$(HELPERS))
 HELPERS_INSTALL := $(patsubst %,$(INSTALL_VDEVD_HELPERS)/%,$(HELPERS))
