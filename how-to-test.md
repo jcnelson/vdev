@@ -129,7 +129,7 @@ This will generate an initramfs image in `example/`, which can be installed with
 
 To enable vdev and disable udev in the init system, the command is 
 
-    $ cd example/ && make initscript-install
+    $ cd example/ && make install-initscript
 
 I'm still working on the packaging scripts that will do all of this automatically.
 
