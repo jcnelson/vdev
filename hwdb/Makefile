@@ -11,6 +11,7 @@ HWDB_INSTALL := $(INSTALL_HWDB)/hwdb.squashfs
 all: $(HWDB_BUILD)
 
 $(HWDB_BUILD): $(HWDB_BUILD_INPUT) $(HWDB_BUILD_GEN)
+	test -f hwdb.squashfs && cp -a hwdb.squashfs "$@"
 	@echo "Generating hardware database"
 	@mkdir -p "$@.dir"
 	$(BUILD_HWDB)/gen_database.sh -o "$@.dir" $(BUILD_HWDB)/input/*.hwdb
