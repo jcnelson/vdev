@@ -16,7 +16,7 @@ all: $(VDEVFS)
 
 $(VDEVFS): $(OBJ)
 	@mkdir -p "$(shell dirname "$@")"
-	$(CXX) $(LDFLAGS)  -o "$@" $(OBJ) $(LIBINC) $(LIB)
+	$(CXX) $(LDFLAGS) -o "$@" $(OBJ) $(LIBINC) $(LIB)
 
 $(BUILD_VDEVFS)/%.o : %.c
 	@mkdir -p "$(shell dirname "$@")"

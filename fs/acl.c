@@ -812,7 +812,7 @@ int vdev_acl_run_predicate( struct vdev_acl* acl, struct pstat* ps, uid_t caller
    
    sprintf(env_buf[0], "VDEV_UID=%u", caller_uid );
    sprintf(env_buf[1], "VDEV_GID=%u", caller_gid );
-   sprintf(env_buf[2], "VDEV_PID=%u", ps->pid );
+   sprintf(env_buf[2], "VDEV_PID=%u", pstat_get_pid( ps ));
    
    predicate_env[0] = env_buf[0];
    predicate_env[1] = env_buf[1];
@@ -845,6 +845,8 @@ int vdev_acl_run_predicate( struct vdev_acl* acl, struct pstat* ps, uid_t caller
 int vdev_acl_match_process( struct vdev_acl* acl, struct pstat* ps, uid_t caller_uid, gid_t caller_gid ) {
    
    int rc = 0;
+   char path[PATH_MAX+1];
+   struct stat sb;
    
    if( !acl->has_proc ) {
       // applies to anyone 
@@ -854,7 +856,9 @@ int vdev_acl_match_process( struct vdev_acl* acl, struct pstat* ps, uid_t caller
    if( acl->proc_path != NULL || acl->has_proc_inode ) {
       
       if( acl->proc_path != NULL ) {
-         if( strcmp( acl->proc_path, ps->path ) != 0 ) {
+          
+         pstat_get_path( ps, path );
+         if( strcmp( acl->proc_path, path ) != 0 ) {
             
             // doesn't match 
             return 0;
@@ -862,7 +866,9 @@ int vdev_acl_match_process( struct vdev_acl* acl, struct pstat* ps, uid_t caller
       }
       
       if( acl->has_proc_inode ) {
-         if( acl->proc_inode != ps->bin_stat.st_ino ) {
+         
+         pstat_get_stat( ps, &sb );
+         if( acl->proc_inode != sb.st_ino ) {
             
             // doesn't match 
             return 0;
@@ -954,7 +960,7 @@ int vdev_acl_find_next( char const* path, struct pstat* caller_proc, uid_t calle
       if( rc < 0 ) {
          
          // error...
-         vdev_error("vdev_acl_match_process(%d) rc = %d\n", caller_proc->pid, rc );
+         vdev_error("vdev_acl_match_process(%d) rc = %d\n", pstat_get_pid( caller_proc ), rc );
          break;
       }
       

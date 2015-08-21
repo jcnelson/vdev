@@ -23,6 +23,10 @@
 #include "fs.h"
 #include "acl.h"
 
+#include <queue>
+
+using namespace std;
+
 static char const* vdev_fuse_odev = "-odev";
 static char const* vdev_fuse_ononempty = "-ononempty";
 static char const* vdev_fuse_allow_other = "-oallow_other";
@@ -138,7 +142,7 @@ static int vdevfs_scandirat_context_callback( int dirfd, struct dirent* dent, vo
    }
    
    // construct an inode for this entry 
-   child = VDEV_CALLOC( struct fskit_entry, 1 );
+   child = fskit_entry_new();
    if( child == NULL ) {
       
       return -ENOMEM;
@@ -742,30 +746,36 @@ static int vdevfs_access_check( struct vdevfs* vdev, struct fskit_fuse_state* fs
    uid_t uid = 0;
    gid_t gid = 0;
    struct stat sb;
-   struct pstat ps;
+   struct pstat* ps = NULL;
    
    memset( &sb, 0, sizeof(struct stat) );
    sb.st_mode = 0777;
-   
-   memset( &ps, 0, sizeof(struct pstat) );
    
    // stat the calling process
    pid = fskit_fuse_get_pid();
    uid = fskit_fuse_get_uid( fs_state );
    gid = fskit_fuse_get_gid( fs_state );
    
+   ps = pstat_new();
+   if( ps == NULL ) {
+      return -ENOMEM;
+   }
+   
    vdev_debug("%s('%s') from user %d group %d task %d\n", method_name, path, uid, gid, pid );
    
    // see who's asking 
-   rc = pstat( pid, &ps, 0 );
+   rc = pstat( pid, ps, 0 );
    if( rc != 0 ) {
       
       vdev_error("pstat(%d) rc = %d\n", pid, rc );
+      pstat_free( ps );
       return -EIO;
    }
    
    // apply the ACLs on the stat buffer
-   rc = vdev_acl_apply_all( vdev->config, vdev->acls, vdev->num_acls, path, &ps, uid, gid, &sb );
+   rc = vdev_acl_apply_all( vdev->config, vdev->acls, vdev->num_acls, path, ps, uid, gid, &sb );
+   pstat_free( ps );
+   
    if( rc < 0 ) {
       
       vdev_error("vdev_acl_apply_all(%s, uid=%d, gid=%d, pid=%d) rc = %d\n", path, uid, gid, pid, rc );
@@ -788,14 +798,14 @@ static int vdevfs_access_check( struct vdevfs* vdev, struct fskit_fuse_state* fs
    
 
 // mknod: create the device node as normal, but also write to the underlying filesystem as an emergency counter-measure
-int vdevfs_mknod( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, mode_t mode, dev_t dev, void** inode_cls ) {
+int vdevfs_mknod( struct fskit_core* core, struct fskit_route_metadata* grp, struct fskit_entry* fent, mode_t mode, dev_t dev, void** inode_cls ) {
    
    int rc = 0;
    struct vdevfs* vdev = (struct vdevfs*)fskit_core_get_user_data( core );
    struct fskit_fuse_state* fs_state = fskit_fuse_get_state();
    char const* path = NULL;
    
-   rc = vdevfs_access_check( vdev, fs_state, "mknod", grp->path );
+   rc = vdevfs_access_check( vdev, fs_state, "mknod", fskit_route_metadata_get_path( grp ) );
    if( rc < 0 ) {
       
       // denied!
@@ -803,7 +813,7 @@ int vdevfs_mknod( struct fskit_core* core, struct fskit_match_group* grp, struct
    }
    
    // must be relative path 
-   path = grp->path;
+   path = fskit_route_metadata_get_path( grp );
    while( *path == '/' && *path != '\0' ) {
       path++;
    }
@@ -827,14 +837,14 @@ int vdevfs_mknod( struct fskit_core* core, struct fskit_match_group* grp, struct
 
 
 // mkdir: create the directory as normal, but also write to the underlying filesystem as an emergency counter-measure
-int vdevfs_mkdir( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, mode_t mode, void** inode_cls ) {
+int vdevfs_mkdir( struct fskit_core* core, struct fskit_route_metadata* grp, struct fskit_entry* fent, mode_t mode, void** inode_cls ) {
    
    int rc = 0;
    struct vdevfs* vdev = (struct vdevfs*)fskit_core_get_user_data( core );
    struct fskit_fuse_state* fs_state = fskit_fuse_get_state();
    char const* path = NULL;
    
-   rc = vdevfs_access_check( vdev, fs_state, "mkdir", grp->path );
+   rc = vdevfs_access_check( vdev, fs_state, "mkdir", fskit_route_metadata_get_path( grp ) );
    if( rc < 0 ) {
       
       // denied!
@@ -842,7 +852,7 @@ int vdevfs_mkdir( struct fskit_core* core, struct fskit_match_group* grp, struct
    }
    
    // must be relative path 
-   path = grp->path;
+   path = fskit_route_metadata_get_path( grp );
    while( *path == '/' && *path != '\0' ) {
       path++;
    }
@@ -867,7 +877,7 @@ int vdevfs_mkdir( struct fskit_core* core, struct fskit_match_group* grp, struct
 
 // creat: create the file as usual, but also write to the underlying filesystem as an emergency counter-measure
 // NOTE: since this is backed by FUSE, this handler will only be called for regular files
-int vdevfs_create( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, mode_t mode, void** inode_cls, void** handle_cls ) {
+int vdevfs_create( struct fskit_core* core, struct fskit_route_metadata* grp, struct fskit_entry* fent, mode_t mode, void** inode_cls, void** handle_cls ) {
    
    int fd = 0;
    struct vdevfs* vdev = (struct vdevfs*)fskit_core_get_user_data( core );
@@ -875,7 +885,7 @@ int vdevfs_create( struct fskit_core* core, struct fskit_match_group* grp, struc
    char const* path = NULL;
    int rc = 0;
    
-   rc = vdevfs_access_check( vdev, fs_state, "create", grp->path );
+   rc = vdevfs_access_check( vdev, fs_state, "create", fskit_route_metadata_get_path( grp ) );
    if( rc < 0 ) {
       
       // denied!
@@ -883,7 +893,7 @@ int vdevfs_create( struct fskit_core* core, struct fskit_match_group* grp, struc
    }
    
    // must be relative path 
-   path = grp->path;
+   path = fskit_route_metadata_get_path( grp );
    while( *path == '/' && *path != '\0' ) {
       path++;
    }
@@ -914,7 +924,7 @@ int vdevfs_create( struct fskit_core* core, struct fskit_match_group* grp, struc
 
 // open: open the file as usual, but from the underlying filesystem 
 // NOTE: since this is backed by FUSE, this handler will only be called for regular files
-int vdevfs_open( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, int flags, void** handle_cls ) {
+int vdevfs_open( struct fskit_core* core, struct fskit_route_metadata* grp, struct fskit_entry* fent, int flags, void** handle_cls ) {
    
    int fd = 0;
    struct vdevfs* vdev = (struct vdevfs*)fskit_core_get_user_data( core );
@@ -928,11 +938,11 @@ int vdevfs_open( struct fskit_core* core, struct fskit_match_group* grp, struct 
    
    if( fskit_entry_get_type( fent ) == FSKIT_ENTRY_TYPE_DIR ) {
    
-      rc = vdevfs_access_check( vdev, fs_state, "opendir", grp->path );
+      rc = vdevfs_access_check( vdev, fs_state, "opendir", fskit_route_metadata_get_path( grp ) );
    }
    else {
       
-      rc = vdevfs_access_check( vdev, fs_state, "open", grp->path );
+      rc = vdevfs_access_check( vdev, fs_state, "open", fskit_route_metadata_get_path( grp ) );
    }
    
    if( rc < 0 ) {
@@ -949,7 +959,7 @@ int vdevfs_open( struct fskit_core* core, struct fskit_match_group* grp, struct 
    }
    
    // must be relative path 
-   path = grp->path;
+   path = fskit_route_metadata_get_path( grp );
    while( *path == '/' && *path != '\0' ) {
       path++;
    }
@@ -979,7 +989,7 @@ int vdevfs_open( struct fskit_core* core, struct fskit_match_group* grp, struct 
 
 // read: read as usual, but from the underlying filesystem 
 // NOTE: since this is backed by FUSE, this handler will only be called for regular files 
-int vdevfs_read( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, char* buf, size_t len, off_t offset, void* handle_cls ) {
+int vdevfs_read( struct fskit_core* core, struct fskit_route_metadata* grp, struct fskit_entry* fent, char* buf, size_t len, off_t offset, void* handle_cls ) {
    
    // careful...
    int fd = 0;
@@ -992,7 +1002,7 @@ int vdevfs_read( struct fskit_core* core, struct fskit_match_group* grp, struct 
    if( rc < 0 ) {
       
       rc = -errno;
-      vdev_error("lseek(%d '%s') rc = %d\n", fd, grp->path, rc );
+      vdev_error("lseek(%d '%s') rc = %d\n", fd, fskit_route_metadata_get_path( grp ), rc );
       
       return rc;
    }
@@ -1001,7 +1011,7 @@ int vdevfs_read( struct fskit_core* core, struct fskit_match_group* grp, struct 
    if( rc < 0 ) {
       
       rc = -errno;
-      vdev_error("read(%d '%s') rc = %d\n", fd, grp->path, rc );
+      vdev_error("read(%d '%s') rc = %d\n", fd, fskit_route_metadata_get_path( grp ), rc );
       
       return rc;
    }
@@ -1012,7 +1022,7 @@ int vdevfs_read( struct fskit_core* core, struct fskit_match_group* grp, struct 
 
 // write; write as usual, but to the underlying filesystem 
 // NOTE: since this is backed by FUSE, this handler will only be called for regular files 
-int vdevfs_write( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, char* buf, size_t len, off_t offset, void* handle_cls ) {
+int vdevfs_write( struct fskit_core* core, struct fskit_route_metadata* grp, struct fskit_entry* fent, char* buf, size_t len, off_t offset, void* handle_cls ) {
    
    // careful...
    int fd = 0;
@@ -1026,7 +1036,7 @@ int vdevfs_write( struct fskit_core* core, struct fskit_match_group* grp, struct
    if( rc < 0 ) {
       
       rc = -errno;
-      vdev_error("lseek(%d '%s') rc = %d\n", fd, grp->path, rc );
+      vdev_error("lseek(%d '%s') rc = %d\n", fd, fskit_route_metadata_get_path( grp ), rc );
       
       return rc;
    }
@@ -1035,7 +1045,7 @@ int vdevfs_write( struct fskit_core* core, struct fskit_match_group* grp, struct
    if( rc < 0 ) {
       
       rc = -errno;
-      vdev_error("write(%d '%s') rc = %d\n", fd, grp->path, rc );
+      vdev_error("write(%d '%s') rc = %d\n", fd, fskit_route_metadata_get_path( grp ), rc );
       
       return rc;
    }
@@ -1046,7 +1056,7 @@ int vdevfs_write( struct fskit_core* core, struct fskit_match_group* grp, struct
 
 // close: close as usual
 // NOTE: since this is backed by FUSE, this handler will only be called for regular files
-int vdevfs_close( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, void* handle_cls ) {
+int vdevfs_close( struct fskit_core* core, struct fskit_route_metadata* grp, struct fskit_entry* fent, void* handle_cls ) {
    
    // only care about close() for files 
    if( fskit_entry_get_type( fent ) == FSKIT_ENTRY_TYPE_DIR ) {
@@ -1065,7 +1075,7 @@ int vdevfs_close( struct fskit_core* core, struct fskit_match_group* grp, struct
    if( rc < 0 ) {
       
       rc = -errno;
-      vdev_error("close(%d '%s') rc = %d\n", fd, grp->path, rc );
+      vdev_error("close(%d '%s') rc = %d\n", fd, fskit_route_metadata_get_path( grp ), rc );
       
       return rc;
    }
@@ -1076,7 +1086,7 @@ int vdevfs_close( struct fskit_core* core, struct fskit_match_group* grp, struct
 
 // sync: sync as usual
 // NOTE: since this is backed by FUSE, this handler will only be called for regular files
-int vdevfs_sync( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent ) {
+int vdevfs_sync( struct fskit_core* core, struct fskit_route_metadata* grp, struct fskit_entry* fent ) {
    
    void* user_data = fskit_entry_get_user_data( fent );
    
@@ -1090,7 +1100,7 @@ int vdevfs_sync( struct fskit_core* core, struct fskit_match_group* grp, struct 
    if( rc < 0 ) {
       
       rc = -errno;
-      vdev_error("fsync(%d '%s') rc = %d\n", fd, grp->path, rc );
+      vdev_error("fsync(%d '%s') rc = %d\n", fd, fskit_route_metadata_get_path( grp ), rc );
       
       return rc;
    }
@@ -1100,7 +1110,7 @@ int vdevfs_sync( struct fskit_core* core, struct fskit_match_group* grp, struct 
 
 
 // unlink/rmdir: remove the file or device node from the underlying filesystem 
-int vdevfs_detach( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, void* inode_cls ) {
+int vdevfs_detach( struct fskit_core* core, struct fskit_route_metadata* grp, struct fskit_entry* fent, void* inode_cls ) {
    
    int rc = 0;
    struct vdevfs* vdev = (struct vdevfs*)fskit_core_get_user_data( core );
@@ -1117,7 +1127,7 @@ int vdevfs_detach( struct fskit_core* core, struct fskit_match_group* grp, struc
    }
    
    
-   rc = vdevfs_access_check( vdev, fs_state, method, grp->path );
+   rc = vdevfs_access_check( vdev, fs_state, method, fskit_route_metadata_get_path( grp ) );
    if( rc < 0 ) {
       
       // denied!
@@ -1127,7 +1137,7 @@ int vdevfs_detach( struct fskit_core* core, struct fskit_match_group* grp, struc
    if( rc != 0 ) {
       
       rc = -errno;
-      vdev_error("%s('%s', '%s') rc = %d\n", method, vdev->mountpoint, grp->path, rc );
+      vdev_error("%s('%s', '%s') rc = %d\n", method, vdev->mountpoint, fskit_route_metadata_get_path( grp ), rc );
       
       return rc;
    }
@@ -1138,13 +1148,13 @@ int vdevfs_detach( struct fskit_core* core, struct fskit_match_group* grp, struc
 
 // stat: equvocate about which devices exist, depending on who's asking
 // return -ENOENT not only if the file doesn't exist, but also if the file is blocked by the ACL
-int vdevfs_stat( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct stat* sb ) {
+int vdevfs_stat( struct fskit_core* core, struct fskit_route_metadata* grp, struct fskit_entry* fent, struct stat* sb ) {
    
    int rc = 0;
    struct vdevfs* vdev = (struct vdevfs*)fskit_core_get_user_data( core );
    struct fskit_fuse_state* fs_state = fskit_fuse_get_state();
    
-   rc = vdevfs_access_check( vdev, fs_state, "stat", grp->path );
+   rc = vdevfs_access_check( vdev, fs_state, "stat", fskit_route_metadata_get_path( grp ) );
    if( rc < 0 ) {
       
       // denied!
@@ -1158,7 +1168,7 @@ int vdevfs_stat( struct fskit_core* core, struct fskit_match_group* grp, struct 
 
 // readdir: equivocate about which devices exist, depending on who's asking
 // omit entries if the ACLs forbid them
-int vdevfs_readdir( struct fskit_core* core, struct fskit_match_group* grp, struct fskit_entry* fent, struct fskit_dir_entry** dirents, size_t num_dirents ) {
+int vdevfs_readdir( struct fskit_core* core, struct fskit_route_metadata* grp, struct fskit_entry* fent, struct fskit_dir_entry** dirents, size_t num_dirents ) {
    
    int rc = 0;
    struct fskit_entry* child = NULL;
@@ -1174,20 +1184,27 @@ int vdevfs_readdir( struct fskit_core* core, struct fskit_match_group* grp, stru
    struct fskit_fuse_state* fs_state = fskit_fuse_get_state();
    
    struct stat sb;
-   struct pstat ps;
+   struct stat fskit_sb;
+   struct pstat* ps = NULL;
    char* child_path = NULL;
    
    pid = fskit_fuse_get_pid();
    uid = fskit_fuse_get_uid( fs_state );
    gid = fskit_fuse_get_gid( fs_state );
    
-   vdev_debug("vdevfs_readdir(%s, %zu) from user %d group %d task %d\n", grp->path, num_dirents, uid, gid, pid );
+   vdev_debug("vdevfs_readdir(%s, %zu) from user %d group %d task %d\n", fskit_route_metadata_get_path( grp ), num_dirents, uid, gid, pid );
+   
+   ps = pstat_new();
+   if( ps == NULL ) {
+      return -ENOMEM;
+   }
    
    // see who's asking
-   rc = pstat( pid, &ps, 0 );
+   rc = pstat( pid, ps, 0 );
    if( rc != 0 ) { 
       
       vdev_error("pstat(%d) rc = %d\n", pid, rc );
+      pstat_free( ps );
       return -EIO;
    }
    
@@ -1211,11 +1228,12 @@ int vdevfs_readdir( struct fskit_core* core, struct fskit_match_group* grp, stru
       // construct a stat buffer from what we actually need 
       memset( &sb, 0, sizeof(struct stat) );
       
-      sb.st_uid = child->owner;
-      sb.st_gid = child->group;
-      sb.st_mode = fskit_fullmode( child->type, child->mode );
+      fskit_entry_fstat( child, &fskit_sb );
+      sb.st_uid = fskit_sb.st_uid;
+      sb.st_gid = fskit_sb.st_gid;
+      sb.st_mode = fskit_sb.st_mode;
       
-      child_path = fskit_fullpath( grp->path, child->name, NULL );
+      child_path = fskit_fullpath( fskit_route_metadata_get_path( grp ), fskit_entry_get_name( child ), NULL );
       if( child_path == NULL ) {
          
          // can't continue; OOM
@@ -1225,7 +1243,7 @@ int vdevfs_readdir( struct fskit_core* core, struct fskit_match_group* grp, stru
       }
       
       // filter it 
-      rc = vdev_acl_apply_all( vdev->config, vdev->acls, vdev->num_acls, child_path, &ps, uid, gid, &sb );
+      rc = vdev_acl_apply_all( vdev->config, vdev->acls, vdev->num_acls, child_path, ps, uid, gid, &sb );
       if( rc < 0 ) {
          
          vdev_error("vdev_acl_apply_all('%s', uid=%d, gid=%d, pid=%d) rc = %d\n", child_path, uid, gid, pid, rc );
@@ -1234,7 +1252,7 @@ int vdevfs_readdir( struct fskit_core* core, struct fskit_match_group* grp, stru
       else if( rc == 0 || (sb.st_mode & 0777) == 0 ) {
          
          // omit this one 
-         vdev_debug("Filter '%s'\n", child->name );
+         vdev_debug("Filter '%s'\n", fskit_entry_get_name( child ) );
          omitted_idx.push_back( i );
          
          rc = 0;
@@ -1261,5 +1279,6 @@ int vdevfs_readdir( struct fskit_core* core, struct fskit_match_group* grp, stru
       fskit_readdir_omit( dirents, omitted_idx[i] );
    }
    
+   pstat_free( ps );
    return rc;
 }
