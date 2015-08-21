@@ -371,6 +371,7 @@ char* vdev_basename( char const* path, char* dest ) {
 }
 
 // run a subprocess in the system shell (/bin/sh)
+// TODO: exec directly
 // gather the output into the output buffer (allocating it if needed).
 // return 0 on success
 // return 1 on output truncate 
@@ -471,28 +472,21 @@ int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t m
       // get output 
       if( output != NULL && *output != NULL && max_output > 0 ) {
          
-         while( (unsigned)num_read < max_output ) {
+         nr = vdev_read_uninterrupted( p[0], (*output) + num_read, max_output - num_read );
+         if( nr < 0 ) {
             
-            nr = vdev_read_uninterrupted( p[0], (*output) + num_read, max_output - num_read );
-            if( nr < 0 ) {
-               
-               vdev_error("vdev_read_uninterrupted rc = %d\n", rc );
-               close( p[0] );
-               
-               if( alloced ) {
-                  
-                  free( *output );
-                  *output = NULL;
-               }
-               return rc;
+            vdev_error("vdev_read_uninterrupted rc = %zd\n", nr );
+            close( p[0] );
+            
+            if( alloced ) {
+                
+                free( *output );
+                *output = NULL;
             }
-            
-            if( nr == 0 ) {
-               break;
-            }
-            
-            num_read += nr;
+            return nr;
          }
+         
+         num_read = nr;
       }
       
       // wait for child
