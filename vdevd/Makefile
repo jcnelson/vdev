@@ -35,7 +35,7 @@ helpers-install:
 install: $(VDEVD_INSTALL) helpers-install
 $(VDEVD_INSTALL): $(VDEVD)
 	@mkdir -p $(INSTALL_VDEVD)
-	cp -a $< $@
+	cp -a "$<" "$@"
 
 .PHONY: clean
 clean:
