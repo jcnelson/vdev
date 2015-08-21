@@ -32,8 +32,7 @@ To build vdevd, you'll need:
 * libpthread
 
 For vdevfs, you'll need all of the above, plus:
-* libstdc++
-* FUSE
+* libfuse
 * [libpstat](https://github.com/jcnelson/libpstat)
 * [fskit](https://github.com/jcnelson/fskit)
 

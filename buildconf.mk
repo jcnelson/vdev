@@ -24,7 +24,7 @@ USRSHAREDIR		?= $(DESTDIR)/usr/share
 PKGCONFIGDIR   ?= $(DESTDIR)/usr/lib/pkgconfig
 ETCDIR			?= $(DESTDIR)/etc
 
-# libvdev
+# libvdev (NOTE: not an installable target; just common code)
 LIBVDEV_ROOT := $(ROOT_DIR)/libvdev 
 BUILD_LIBVDEV := $(BUILD_LIBDIR)
 BUILD_LIBVDEV_HEADERS := $(BUILD_INCLUDEDIR)/libvdev
@@ -85,7 +85,7 @@ all:
 build_setup: $(BUILD_DIRS)
 
 $(BUILD_DIRS):
-	@mkdir -p $@
+	@mkdir -p "$@"
 
 # rule to make an archive member from an object file
 (%.o): %.o ;    $(AR) cr $@ $*.o
