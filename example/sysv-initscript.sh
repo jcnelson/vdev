@@ -34,11 +34,11 @@ source_ini_file() {
    FILE_PATH=$1
    NAMESPACE=$2
    
-   /bin/cat $FILE_PATH | /bin/sed -r "s/.*\[.*\].*//g" | \
+   /bin/cat $FILE_PATH | /bin/sed "s/.*\[.*\].*//g" | \
    while read line; do 
    
-      KEY=$(echo $line | /bin/sed -r "s/(^.*)=.*/\1/g");
-      VALUE=$(echo $line | /bin/sed -r "s/^.*=(.*)$/\1/g");
+      KEY=$(echo $line | /bin/sed "s/\(^.*\)=.*/\1/g");
+      VALUE=$(echo $line | /bin/sed "s/^.*=\(.*\)$/\1/g");
       
       if [ -n "$KEY" ]; then 
       
@@ -100,15 +100,25 @@ vdevd_start() {
    # make sure log directory exists...
    if [ -n "$vdev_config_logfile" ]; then 
       
-      vdev_log_dir=$(echo "$vdev_config_logfile" | sed -r 's/[^/]+$//g')
+      vdev_log_dir="$(echo "$vdev_config_logfile" | sed 's/[^/]\+$//g')"
 
       if [ -n "$vdev_log_dir" ]; then 
          mkdir -p "$vdev_log_dir"
       fi
    fi
+
+   # make sure the pid directory exists 
+   if [ -n "$vdev_config_pidfile" ]; then 
+
+      vdev_pid_dir="$(echo "$vdev_config_pidfile" | sed 's/[^/]\+$//g')"
+
+      if [ -n "$vdev_pid_dir "]; then 
+         mkdir -p "$vdev_pid_dir"
+      fi
+   fi
    
    # start vdev
-   if $VDEV_BIN -c $VDEV_CONFIG $@ $VDEV_MOUNTPOINT; then
+   if "$VDEV_BIN" -c "$VDEV_CONFIG" $@ "$VDEV_MOUNTPOINT"; then
       log_end_msg $?
    
    else
