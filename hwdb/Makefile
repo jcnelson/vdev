@@ -11,11 +11,14 @@ HWDB_INSTALL := $(INSTALL_HWDB)/hwdb.squashfs
 all: $(HWDB_BUILD)
 
 $(HWDB_BUILD): $(HWDB_BUILD_INPUT) $(HWDB_BUILD_GEN)
-	test -f hwdb.squashfs && cp -a hwdb.squashfs "$@"
-	@echo "Generating hardware database"
-	@mkdir -p "$@.dir"
-	$(BUILD_HWDB)/gen_database.sh -o "$@.dir" $(BUILD_HWDB)/input/*.hwdb
-	mksquashfs "$@.dir" "$@" -force-uid 0 -force-gid 0
+	if [ -f hwdb.squashfs ]; then \
+	  	cp -a hwdb.squashfs "$@"; \
+	else \
+		@echo "Generating hardware database"; \
+		@mkdir -p "$@.dir"; \
+		$(BUILD_HWDB)/gen_database.sh -o "$@.dir" $(BUILD_HWDB)/input/*.hwdb; \
+		mksquashfs "$@.dir" "$@" -force-uid 0 -force-gid 0; \
+	fi
 
 $(BUILD_HWDB)/input/%.hwdb: udev/%.hwdb
 	@mkdir -p "$(shell dirname "$@")"
@@ -38,4 +41,6 @@ uninstall:
 .PHONY: clean 
 clean:
 	rm -rf $(HWDB_BUILD) $(HWDB_BUILD_INPUT) $(HWDB_BUILD_GEN) $(HWDB_BUILD).dir
+
+print-%: ; @echo $*=$($*)
 
