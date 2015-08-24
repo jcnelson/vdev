@@ -502,7 +502,7 @@ udev_event_generate_text() {
 # return 0 on success
 main() {
 
-   local _DEVICE_ID 
+   local _DEVICE_ID _RC
 
    # if our path is still "UNKNOWN", then generate a device ID and go with that for metadata
    if [ "$VDEV_PATH" = "UNKNOWN" ]; then 
@@ -527,9 +527,8 @@ main() {
       udev_remove_links "$_DEVICE_ID" "$VDEV_METADATA" "$VDEV_MOUNTPOINT" || vdev_error "Failed to remove udev links for $VDEV_PATH"
       udev_remove_tags "$_DEVICE_ID" "$VDEV_METADATA" || vdev_error "Failed to remove udev tags for $VDEV_PATH"
    fi
-
-
-   # require sequence number and devpath, at least 
+   
+   # require sequence number and devpath, at least, for event propagation
    if [ -z "$VDEV_OS_SEQNUM" ] || [ -z "$VDEV_OS_DEVPATH" ] || [ -z "$VDEV_OS_SUBSYSTEM" ]; then 
       return 0
    fi
@@ -544,7 +543,8 @@ main() {
 $(udev_event_generate_text "$VDEV_ACTION" "$VDEV_OS_DEVPATH" "$VDEV_OS_SUBSYSTEM" "$VDEV_OS_SEQNUM" "$VDEV_METADATA")
 EOF
 
-   return $?
+   _RC=$?
+   return $_RC
 }
 
 
