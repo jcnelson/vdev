@@ -128,8 +128,8 @@ static int vdev_remove_unplugged_device( char const* path, void* cls ) {
    // is this a directory?
    if( S_ISDIR( sb.st_mode ) ) {
        
-      // skip the hwdb 
-      if( strcmp( basename, "hwdb" ) == 0 ) {
+      // skip the metadata dir 
+      if( strcmp( basename, "metadata" ) == 0 ) {
          return 0;
       }
 
