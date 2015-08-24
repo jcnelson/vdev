@@ -398,6 +398,7 @@ int vdev_config_fullpaths( struct vdev_config* conf ) {
    int rc = 0;
    
    char** need_fullpath[] = {
+      &conf->config_path,
       &conf->acls_dir,
       &conf->acts_dir,
       &conf->helpers_dir,
