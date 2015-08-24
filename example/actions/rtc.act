@@ -1,4 +1,4 @@
 [vdev-action]
 event=add
 path=^rtc[0-9]+$
-command=/bin/ln -sf "$VDEV_PATH" "$VDEV_MOUNTPOINT/rtc"
+command=. "$VDEV_HELPERS/subr.sh"; vdev_symlink "$VDEV_PATH" "$VDEV_MOUNTPOINT/rtc" "$VDEV_METADATA"

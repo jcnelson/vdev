@@ -2,4 +2,7 @@
 event=add
 path=^3270/tty[0-9]*$
 OS_SUBSYSTEM=tty
-command=/bin/chown root:tty "$VDEV_MOUNTPOINT/$VDEV_PATH" && /bin/chmod 0620 "$VDEV_MOUNTPOINT/$VDEV_PATH"
+VAR_PERMISSIONS_OWNER=root
+VAR_PERMISSIONS_GROUP=tty
+VAR_PERMISSIONS_MODE=0620
+helper=permissions.sh

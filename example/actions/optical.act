@@ -1,5 +1,5 @@
 [vdev-action]
 event=any
 path=^sr[0-9]*$
-command=$VDEV_HELPERS/optical.sh
+helper=optical.sh
 daemonlet=true

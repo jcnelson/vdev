@@ -2,4 +2,4 @@
 event=any
 OS_SUBSYSTEM=msr
 path=^msr[0-9]*$
-rename_command=echo -n "$VDEV_PATH" | /bin/sed 's/msr\([0-9]*\)/cpu\/\1\/msr/g'
+rename_command="$VDEV_HELPERS/echo_n" "$VDEV_PATH" | /bin/sed 's/msr\([0-9]*\)/cpu\/\1\/msr/g'

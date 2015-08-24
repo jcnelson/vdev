@@ -1,4 +1,7 @@
 [vdev-action]
 event=add
 path=^port$
-command=/bin/chown root:kmem "$VDEV_MOUNTPOINT/$VDEV_PATH" && /bin/chmod 0640 "$VDEV_MOUNTPOINT/$VDEV_PATH"
+VAR_PERMISSIONS_OWNER=root
+VAR_PERMISSIONS_GROUP=kmem
+VAR_PERMISSIONS_MODE=0640
+helper=permissions.sh

@@ -2,4 +2,5 @@
 event=add
 path=^err$
 OS_SUBSYSTEM=aoe
-command=/bin/chmod 0440 "$VDEV_MOUNTPOINT/$VDEV_PATH"
+VAR_PERMISSIONS_MODE=0440
+helper=permissions.sh

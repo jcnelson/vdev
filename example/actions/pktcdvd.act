@@ -1,4 +1,7 @@
 [vdev-action]
 event=add
 path=^pktcdvd$
-command=/bin/chown root:cdrom "$VDEV_MOUNTPOINT/$VDEV_PATH" && /bin/chmod 0644 "$VDEV_MOUNTPOINT/$VDEV_PATH"
+VAR_PERMISSIONS_OWNER=root
+VAR_PERMISSIONS_GROUP=cdrom
+VAR_PERMISSIONS_MODE=0644
+helper=permissions.sh

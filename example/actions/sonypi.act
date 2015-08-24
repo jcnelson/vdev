@@ -1,4 +1,5 @@
 [vdev-action]
 event=add
 path=^sonypi$
-command=/bin/chmod 0666 "$VDEV_MOUNTPOINT/$VDEV_PATH"
+VAR_PERMISSIONS_MODE=0666
+helper=permissions.sh

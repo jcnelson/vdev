@@ -1,4 +1,4 @@
 [vdev-action]
 event=add
-command=$VDEV_HELPERS/hwdb-props.sh
+helper=hwdb-props.sh
 daemonlet=true

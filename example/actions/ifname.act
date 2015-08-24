@@ -2,5 +2,5 @@
 event=add
 OS_INTERFACE=
 OS_SUBSYSTEM=net
-command=$VDEV_HELPERS/ifname.sh
+helper=ifname.sh
 daemonlet=true

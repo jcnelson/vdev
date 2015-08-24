@@ -2,5 +2,5 @@
 event=add
 path=^input/event[0-9]+$
 OS_SUBSYSTEM=input
-command=$VDEV_HELPERS/power-switch.sh
+helper=power-switch.sh
 daemonlet=true

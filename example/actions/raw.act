@@ -2,4 +2,5 @@
 event=add
 path=^raw[0-9]+$
 OS_SUBSYSTEM=raw
-command=/bin/chgrp disk "$VDEV_MOUNTPOINT/$VDEV_PATH"
+VAR_PERMISSIONS_GROUP=disk
+helper=permissions.sh

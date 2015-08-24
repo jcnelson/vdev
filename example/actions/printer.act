@@ -2,4 +2,5 @@
 event=add
 path=^lp.*$
 OS_SUBSYSTEM=printer
-command=/bin/chgrp lp "$VDEV_MOUNTPOINT/$VDEV_PATH"
+VAR_PERMISSIONS_GROUP=lp
+helper=permissions.sh

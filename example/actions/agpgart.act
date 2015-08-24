@@ -2,4 +2,5 @@
 event=add
 path=^agpgart$
 OS_SUBSYSTEM=misc
-command=/bin/chgrp video "$VDEV_MOUNTPOINT/$VDEV_PATH"
+VAR_PERMISSIONS_GROUP=video
+helper=permissions.sh

@@ -2,5 +2,5 @@
 event=any
 OS_SUBSYSTEM=block
 OS_DEVTYPE=partition
-command=$VDEV_HELPERS/disk.sh
+helper=disk.sh
 daemonlet=true

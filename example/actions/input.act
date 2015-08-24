@@ -1,5 +1,5 @@
 [vdev-action]
 event=any
 OS_SUBSYSTEM=input
-command=$VDEV_HELPERS/input.sh
+helper=input.sh
 daemonlet=true

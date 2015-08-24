@@ -1,4 +1,5 @@
 [vdev-action]
 event=add
 path=^rfkill$
-command=/bin/chmod 0664 "$VDEV_MOUNTPOINT/$VDEV_PATH"
+VAR_PERMISSIONS_MODE=0664
+helper=permissions.sh

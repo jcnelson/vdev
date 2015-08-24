@@ -1,4 +1,7 @@
 [vdev-action]
 event=add
 path=^btrfs-control$
-command=/bin/chown root:disk "$VDEV_MOUNTPOINT/$VDEV_PATH" && /bin/chmod 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
+VAR_PERMISSIONS_OWNER=root
+VAR_PERMISSIONS_GROUP=disk
+VAR_PERMISSIONS_MODE=0660
+helper=permissions.sh

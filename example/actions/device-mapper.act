@@ -1,4 +1,4 @@
 [vdev-action]
 event=any
 OS_DEVNAME=mapper/control
-rename_command=echo -n "$VDEV_OS_DEVNAME"
+rename_command="$VDEV_HELPERS/echo_n" "$VDEV_OS_DEVNAME"

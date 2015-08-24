@@ -1,5 +1,5 @@
 [vdev-action]
 event=add
 OS_FIRMWARE=
-command=$VDEV_HELPERS/firmware.sh
+helper=firmware.sh
 daemonlet=true

@@ -1,4 +1,5 @@
 [vdev-action]
 event=add
 path=^mmtimer$
-command=/bin/chmod 0644 "$VDEV_MOUNTPOINT/$VDEV_PATH"
+VAR_PERMISSIONS_MODE=0644
+helper=permissions.sh

@@ -1,0 +1,4 @@
+[vdev-action]
+event=add
+path=^fuse$
+command=if [ -z "$(/bin/cat /proc/self/mounts | /bin/grep "fusectl")" ]; then /bin/mount -t fusectl fusectl /sys/fs/fuse/connections; fi

@@ -2,5 +2,5 @@
 event=add
 type=char
 OS_DEVPATH=
-command=$VDEV_HELPERS/sysfs.sh
+helper=sysfs.sh
 daemonlet=true
