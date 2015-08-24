@@ -64,8 +64,8 @@ struct vdev_state {
    // run once? (i.e. coldplug only)
    bool once;
    
-   // fd to write to to signal when the initial devices have all been processed
-   int flush_fd;
+   // fd to the child for signaling the end of coldplug 
+   int coldplug_finished_fd;
 };
 
 typedef char* cstr;
@@ -78,8 +78,7 @@ int vdev_main( struct vdev_state* vdev, int flush_fd );
 int vdev_stop( struct vdev_state* vdev );
 int vdev_shutdown( struct vdev_state* vdev, bool unlink_pidfile );
 
-// NOTE: this is meant to be called by the workqueue
-int vdev_signal_wq_flushed( struct vdev_state* state );
+int vdev_signal_coldplug_finished( struct vdev_state* state, int status );
 
 int vdev_preseed_run( struct vdev_state* state );
 int vdev_remove_unplugged_devices( struct vdev_state* state );

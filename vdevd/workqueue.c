@@ -24,7 +24,7 @@
 #include "os/common.h"
 #include "vdev.h"
 
-// wait for the queue to be drained
+// wait for the queue to be drained of coldplug events
 static void vdev_wq_wait_for_empty( struct vdev_wq* wq ) {
    
    pthread_mutex_lock( &wq->waiter_lock );
@@ -37,7 +37,7 @@ static void vdev_wq_wait_for_empty( struct vdev_wq* wq ) {
 }
 
 
-// signal any waiting threds that the queue is empty 
+// signal any waiting threads that the queue has been drained of coldplug events
 static void vdev_wq_signal_empty( struct vdev_wq* wq ) {
    
    volatile int num_waiters = 0;
@@ -66,6 +66,8 @@ static void* vdev_wq_main( void* cls ) {
    struct vdev_wreq* next = NULL;
    
    struct vdev_state* state = wq->state;
+   
+   bool coldplug_finished = false;
    
    int rc = 0;
 
@@ -103,16 +105,20 @@ static void* vdev_wq_main( void* cls ) {
       
       pthread_mutex_unlock( &wq->work_lock );
       
+      if( !coldplug_finished ) {
+         coldplug_finished = vdev_os_context_is_coldplug_finished( state->os );
+      }
+      
       if( work_itr == NULL ) {
          
-         if( vdev_os_context_is_flushed( state->os ) ) {
+         vdev_wq_signal_empty( wq );
          
-            // no work; wake up anyone waiting for us to have finished the initial devices
-            vdev_signal_wq_flushed( state );
+         if( coldplug_finished ) {
+         
+            // coldplug has finished!  signal anyone waiting for us
+            vdev_signal_coldplug_finished( state, 0 );
          }
          
-         vdev_wq_signal_empty( wq );
-            
          continue;
       }
 

@@ -24,6 +24,7 @@
 
 #include "libvdev/util.h"
 #include "libvdev/config.h"
+#include "action.h"
 #include "vdev.h"
 
 #endif

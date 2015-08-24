@@ -62,7 +62,7 @@ struct vdev_wq {
    // semaphore to signal the availability of work
    sem_t work_sem;
    
-   // semaphore to signal the end of work 
+   // semaphore to signal the end of coldplug processing 
    sem_t end_sem;
    
    // pointer to vdev global state 

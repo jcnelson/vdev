@@ -92,6 +92,7 @@ static int vdev_remove_unplugged_device( char const* path, void* cls ) {
    int rc = 0;
    struct stat sb;
    char instance_str[ VDEV_CONFIG_INSTANCE_NONCE_STRLEN + 1 ];
+   char basename[ NAME_MAX+1 ];
    
    memset( instance_str, 0, VDEV_CONFIG_INSTANCE_NONCE_STRLEN + 1 );
    
@@ -107,16 +108,12 @@ static int vdev_remove_unplugged_device( char const* path, void* cls ) {
       return 0;
    }
    
-   // is this . or ..?
-   char* basename = vdev_basename( path, NULL );
+   vdev_basename( path, basename );
    
-   // skip . and ..
+   // is this . or ..?
    if( strcmp(basename, ".") == 0 || strcmp(basename, "..") == 0 ) {
-      free( basename );
       return 0;
    }
-   
-   free( basename );
    
    // what is this?
    rc = lstat( path, &sb );
@@ -130,6 +127,11 @@ static int vdev_remove_unplugged_device( char const* path, void* cls ) {
    
    // is this a directory?
    if( S_ISDIR( sb.st_mode ) ) {
+       
+      // skip the hwdb 
+      if( strcmp( basename, "hwdb" ) == 0 ) {
+         return 0;
+      }
 
       // search this later 
       char* path_dup = vdev_strdup_or_null( path );
@@ -199,7 +201,7 @@ static int vdev_remove_unplugged_device( char const* path, void* cls ) {
 }
 
 
-// remove all devices that no longer exist--that is, the contents of the /dev/vdev/$DEVICE_PATH/dev_instance file 
+// remove all devices that no longer exist--that is, the contents of the /dev/metadata/$DEVICE_PATH/dev_instance file 
 // does not match this vdev's instance nonce.
 // this is used when running with --once.
 int vdev_remove_unplugged_devices( struct vdev_state* state ) {
@@ -646,7 +648,7 @@ int vdev_preseed_run( struct vdev_state* vdev ) {
    
    sprintf(command, "%s %s %s", vdev->config->preseed_path, vdev->config->mountpoint, vdev->config->config_path );
    
-   rc = vdev_subprocess( command, NULL, &output, output_len, &exit_status );
+   rc = vdev_subprocess( command, NULL, &output, output_len, &exit_status, true );
    if( rc != 0 ) {
       
       vdev_error("vdev_subprocess('%s') rc = %d\n", command, rc );
@@ -799,7 +801,7 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
    vdev->argv = argv;
    
    // load actions 
-   rc = vdev_action_load_all( vdev->config->acts_dir, &vdev->acts, &vdev->num_acts );
+   rc = vdev_action_load_all( vdev->config, &vdev->acts, &vdev->num_acts );
    if( rc != 0) {
       
       vdev_error("vdev_action_load_all('%s') rc = %d\n", vdev->config->acts_dir, rc );
@@ -821,11 +823,14 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
 
 
 // main loop for the back-end 
+// takes a file descriptor to be written to once coldplug processing has finished.
 // return 0 on success
 // return -errno on failure to daemonize, or abnormal OS-specific back-end failure
-int vdev_main( struct vdev_state* vdev, int flush_fd ) {
+int vdev_main( struct vdev_state* vdev, int coldplug_finished_fd ) {
    
    int rc = 0;
+   
+   vdev->coldplug_finished_fd = coldplug_finished_fd;
    
    char* metadata_dir = vdev_device_metadata_fullpath( vdev->mountpoint, "" );
    if( metadata_dir == NULL ) {
@@ -846,26 +851,19 @@ int vdev_main( struct vdev_state* vdev, int flush_fd ) {
    
    free( metadata_dir );
    
-   vdev->flush_fd = flush_fd;
-   
    rc = vdev_os_main( vdev->os );
    
    return rc;
 }
 
 
-// signal that the device work queue has flushed all initial devices 
-// always succeeds 
-int vdev_signal_wq_flushed( struct vdev_state* state ) {
+// signal that we've processed all coldplug devices
+int vdev_signal_coldplug_finished( struct vdev_state* vdev, int status ) {
    
-   if( state->flush_fd >= 0) {
-      
-      // wake up anyone waiting for the workqueue to be drained
-      int rc = 0;
-      write( state->flush_fd, &rc, sizeof(rc) );
-      
-      close( state->flush_fd );
-      state->flush_fd = -1;
+   if( vdev->coldplug_finished_fd > 0 ) {
+      write( vdev->coldplug_finished_fd, &status, sizeof(status));
+      close( vdev->coldplug_finished_fd );
+      vdev->coldplug_finished_fd = -1;
    }
    
    return 0;
@@ -915,13 +913,6 @@ int vdev_shutdown( struct vdev_state* vdev, bool unlink_pidfile ) {
    // remove the PID file, if we have one 
    if( vdev->config->pidfile_path != NULL && unlink_pidfile ) {
       unlink( vdev->config->pidfile_path );
-   }
-   
-   // print benchmarks...
-   vdev_debug("%s", "Action benchmarks:\n");
-   for( unsigned int i = 0; i < vdev->num_acts; i++ ) {
-      
-      vdev_action_log_benchmarks( &vdev->acts[i] );
    }
    
    vdev_action_free_all( vdev->acts, vdev->num_acts );

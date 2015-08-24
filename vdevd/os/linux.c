@@ -501,8 +501,8 @@ int vdev_os_next_device( struct vdev_device_request* vreq, void* cls ) {
       // was that the last of them?
       if( ctx->initial_requests == NULL ) {
          
-         // tell vdevd that we've flushed all pending requests 
-         vdev_os_context_signal_flushed( ctx->os_ctx );
+         // tell vdevd that we've finished coldplug processing
+         vdev_os_context_signal_coldplug_finished( ctx->os_ctx );
       }
       
       return 0;
