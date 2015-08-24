@@ -370,14 +370,13 @@ char* vdev_basename( char const* path, char* dest ) {
    return dest;
 }
 
-// run a subprocess in the system shell (/bin/sh)
-// TODO: exec directly
+// run a subprocess, optionally in the system shell.
 // gather the output into the output buffer (allocating it if needed).
 // return 0 on success
 // return 1 on output truncate 
 // return negative on error
 // set the subprocess exit status in *exit_status
-int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t max_output, int* exit_status ) {
+int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t max_output, int* exit_status, bool use_shell ) {
    
    int p[2];
    int rc = 0;
@@ -428,13 +427,27 @@ int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t m
       }
       
       // run the command 
-      if( env != NULL ) {
-         rc = execle( "/bin/sh", "sh", "-c", cmd, (char*)0, env );
+      if( use_shell ) {
+          
+         if( env != NULL ) {
+            rc = execle( "/bin/sh", "sh", "-c", cmd, (char*)0, env );
+         }
+         else {
+            
+            char** noenv = { NULL };
+            rc = execle( "/bin/sh", "sh", "-c", cmd, (char*)0, noenv );
+         }
       }
       else {
          
-         char** noenv = { NULL };
-         rc = execle( "/bin/sh", "sh", "-c", cmd, (char*)0, noenv );
+         if( env != NULL ) {
+            rc = execle( cmd, cmd, (char*)0, env );
+         }
+         else {
+            
+            char** noenv = { NULL };
+            rc = execle( cmd, cmd, (char*)0, noenv );
+         }
       }
       
       if( rc != 0 ) {

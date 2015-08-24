@@ -36,10 +36,12 @@
 #define VDEV_ACTION_NAME_PATH           "path"
 #define VDEV_ACTION_NAME_TYPE           "type"
 #define VDEV_ACTION_NAME_RENAME         "rename_command"
-#define VDEV_ACTION_NAME_SHELL          "command"
+#define VDEV_ACTION_NAME_COMMAND        "command"
+#define VDEV_ACTION_NAME_HELPER         "helper"
 #define VDEV_ACTION_NAME_ASYNC          "async"
 #define VDEV_ACTION_NAME_IF_EXISTS      "if_exists"
 #define VDEV_ACTION_NAME_OS_PREFIX      "OS_"
+#define VDEV_ACTION_NAME_VAR_PREFIX     "VAR_"
 
 #define VDEV_ACTION_EVENT_ADD           "add"
 #define VDEV_ACTION_EVENT_REMOVE        "remove"
@@ -78,11 +80,21 @@ struct vdev_action {
    // command to run to rename the matched path, if needed
    char* rename_command;
    
-   // command to run once the device state change is processed
+   // command to run once the device state change is processed.
+   // can be dynamically generated from helper, below.
    char* command;
+   
+   // name of a helper to run once the device state change is processed (conflicts with command)
+   char* helper;
+   
+   // whether or not to run this action in the system shell, or directly 
+   bool use_shell;
    
    // OS-specific fields to match on
    vdev_params* dev_params;
+   
+   // helper-specific variables to export
+   vdev_params* helper_vars;
    
    // synchronous or asynchronous 
    bool async;
@@ -105,14 +117,14 @@ typedef struct vdev_action vdev_action;
 
 C_LINKAGE_BEGIN
 
-int vdev_action_init( struct vdev_action* act, vdev_device_request_t trigger, char* path, char* command, bool async );
+int vdev_action_init( struct vdev_action* act, vdev_device_request_t trigger, char* path, char* command, char* helper, bool async );
 int vdev_action_add_param( struct vdev_action* act, char const* name, char const* value );
 int vdev_action_free( struct vdev_action* act );
 int vdev_action_free_all( struct vdev_action* act_list, size_t num_acts );
 
-int vdev_action_load( char const* path, struct vdev_action* act );
+int vdev_action_load( struct vdev_config* config, char const* path, struct vdev_action* act );
 
-int vdev_action_load_all( char const* dir, struct vdev_action** acts, size_t* num_acts );
+int vdev_action_load_all( struct vdev_config* config, struct vdev_action** acts, size_t* num_acts );
 
 int vdev_action_create_path( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts, char** path );
 int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_action* acts, size_t num_acts, bool exists );

@@ -137,13 +137,14 @@ static char const* vdev_device_request_mode_to_string( mode_t mode ) {
 // if is_daemonlet is set, then set VDEV_DAEMONLET=1
 // return 0 on success 
 // return negative on error 
-int vdev_device_request_to_env( struct vdev_device_request* req, char*** ret_env, size_t* num_env, int is_daemonlet ) {
+int vdev_device_request_to_env( struct vdev_device_request* req, vdev_params* helper_vars, char*** ret_env, size_t* num_env, int is_daemonlet ) {
    
    // type --> VDEV_ACTION
    // path --> VDEV_PATH (if non-null)
    // dev --> VDEV_MAJOR, VDEV_MINOR (if given)
    // mode --> VDEV_MODE (if given)
    // params --> VDEV_OS_* 
+   // helper vars --> VDEV_VAR_*
    // mountpoint --> VDEV_MOUNTPOINT
    // metadata --> VDEV_METADATA (if path is non-null)
    // global metadata --> VDEV_GLOBAL_METADATA
@@ -153,7 +154,7 @@ int vdev_device_request_to_env( struct vdev_device_request* req, char*** ret_env
    // config file --> VDEV_CONFIG_FILE
    // daemonlet --> VDEV_DAEMONLET (0 by default, 1 if is_daemonlet is non-zero)
    
-   size_t num_vars = 15 + sglib_vdev_params_len( req->params );
+   size_t num_vars = 15 + sglib_vdev_params_len( req->params ) + sglib_vdev_params_len( helper_vars );
    int i = 0;
    int rc = 0;
    char dev_buf[51];
@@ -341,6 +342,36 @@ int vdev_device_request_to_env( struct vdev_device_request* req, char*** ret_env
       }
       
       sprintf( varname, "VDEV_OS_%s", param_key );
+      
+      rc = vdev_device_request_make_env_str( varname, param_value, &env[i] );
+      
+      free( varname );
+      
+      if( rc != 0 ) {
+         
+         VDEV_FREE_LIST( env );
+         return rc;
+      }
+      
+      i++;
+   }
+   
+   // add all helper-specific variables 
+   for( dp = sglib_vdev_params_it_init_inorder( &itr, helper_vars ); dp != NULL; dp = sglib_vdev_params_it_next( &itr ) ) {
+      
+      char const* param_key = dp->key;
+      char const* param_value = dp->value;
+      
+      // prepend with "VDEV_OS_"
+      char* varname = VDEV_CALLOC( char, strlen(param_key) + 1 + strlen("VDEV_VAR_") );
+      
+      if( varname == NULL ) {
+         
+         VDEV_FREE_LIST( env );
+         return -ENOMEM;
+      }
+      
+      sprintf( varname, "VDEV_VAR_%s", param_key );
       
       rc = vdev_device_request_make_env_str( varname, param_value, &env[i] );
       

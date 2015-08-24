@@ -28,6 +28,13 @@
 
 #include "libvdev/ini.h"
 
+// to be passed into the action loader loop
+struct vdev_action_loader_cls {
+
+   struct sglib_vdev_action_vector* acts;
+   struct vdev_config* config;
+};
+
 // prototypes
 SGLIB_DEFINE_VECTOR_PROTOTYPES( vdev_action );
 SGLIB_DEFINE_VECTOR_FUNCTIONS( vdev_action );
@@ -37,7 +44,7 @@ static int vdev_action_daemonlet_stop( struct vdev_action* act );
 // initialize an action 
 // return 0 on success 
 // return -ENOMEM on OOM 
-int vdev_action_init( struct vdev_action* act, vdev_device_request_t trigger, char* path, char* command, bool async ) {
+int vdev_action_init( struct vdev_action* act, vdev_device_request_t trigger, char* path, char* command, char* helper, bool async ) {
    
    int rc = 0;
    memset( act, 0, sizeof(struct vdev_action) );
@@ -45,6 +52,7 @@ int vdev_action_init( struct vdev_action* act, vdev_device_request_t trigger, ch
    act->trigger = trigger;
    act->path = vdev_strdup_or_null( path );
    act->command = vdev_strdup_or_null( command );
+   act->helper = vdev_strdup_or_null( helper );
    act->async = async;
    
    act->is_daemonlet = false;
@@ -75,6 +83,15 @@ int vdev_action_add_param( struct vdev_action* act, char const* name, char const
    return vdev_params_add( &act->dev_params, name, value );
 }
 
+
+// add an environment variable to send to a helper 
+// return 0 on success 
+// return -ENOMEM on OOM 
+// return -EEXIST if the name already exists 
+int vdev_action_add_var( struct vdev_action* act, char const* name, char const* value ) {
+   return vdev_params_add( &act->helper_vars, name, value );
+}
+
 // free an action 
 // always succeeds
 // NOTE: does NOT touch the daemonlet state.
@@ -102,6 +119,18 @@ int vdev_action_free( struct vdev_action* act ) {
       
       vdev_params_free( act->dev_params );
       act->dev_params = NULL;
+   }
+   
+   if( act->helper_vars != NULL ) {
+      
+      vdev_params_free( act->helper_vars );
+      act->helper_vars = NULL;
+   }
+   
+   if( act->helper != NULL ) {
+      
+      free( act->helper );
+      act->helper = NULL;
    }
    
    if( act->path != NULL ) {
@@ -206,7 +235,7 @@ static int vdev_action_ini_parser( void* userdata, char const* section, char con
          }
       }
       
-      if( strcmp(name, VDEV_ACTION_NAME_SHELL) == 0 ) {
+      if( strcmp(name, VDEV_ACTION_NAME_COMMAND) == 0 ) {
          
          // shell command 
          if( act->command != NULL ) {
@@ -215,6 +244,18 @@ static int vdev_action_ini_parser( void* userdata, char const* section, char con
          }
          
          act->command = vdev_strdup_or_null( value );
+         return 1;
+      }
+      
+      if( strcmp(name, VDEV_ACTION_NAME_HELPER) == 0 ) {
+         
+         // helper in /lib/vdev 
+         if( act->helper != NULL ) {
+            
+            free( act->helper );
+         }
+         
+         act->helper = vdev_strdup_or_null( value );
          return 1;
       }
       
@@ -296,6 +337,19 @@ static int vdev_action_ini_parser( void* userdata, char const* section, char con
          }
       }
       
+      if( strncmp(name, VDEV_ACTION_NAME_VAR_PREFIX, strlen(VDEV_ACTION_NAME_VAR_PREFIX)) == 0 ) {
+          
+         // helper-specific variable 
+         rc = vdev_action_add_var( act, name + strlen(VDEV_ACTION_NAME_VAR_PREFIX), value );
+         
+         if( rc == 0 ) {
+            return 1;
+         }
+         else {
+            vdev_error("vdev_action_add_var( '%s', '%s' ) rc = %d\n", name, value, rc );
+            return 0;
+         }
+      }
       fprintf(stderr, "Unknown field '%s' in section '%s'\n", name, section );
       return 0;
    }
@@ -311,9 +365,15 @@ int vdev_action_sanity_check( struct vdev_action* act ) {
    
    int rc = 0;
    
-   if( act->command == NULL && act->rename_command == NULL ) {
+   if( act->command == NULL && act->rename_command == NULL && act->helper == NULL ) {
       
-      fprintf(stderr, "Action is missing 'command=' or 'rename_command='\n");
+      fprintf(stderr, "Action is missing 'command=', 'rename_command=', and 'helper='\n");
+      rc = -EINVAL;
+   }
+   
+   if( act->command != NULL && act->helper != NULL ) {
+       
+      fprintf(stderr, "Action has both 'command=' and 'helper='\n");
       rc = -EINVAL;
    }
    
@@ -327,11 +387,39 @@ int vdev_action_sanity_check( struct vdev_action* act ) {
 }
 
 
+// perform misc. post-processing on an action:
+// * if the command is NULL but the helper is not, then set command to be the full path to the helper.
+// return 0 on success 
+// return -ENOMEM on OOM 
+int vdev_action_postprocess( struct vdev_config* config, struct vdev_action* act ) {
+    
+   int rc = 0;
+   
+   if( act->command == NULL && act->helper != NULL ) {
+       
+      act->command = VDEV_CALLOC( char, strlen(config->helpers_dir) + 1 + strlen(act->helper) + 1 );
+      if( act->command == NULL ) {
+          return -ENOMEM;
+      }
+      
+      sprintf( act->command, "%s/%s", config->helpers_dir, act->helper );
+      
+      act->use_shell = false;
+   }
+   else {
+      
+      // given a shell command string 
+      act->use_shell = true;
+   }
+   
+   return rc;
+}
+
 // load an action from a file
 // return 0 on success
 // return -errno on failure to open, read, parse, or close
 // return -EINVAL if the loaded action fails our sanity tests
-int vdev_action_load_file( FILE* f, struct vdev_action* act ) {
+int vdev_action_load_file( struct vdev_config* config, char const* path, struct vdev_action* act, FILE* f ) {
    
    int rc = 0;
    
@@ -341,8 +429,16 @@ int vdev_action_load_file( FILE* f, struct vdev_action* act ) {
    }
    else {
       rc = vdev_action_sanity_check( act );
+      if( rc != 0 ) {
+         vdev_error("Invalid action '%s'\n", path );
+      }
    }
    
+   if( rc == 0 ) {
+      
+      // postprocess 
+      rc = vdev_action_postprocess( config, act );
+   }
    return rc;
 }
 
@@ -351,12 +447,12 @@ int vdev_action_load_file( FILE* f, struct vdev_action* act ) {
 // return -ENOMEM if OOM
 // return -errno on failure to open or read the file
 // return -EINVAL if the file could not be parsed
-int vdev_action_load( char const* path, struct vdev_action* act ) {
+int vdev_action_load( struct vdev_config* config, char const* path, struct vdev_action* act ) {
    
    int rc = 0;
    FILE* f = NULL;
    
-   rc = vdev_action_init( act, VDEV_DEVICE_INVALID, NULL, NULL, false );
+   rc = vdev_action_init( act, VDEV_DEVICE_INVALID, NULL, NULL, NULL, false );
    if( rc != 0 ) {
       
       vdev_error("vdev_action_init('%s') rc = %d\n", path, rc );
@@ -372,7 +468,7 @@ int vdev_action_load( char const* path, struct vdev_action* act ) {
       return rc;
    }
    
-   rc = vdev_action_load_file( f, act );
+   rc = vdev_action_load_file( config, path, act, f );
    
    fclose( f );
    
@@ -427,8 +523,10 @@ int vdev_action_loader( char const* path, void* cls ) {
    int rc = 0;
    struct vdev_action act;
    struct stat sb;
+   struct vdev_action_loader_cls* loader_cls = (struct vdev_action_loader_cls*)cls;
    
-   struct sglib_vdev_action_vector* acts = (struct sglib_vdev_action_vector*)cls;
+   struct sglib_vdev_action_vector* acts = loader_cls->acts;
+   struct vdev_config* config = loader_cls->config;
    
    // skip if not a regular file 
    rc = stat( path, &sb );
@@ -448,7 +546,7 @@ int vdev_action_loader( char const* path, void* cls ) {
    
    memset( &act, 0, sizeof(struct vdev_action) );
    
-   rc = vdev_action_load( path, &act );
+   rc = vdev_action_load( config, path, &act );
    if( rc != 0 ) {
       
       vdev_error("vdev_acl_load(%s) rc = %d\n", path, rc );
@@ -488,14 +586,18 @@ static int vdev_action_vector_free( struct sglib_vdev_action_vector* acts ) {
 // return -ENOMEM if OOM 
 // return -EINVAL if at least one action file failed to load due to a sanity test failure 
 // return -errno if at least one action file failed to load due to an I/O error
-int vdev_action_load_all( char const* dir_path, struct vdev_action** ret_acts, size_t* ret_num_acts ) {
+int vdev_action_load_all( struct vdev_config* config, struct vdev_action** ret_acts, size_t* ret_num_acts ) {
    
    int rc = 0;
+   struct vdev_action_loader_cls loader_cls;
    struct sglib_vdev_action_vector acts;
    
    sglib_vdev_action_vector_init( &acts );
    
-   rc = vdev_load_all( dir_path, vdev_action_loader, &acts );
+   loader_cls.acts = &acts;
+   loader_cls.config = config;
+   
+   rc = vdev_load_all( config->acts_dir, vdev_action_loader, &loader_cls );
    
    if( rc != 0 ) {
       
@@ -530,7 +632,7 @@ int vdev_action_load_all( char const* dir_path, struct vdev_action** ret_acts, s
 // carry out a command, synchronously, using an environment given by vreq.
 // return the exit status on success (non-negative)
 // return negative on error
-int vdev_action_run_sync( struct vdev_device_request* vreq, char const* command, char** output, size_t max_output ) {
+int vdev_action_run_sync( struct vdev_device_request* vreq, char const* command, vdev_params* helper_vars, bool use_shell, char** output, size_t max_output ) {
    
    int rc = 0;
    int exit_status = 0;
@@ -538,7 +640,7 @@ int vdev_action_run_sync( struct vdev_device_request* vreq, char const* command,
    size_t num_env = 0;
    
    // convert to environment variables
-   rc = vdev_device_request_to_env( vreq, &req_env, &num_env, 0 );
+   rc = vdev_device_request_to_env( vreq, helper_vars, &req_env, &num_env, 0 );
    if( rc != 0 ) {
       
       vdev_error("vdev_device_request_to_env(%s) rc = %d\n", vreq->path, rc );
@@ -551,7 +653,7 @@ int vdev_action_run_sync( struct vdev_device_request* vreq, char const* command,
       vdev_debug("command env: '%s'\n", req_env[i] );
    }
    
-   rc = vdev_subprocess( command, req_env, output, max_output, &exit_status );
+   rc = vdev_subprocess( command, req_env, output, max_output, &exit_status, use_shell );
    
    vdev_debug("exit status %d\n", exit_status );
    
@@ -583,7 +685,7 @@ int vdev_action_run_sync( struct vdev_device_request* vreq, char const* command,
 // return 0 if we were able to fork 
 // return -errno on failure to fork
 // TODO: configurable interpreter (defaults to /bin/dash)
-int vdev_action_run_async( struct vdev_device_request* req, char const* command ) {
+int vdev_action_run_async( struct vdev_device_request* req, char const* command, vdev_params* helper_vars, bool use_shell ) {
    
    int rc = 0;
    pid_t pid = 0;
@@ -594,7 +696,7 @@ int vdev_action_run_async( struct vdev_device_request* req, char const* command 
    char** env = NULL;
    size_t num_env = 0;
    
-   rc = vdev_device_request_to_env( req, &env, &num_env, 0 );
+   rc = vdev_device_request_to_env( req, helper_vars, &env, &num_env, 0 );
    if( rc != 0 ) {
       
       // NOTE: must be async-safe!
@@ -630,16 +732,28 @@ int vdev_action_run_async( struct vdev_device_request* req, char const* command 
          
          // fully detached
          max_fd = sysconf(_SC_OPEN_MAX);
+         if( max_fd < 0 ) {
+            
+            // should be big enough...
+            max_fd = 1024;
+         }
          
-         // close everything 
+         // close everything except stderr, which should be directed to our log
          for( int i = 0; i < max_fd; i++ ) {
-            close( i );
+            if( i != STDERR_FILENO ) {
+               close( i );
+            }
          }
          
          clearenv();
          
          // run the command 
-         execle( "/bin/dash", "dash", "-c", command, (char*)0, env );
+         if( use_shell ) {
+            execle( "/bin/dash", "dash", "-c", command, (char*)0, env );
+         }
+         else {
+            execle( command, command, (char*)0, env );
+         }
          
          // keep gcc happy 
          exit(0);
@@ -823,33 +937,19 @@ static int vdev_action_daemonlet_start( struct vdev_config* config, struct vdev_
          exit(1);
       }
       
-      if( act->async ) {
-         
-         // running asynchronously. we won't receive any input back.
-         rc = dup2( null_fd, STDOUT_FILENO );
-         if( rc < 0 ) {
+      // reroute output back to vdevd.
+      rc = dup2( daemonlet_pipe_stdout[1], STDERR_FILENO );
+      if( rc < 0 ) {
             
-            vdev_error_async_safe( "dup2 stdout to /dev/null failed\n");
-            exit(1);
-         }
-         
-         rc = dup2( null_fd, STDERR_FILENO );
-         if( rc < 0 ) {
-            
-            vdev_error_async_safe( "dup2 stderr to /dev/null failed\n");
-            exit(1);
-         }
+         vdev_error_async_safe("dup2 stderr to stdout failed\n");
+         _exit(1);
       }
-      else {
          
-         // running synchronously.  reroute output back to vdevd.   
-         rc = dup2( daemonlet_pipe_stdout[1], STDOUT_FILENO );
+      rc = dup2( daemonlet_pipe_stdout[1], STDOUT_FILENO );
+      if( rc < 0 ) {
          
-         if( rc < 0 ) {
-         
-            vdev_error_async_safe("dup2 stdout to vdevd failed\n");
-            exit(1);
-         }
+         vdev_error_async_safe("dup2 stdout to vdevd failed\n");
+         _exit(1);
       }
       
       // close all non-standard-io descriptors
@@ -871,7 +971,7 @@ static int vdev_action_daemonlet_start( struct vdev_config* config, struct vdev_
       execv( daemonlet_runner_path, daemonlet_argv );
       
       // keep gcc happy
-      exit(0);
+      _exit(0);
    }
    else if( pid > 0 ) {
       
@@ -885,6 +985,7 @@ static int vdev_action_daemonlet_start( struct vdev_config* config, struct vdev_
       
       // wait for child to indicate readiness, if running synchronously
       if( !act->async ) {
+         
          while( 1 ) {
             
             char tmp = 0;
@@ -1152,7 +1253,7 @@ int vdev_action_run_daemonlet( struct vdev_device_request* vreq, struct vdev_act
    }
    
    // generate the environment...
-   rc = vdev_device_request_to_env( vreq, &req_env, &num_env, 1 );
+   rc = vdev_device_request_to_env( vreq, act->helper_vars, &req_env, &num_env, 1 );
    if( rc != 0 ) {
       
       vdev_error("vdev_device_request_to_env(%s) rc = %d\n", vreq->path, rc );
@@ -1423,7 +1524,7 @@ int vdev_action_create_path( struct vdev_device_request* vreq, struct vdev_actio
          }
          
          // generate the new name
-         rc = vdev_action_run_sync( vreq, acts[i].rename_command, &new_path, PATH_MAX + 1 );
+         rc = vdev_action_run_sync( vreq, acts[i].rename_command, acts[i].helper_vars, acts[i].use_shell, &new_path, PATH_MAX + 1 );
          if( rc < 0 ) {
             
             vdev_error("vdev_action_run_sync('%s') rc = %d\n", acts[i].rename_command, rc );
@@ -1535,12 +1636,12 @@ int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_acti
             if( acts[i].async ) {
                
                method = "vdev_action_run_async";
-               rc = vdev_action_run_async( vreq, acts[i].command );
+               rc = vdev_action_run_async( vreq, acts[i].command, acts[i].helper_vars, acts[i].use_shell );
             }
             else {
                
                method = "vdev_action_run_sync";
-               rc = vdev_action_run_sync( vreq, acts[i].command, NULL, 0 );
+               rc = vdev_action_run_sync( vreq, acts[i].command, acts[i].helper_vars, acts[i].use_shell, NULL, 0 );
             }
          }
          else {
