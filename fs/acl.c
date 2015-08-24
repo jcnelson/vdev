@@ -819,7 +819,7 @@ int vdev_acl_run_predicate( struct vdev_acl* acl, struct pstat* ps, uid_t caller
    predicate_env[2] = env_buf[2];
    predicate_env[3] = NULL;
    
-   rc = vdev_subprocess( cmd_buf, predicate_env, NULL, 0, &exit_status );
+   rc = vdev_subprocess( cmd_buf, predicate_env, NULL, 0, &exit_status, true );
    
    if( rc != 0 ) {
       
