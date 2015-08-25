@@ -1,4 +1,5 @@
 #!/bin/dash
+# vim: set sts=4 expandtab:
 
 # set up /dev/snd/by-path and /dev/snd/by-id 
 
@@ -10,21 +11,21 @@
 main() {
 
    local STAT_RC VDEV_PERSISTENT_PATH VDEV_PROPERTIES BUS SERIAL SOUND_DATA
-   
+
    VDEV_PROPERTIES=""
    BUS=""
    SERIAL=""
-   
+
    # if removing, just remove symlinks
    if [ "$VDEV_ACTION" = "remove" ]; then 
-      
+
       vdev_cleanup "$VDEV_METADATA"
       return 0
    fi
 
    # make sure we're adding 
    if [ "$VDEV_ACTION" != "add" ]; then 
-      
+
       vdev_error "Unknown action \"$VDEV_ACTION\""
       return 10
    fi
@@ -37,10 +38,10 @@ main() {
 
       # verify that we got a persistent path 
       if [ $STAT_RC -eq 0 ]; then 
-         
+
          # import 
          eval "$SOUND_DATA"
-         
+
          if [ -n "$VDEV_PERSISTENT_PATH" ]; then
  
             # install the path 
@@ -58,31 +59,32 @@ main() {
 
    # if this is a USB device, then add by-id persistent path 
    if [ -n "$(vdev_subsystems "$SYSFS_PATH" | /bin/grep 'usb')" ]; then 
-      
+
       SOUND_DATA="$($VDEV_HELPERS/stat_usb "$SYSFS_PATH")"
       STAT_RC=$?
-      
+
       # did we get USB info?
       if [ $STAT_RC -ne 0 ]; then 
 
          # nope 
          vdev_error "$VDEV_HELPERS/stat_usb \"$SYSFS_PATH\" rc = $STAT_RC"
+      else
 
-      elif [ -n "$VDEV_USB_SERIAL" ]; then 
-
-         # import 
+         # import
          eval "$SOUND_DATA"
-         
-         BUS="usb"      
-         SERIAL="$VDEV_USB_SERIAL"
 
-         if [ -n "$VDEV_USB_INTERFACE_NUM" ]; then 
+         if [ -n "$VDEV_USB_SERIAL" ]; then
 
-            vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/snd/by-id/$BUS-$SERIAL-$VDEV_USB_INTERFACE_NUM" "$VDEV_METADATA"
-         
-         else
+            BUS="usb"
+            SERIAL="$VDEV_USB_SERIAL"
 
-            vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/snd/by-id/$BUS-$SERIAL" "$VDEV_METADATA"
+            if [ -n "$VDEV_USB_INTERFACE_NUM" ]; then
+
+               vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/snd/by-id/$BUS-$SERIAL-$VDEV_USB_INTERFACE_NUM" "$VDEV_METADATA"
+            else
+
+               vdev_symlink "../../$VDEV_PATH" "$VDEV_MOUNTPOINT/snd/by-id/$BUS-$SERIAL" "$VDEV_METADATA"
+            fi
          fi
       fi
    fi
