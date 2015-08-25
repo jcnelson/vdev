@@ -25,7 +25,7 @@ Project Non-Goals
 Dependencies
 -----------
 
-There are two binaries in vdev:  the hotplug daemon vdevd, and the userspace filesystem vdevfs.  You can use one without the other.
+There are two binaries in vdev:  the hotplug daemon vdevd, and the userspace filesystem vdevfs.  You can use one without the other.  If you only intend to replace udevd, you can ignore vdevfs.
 
 To build vdevd, you'll need:
 * libc
@@ -45,50 +45,57 @@ Vdevd's scripts can work without them, but some functionality will be missing.
 Building
 --------
 
-To build and install everything, with default options:
+By default, everything installs under `/usr/local`.  To build and install everything with default options, run:
 
     $ make
     $ sudo make install 
 
-To build and install just vdevd (with no configuration), type:
+To build and install vdevd (with no configuration) to `/usr/local/sbin`, type:
 
     $ make -C vdevd OS=$OS_TYPE
     $ sudo make -C vdevd install
 
-Substitute $OS_TYPE with:
+Substitute `$OS_TYPE` with:
 * "LINUX" to build for Linux (the default value)
 * "OPENBSD" to build for OpenBSD (coming soon)
 
-$OS_TYPE defaults to "LINUX".
+`$OS_TYPE` defaults to "LINUX".
 
-To build and install just vdevd's default recommended configuration, type:
+To build and install vdevd's default recommended configuration to `/usr/local/etc`, type:
 
     $ make -C example
     $ sudo make -C example install 
 
-To build and install just vdevd's hardware database, type:
+To build and install vdevd's hardware database to `/usr/local/lib`, type:
 
     $ make -C hwdb 
     $ sudo make -C hwdb install
 
-To build and install just libudev-compat, type:
+To build and install libudev-compat to `/usr/local/lib/` and its headers to `/usr/local/include`, type:
 
     $ make -C libudev-compat 
     $ sudo make -C libudev-compat install
 
-To build and install just vdevfs, type:
+To build and install vdevfs to `/usr/local/sbin/`, type:
 
     $ make -C fs
     $ sudo make -C fs install
 
-By default, vdevd is installed to /sbin/vdevd, vdevd's helper programs and hardware database are installed to /lib/vdev/, and vdevfs is installed to /usr/sbin/vdevfs.  You can override any of these directory choices at build-time by setting the "PREFIX=" variable on the command-line (e.g. `make -C vdevd PREFIX=/usr/local/`), and you can override the installation location by setting "DESTDIR=" at install-time (e.g. `sudo make -C vdevd install DESTDIR=/usr/local/`).
+By default, vdevd is installed to `/usr/local/sbin/vdevd`, vdevd's helper programs and hardware database are installed to `/usr/local/lib/vdev/`, and vdevfs is installed to `/usr/local/sbin/vdevfs`.  You can override any of these directory choices at build-time by setting the "PREFIX=" variable on the command-line (e.g. `make -C vdevd PREFIX=/`), and you can specify an alternative installation root by setting "DESTDIR=" at install-time (e.g. `sudo make -C vdevd install DESTDIR=/opt`).  You can also control where header files are installed by setting the "INCLUDE_PREFIX" variable (e.g. `make -C libudev-compat install HEADER_PREFIX=/usr`).
+
+Replacing udev on Linux
+-----------------------
+
+If you want to replace udev with vdev, you should consider installing the binaries to your root partition and the libudev-compat headers to `/usr`.  This is done by setting `DESTDIR= PREFIX= INCLUDE_PREFIX=/usr` when installing.  If you have an initramfs and rely on udevd during early boot, you will need to rebuild your initramfs so it will start vdevd instead.  If you are installing on Debian or Devuan, please first read Appendix B of the [how-to-test.md](https://github.com/jcnelson/vdev/blob/master/how-to-test.md) document, since it contains instructions on how to install vdevd's init script and rebuild your initramfs via the Debian/Devuan initramfs tools.
+
+**If you are replacing udev and libudev, you should back up their init scripts, header files, and libraries before installing vdev.  You may need to revert to them if vdev does not work for you.**
 
 FAQ
 ---
 * **Why another device manager?**  I want to control which processes have access to which device nodes based on criteria other than their user and group IDs.  For example, I want to filter access based on which login session the process belongs to, and I want to filter based on which container a process runs in.  Also, I want to have this functionality available on each of the *nix OSs I use on a (semi-)regular basis.  To the best of my knowledge, no device manager lets me do this (except perhaps Plan 9's per-process namespaces), so I wrote my own.
 * **What is the license for vdev?**  Vdev code is available for use under the terms of either the [GPLv3+](https://github.com/jcnelson/vdev/blob/master/LICENSE.GPLv3%2B) or [ISC license](https://github.com/jcnelson/vdev/blob/master/LICENSE.ISC).  However, the Linux port of vdev ships with some optional Linux-specific [helper programs](https://github.com/jcnelson/vdev/tree/master/vdevd/helpers/LINUX) that were derived from udev.  They are available under the terms of the GPLv2 where noted in the source files.
 * **How much time do you have to spend on this project?**  This is a side-project that's not directly related to my day job, so nights and weekends when I have cycles to spare.  However, I am very interested in the success of this project, so expect frequent updates nevertheless :)
-* **Which Linux distributions are you targeting?**  vdev is distro-agnostic, but I'm developing and testing primarily for [Debian](http://www.debian.org) and [Devuan](http://devuan.org).
+* **Which Linux distributions are you targeting?**  Vdev is distro-agnostic, but I'm developing and testing primarily for [Debian](http://www.debian.org) and [Devuan](http://devuan.org).
 * **Which BSDs/other UNIXes are you planning to support?**  OpenBSD for now.  Well-written, suitably-licensed pull requests that port vdev to these or other UNIX-like OSs will be gratefully accepted.
 * **Does this project have anything to do with systemd and udev merging?**  It's not strictly related, but the pending merger definitely motivated me to start this project sooner rather than later.  I hope vdev's existence will help alleviate the tension between the pro- and anti-systemd crowds:
   * Linux users who don't want to use systemd can run vdev in place of udev.
