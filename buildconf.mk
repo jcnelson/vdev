@@ -12,7 +12,6 @@ BUILD_INCLUDEDIR := $(BUILD)/include/
 BUILD_ETCDIR := $(BUILD)/etc
 
 # install environment
-DESTDIR			?= /
 PREFIX         ?= /usr/local
 INCLUDE_PREFIX ?= $(PREFIX)
 BINDIR         ?= $(DESTDIR)$(PREFIX)/bin
