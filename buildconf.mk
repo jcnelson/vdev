@@ -18,7 +18,7 @@ BINDIR         ?= $(DESTDIR)$(PREFIX)/bin
 SBINDIR			?= $(DESTDIR)$(PREFIX)/sbin
 LIBDIR         ?= $(DESTDIR)$(PREFIX)/lib
 INCLUDEDIR     ?= $(DESTDIR)$(INCLUDE_PREFIX)/include
-ETCDIR			?= $(DESTDIR)/$(PREFIX)/etc
+ETCDIR			?= $(DESTDIR)$(PREFIX)/etc
 
 # libvdev (NOTE: not an installable target; just common code)
 LIBVDEV_ROOT := $(ROOT_DIR)/libvdev 
