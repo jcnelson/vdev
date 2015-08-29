@@ -28,8 +28,8 @@ $(BUILD_VDEVFS)/%.o : %.cpp
 
 install: $(VDEVFS_INSTALL)
 $(VDEVFS_INSTALL): $(VDEVFS)
-	@mkdir -p $(INSTALL_VDEVFS)
-	cp -a $(VDEVFS) $(INSTALL_VDEVFS)/
+	@mkdir -p $(VDEVFS_INSTALL)
+	cp -a $(VDEVFS) $(VDEVFS_INSTALL)/
 
 .PHONY: clean
 clean:
