@@ -3,7 +3,7 @@ include ../buildconf.mk
 CFLAGS := -Wall -g -fPIC -fstack-protector -fstack-protector-all -pthread -Wno-unused-variable -Wno-unused-but-set-variable
 INC := $(INC) -I$(BUILD_LIBUDEV_COMPAT_HEADERS)
 DEFS := $(DEFS) -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=0700 -D_BSD_SOURCE -D_GNU_SOURCE
-CC   := gcc $(CFLAGS) $(INC) $(DEFS)
+CC   := cc $(CFLAGS) $(INC) $(DEFS)
 
 C_SRCS:= $(wildcard *.c)
 
@@ -25,7 +25,7 @@ LIBUDEV_COMPAT_FILES := $(LIBUDEV_COMPAT) $(LIBUDEV_COMPAT_SO) $(LIBUDEV_COMPAT_
 
 LIBUDEV_COMPAT_HEADERS := $(patsubst %.h,$(BUILD_LIBUDEV_COMPAT_HEADERS)/%.h,$(HEADERS))
 
-LIBUDEV_COMPAT_FILES_INSTALL := $(patsubst $(BUILD_LIBUDEV_COMPAT)/%,$(LIBDIR)/%,$(LIBUDEV_COMPAT_FILES))
+LIBUDEV_COMPAT_FILES_INSTALL := $(patsubst $(BUILD_LIBUDEV_COMPAT)/%,$(INSTALL_LIBUDEV_COMPAT)/%,$(LIBUDEV_COMPAT_FILES))
 
 LIBUDEV_COMPAT_HEADERS_INSTALL := $(patsubst $(BUILD_LIBUDEV_COMPAT_HEADERS)/%.h,$(INSTALL_LIBUDEV_COMPAT_HEADERS)/libudev/%.h,$(LIBUDEV_COMPAT_HEADERS))
 
@@ -35,7 +35,7 @@ test: $(BUILD_LIBUDEV_COMPAT)/libudev-fs
 
 $(LIBUDEV_COMPAT): $(OBJ)
 	@mkdir -p $(shell dirname "$@")
-	$(CC) -shared -Wl,-soname,$(LIBUDEV_COMPAT_SONAME) -o $@ $(OBJ) $(LIBINC) $(LIB)
+	$(CC) -shared -Wl,-soname,$(LIBUDEV_COMPAT_SONAME) -o "$@" $(OBJ) $(LIBINC) $(LIB)
 
 $(LIBUDEV_COMPAT_LIB): $(LIBUDEV_COMPAT)
 	@mkdir -p "$(shell dirname "$@")"
@@ -43,7 +43,7 @@ $(LIBUDEV_COMPAT_LIB): $(LIBUDEV_COMPAT)
 
 $(LIBUDEV_COMPAT_SO): $(LIBUDEV_COMPAT_LIB)
 	@mkdir -p "$(shell dirname "$@")"
-	@ln -sf "$(shell basename $<)" "$@"
+	@ln -sf "$(shell basename "$<")" "$@"
 
 $(BUILD_LIBUDEV_COMPAT)/libudev-fs: $(BUILD_LIBUDEV_COMPAT)/libudev-fs-test.o $(OBJ_TEST)
 	$(CC) -o "$@" "$<" $(OBJ_TEST) $(LIB) $(LIBINC) 
@@ -61,7 +61,7 @@ $(BUILD_LIBUDEV_COMPAT)/%.o: %.c $(LIBUDEV_COMPAT_HEADERS)
 
 install: $(LIBUDEV_COMPAT_FILES_INSTALL) $(LIBUDEV_COMPAT_HEADERS_INSTALL)
 
-$(LIBDIR)/%: $(BUILD_LIBUDEV_COMPAT)/%
+$(INSTALL_LIBUDEV_COMPAT)/%: $(BUILD_LIBUDEV_COMPAT)/%
 	@mkdir -p $(shell dirname "$@")
 	@cp -a "$<" "$@"
 
