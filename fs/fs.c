@@ -23,13 +23,18 @@
 #include "fs.h"
 #include "acl.h"
 
-#include <queue>
-
-using namespace std;
-
 static char const* vdev_fuse_odev = "-odev";
 static char const* vdev_fuse_ononempty = "-ononempty";
 static char const* vdev_fuse_allow_other = "-oallow_other";
+
+// scanning context queue entry 
+struct vdevfs_scandirat_queue {
+    
+   int fd;
+   char* path;
+   
+   struct vdevfs_scandirat_queue* next;
+};
 
 // scanning context, for vdevfs_dev_import 
 struct vdevfs_scandirat_context {
@@ -38,20 +43,18 @@ struct vdevfs_scandirat_context {
    struct fskit_entry* parent_dir;   // corresponding fskit directory being scanned
    char* parent_path;
    
-   queue<int>* dir_queue;            // points to dirfds
-   queue<char*>* dir_paths;          // points to dirpaths
+   struct vdevfs_scandirat_queue* tail;
 };
 
 
 // set up a vdevfs_scandirat_context 
 // always succeeds
-static void vdevfs_scandirat_context_init( struct vdevfs_scandirat_context* ctx, struct fskit_core* core, struct fskit_entry* parent_dir, char* parent_path, queue<int>* dir_queue, queue<char*>* dir_paths ) {
+static void vdevfs_scandirat_context_init( struct vdevfs_scandirat_context* ctx, struct fskit_core* core, struct fskit_entry* parent_dir, char* parent_path, struct vdevfs_scandirat_queue* tail ) {
    
    ctx->core = core;
    ctx->parent_dir = parent_dir;
    ctx->parent_path = parent_path;
-   ctx->dir_queue = dir_queue;
-   ctx->dir_paths = dir_paths;
+   ctx->tail = tail;
 }
 
 
@@ -71,6 +74,7 @@ static int vdevfs_scandirat_context_callback( int dirfd, struct dirent* dent, vo
    char linkbuf[8193];            // for resolving an underlying symlink
    char const* method_name;       // for logging
    char* joined_path = NULL;
+   struct vdevfs_scandirat_queue* next = NULL;
    
    // skip . and ..
    if( strcmp( dent->d_name, "." ) == 0 || strcmp( dent->d_name, ".." ) == 0 ) {
@@ -118,27 +122,20 @@ static int vdevfs_scandirat_context_callback( int dirfd, struct dirent* dent, vo
          return -ENOMEM;
       }
       
-      try {
+      next = VDEV_CALLOC( struct vdevfs_scandirat_queue, 1 );
+      if( next == NULL ) {
          
-         ctx->dir_paths->push( joined_path );
-      }
-      catch( bad_alloc& ba ) {
-         
-         // OOM
+         close( fd );
          free( joined_path );
          return -ENOMEM;
       }
       
-      try {
-         
-         ctx->dir_queue->push( fd );
-      }
-      catch( bad_alloc& ba ) {
-         
-         // OOM 
-         close( fd );
-         return -ENOMEM;
-      }
+      next->fd = fd;
+      next->path = joined_path;
+      next->next = NULL;
+      
+      ctx->tail->next = next;
+      ctx->tail = ctx->tail->next;
    }
    
    // construct an inode for this entry 
@@ -253,8 +250,9 @@ static int vdevfs_dev_import( struct fskit_fuse_state* fs, void* arg ) {
    
    struct vdevfs* vdev = (struct vdevfs*)arg;
    int rc = 0;
-   queue<int> dirfds;           // directory descriptors
-   queue<char*> dirpaths;       // relative paths to the mountpoint 
+   struct vdevfs_scandirat_queue* dir_queue = NULL;
+   struct vdevfs_scandirat_queue* dir_queue_tail = NULL;
+   struct vdevfs_scandirat_queue* ptr = NULL;
    struct fskit_entry* dir_ent = NULL;
    
    struct vdevfs_scandirat_context scan_context;
@@ -273,26 +271,25 @@ static int vdevfs_dev_import( struct fskit_fuse_state* fs, void* arg ) {
       return rc;
    }
    
-   // start at the mountpoint
-   try {
-      
-      dirfds.push( root_fd );
-      dirpaths.push( root );
-   }
-   catch( bad_alloc& ba ) {
+   // start at the mountpoint 
+   dir_queue = VDEV_CALLOC( struct vdevfs_scandirat_queue, 1 );
+   if( dir_queue == NULL ) {
       
       free( root );
+      close( root_fd );
       return -ENOMEM;
    }
    
-   while( dirfds.size() > 0 ) {
+   dir_queue->fd = root_fd;
+   dir_queue->path = root;
+   dir_queue->next = NULL;
+   
+   dir_queue_tail = dir_queue;
+   
+   while( dir_queue != NULL ) {
       
-      // next directory 
-      int dirfd = dirfds.front();
-      char* dirpath = dirpaths.front();
-      
-      dirfds.pop();
-      dirpaths.pop();
+      int dirfd = dir_queue->fd;
+      char* dirpath = dir_queue->path;
       
       // look up this entry 
       dir_ent = fskit_entry_resolve_path( fskit_fuse_get_core( vdev->fs ), dirpath, 0, 0, true, &rc );
@@ -300,16 +297,11 @@ static int vdevfs_dev_import( struct fskit_fuse_state* fs, void* arg ) {
          
          // shouldn't happen--we're going breadth-first 
          vdev_error("fskit_entry_resolve_path('%s') rc = %d\n", dirpath, rc );
-         
-         close( dirfd );
-         free( dirpath );
-         dirpath = NULL;
-        
          break;
       }
       
       // make a scan context 
-      vdevfs_scandirat_context_init( &scan_context, fskit_fuse_get_core( vdev->fs ), dir_ent, dirpath, &dirfds, &dirpaths );
+      vdevfs_scandirat_context_init( &scan_context, fskit_fuse_get_core( vdev->fs ), dir_ent, dirpath, dir_queue_tail );
       
       // scan this directory 
       rc = vdev_load_all_at( dirfd, vdevfs_scandirat_context_callback, &scan_context );
@@ -320,34 +312,38 @@ static int vdevfs_dev_import( struct fskit_fuse_state* fs, void* arg ) {
          
          // failed
          vdev_error("vdev_load_all_at(%d, '%s') rc = %d\n", dirfd, dirpath, rc );
+         break;
       }
       
+      // advance tail pointer
+      dir_queue_tail = scan_context.tail;
+      
+      // advance to next directory
       close( dirfd );
       free( dirpath );
       dirpath = NULL;
       
-      if( rc != 0 ) {
-         break;
-      }
+      ptr = dir_queue;
+      dir_queue = dir_queue->next;
+      
+      memset( ptr, 0, sizeof(struct vdevfs_scandirat_queue) );
+      free( ptr );
    }
    
    // free any remaining directory state 
-   size_t num_dirfds = dirfds.size();
-   for( unsigned int i = 0; i < num_dirfds; i++ ) {
-      
-      int next_dirfd = dirfds.front();
-      dirfds.pop();
-      
-      close( next_dirfd );
-   }
-   
-   size_t num_dirpaths = dirpaths.size();
-   for( unsigned int i = 0; i < num_dirpaths; i++ ) {
-      
-      char* path = dirpaths.front();
-      dirpaths.pop();
-      
-      free( path );
+   for( struct vdevfs_scandirat_queue* ptr = dir_queue; ptr != NULL; ) {
+       
+       int fd = ptr->fd;
+       char* path = ptr->path;
+       struct vdevfs_scandirat_queue* old_ptr = ptr;
+       
+       close( fd );
+       free( path );
+       
+       ptr = ptr->next;
+       
+       memset( old_ptr, 0, sizeof(struct vdevfs_scandirat_queue) );
+       free( old_ptr );
    }
    
    return rc;
@@ -1174,7 +1170,11 @@ int vdevfs_readdir( struct fskit_core* core, struct fskit_route_metadata* grp, s
    struct fskit_entry* child = NULL;
    
    // entries to omit in the listing
-   vector<int> omitted_idx;
+   unsigned int omitted_idx = 0;
+   int* omitted = VDEV_CALLOC( int, num_dirents );
+   if( omitted == NULL ) {
+       return -ENOMEM;
+   }
    
    pid_t pid = 0;
    uid_t uid = 0;
@@ -1196,6 +1196,7 @@ int vdevfs_readdir( struct fskit_core* core, struct fskit_route_metadata* grp, s
    
    ps = pstat_new();
    if( ps == NULL ) {
+      free( omitted );
       return -ENOMEM;
    }
    
@@ -1205,6 +1206,7 @@ int vdevfs_readdir( struct fskit_core* core, struct fskit_route_metadata* grp, s
       
       vdev_error("pstat(%d) rc = %d\n", pid, rc );
       pstat_free( ps );
+      free( omitted );
       return -EIO;
    }
    
@@ -1253,7 +1255,8 @@ int vdevfs_readdir( struct fskit_core* core, struct fskit_route_metadata* grp, s
          
          // omit this one 
          vdev_debug("Filter '%s'\n", fskit_entry_get_name( child ) );
-         omitted_idx.push_back( i );
+         omitted[ omitted_idx ] = i;
+         omitted_idx++;
          
          rc = 0;
       }
@@ -1274,11 +1277,12 @@ int vdevfs_readdir( struct fskit_core* core, struct fskit_route_metadata* grp, s
    }
    
    // skip ACL'ed entries
-   for( unsigned int i = 0; i < omitted_idx.size(); i++ ) {
+   for( unsigned int i = 0; i < omitted_idx; i++ ) {
       
-      fskit_readdir_omit( dirents, omitted_idx[i] );
+      fskit_readdir_omit( dirents, omitted[i] );
    }
    
    pstat_free( ps );
+   free( omitted );
    return rc;
 }

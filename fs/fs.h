@@ -24,13 +24,14 @@
 
 #include <fcntl.h>
 
+#include <fskit/fskit.h>
+#include <fskit/fuse/fskit_fuse.h>
+
 #include <attr/xattr.h>
 
 #include "libvdev/util.h"
 #include "libvdev/config.h"
 
-#include <fskit/fskit.h>
-#include <fskit/fuse/fskit_fuse.h>
 
 struct vdevfs {
    
