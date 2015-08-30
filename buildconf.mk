@@ -8,7 +8,7 @@ BUILD_LIBDIR := $(BUILD)/lib
 BUILD_USRBIN := $(BUILD)/usr/bin
 BUILD_USRSHARE := $(BUILD)/usr/share
 BUILD_USRSBIN := $(BUILD)/usr/sbin
-BUILD_INCLUDEDIR := $(BUILD)/include/
+BUILD_INCLUDEDIR := $(BUILD)/include
 BUILD_ETCDIR := $(BUILD)/etc
 
 # install environment
@@ -19,11 +19,12 @@ SBINDIR        ?= $(PREFIX)/sbin
 LIBDIR         ?= $(PREFIX)/lib
 INCLUDEDIR     ?= $(INCLUDE_PREFIX)/include
 ETCDIR         ?= $(PREFIX)/etc
+ETCDIR_VDEV    ?= $(PREFIX)/etc/vdev
 
 # libvdev (NOTE: not an installable target; just common code)
 LIBVDEV_ROOT := $(ROOT_DIR)/libvdev 
 BUILD_LIBVDEV := $(BUILD_LIBDIR)
-BUILD_LIBVDEV_HEADERS := $(BUILD_INCLUDEDIR)/libvdev
+BUILD_LIBVDEV_HEADERS := $(BUILD_INCLUDEDIR)
 BUILD_LIBVDEV_DIRS := $(BUILD_LIBVDEV) $(BUILD_LIBVDEV_HEADERS)
 
 # libudev-compat 
@@ -61,13 +62,11 @@ INSTALL_HWDB := $(DESTDIR)$(LIBDIR)/vdev/hwdb
 
 # compiler
 CFLAGS     := -Wall -std=c99 -g -fPIC -fstack-protector -fstack-protector-all -pthread -Wno-unused-variable -Wno-unused-but-set-variable
-CXXFLAGS   := -Wall -g -fPIC -fstack-protector -fstack-protector-all -pthread -Wno-unused-variable -Wno-unused-but-set-variable
 LDFLAGS    :=
 INC      := -I. -I$(ROOT_DIR) -I$(BUILD_INCLUDEDIR)
-DEFS     := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS -D_VDEV_OS_$(OS)
+DEFS     := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS -D_VDEV_OS_$(OS) -D_XOPEN_SOURCE=700
 LIBINC   := 
 CC       ?= cc
-CXX      ?= c++
 
 # build setup
 BUILD_DIRS   := $(sort $(BUILD_VDEVD_DIRS) \
