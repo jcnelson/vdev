@@ -38,46 +38,46 @@ print-%: ; @echo $*=$($*)
 all: $(VDEV_CONFIG_BUILD)
 $(CONF_BUILD): vdevd.conf.in
 	@mkdir -p $(shell dirname "$@")
-	@cat $< | \
-		sed -e 's~@PREFIX@~$(PREFIX)~g;' | \
-		sed -e 's~@CONF_DIR@~$(INSTALL_VDEV_CONFIG)~g;' > $@
+	@cat "$<" | \
+		sed -e 's~@PREFIX@~$(PREFIX)~g;' \
+		    -e 's~@CONF_DIR@~$(ETCDIR_VDEV)~g;' > "$@"
 
 $(IFNAMES_BUILD): ifnames.conf.in 
 	@mkdir -p $(shell dirname "$@")
-	@cat $< > $@
-	$(GEN_IFNAMES) >> $@
+	@cat "$<" > "$@"
+	$(GEN_IFNAMES) >> "$@"
 
 $(INITSCRIPT_BUILD): sysv-initscript.sh 
 	@mkdir -p $(shell dirname "$@")
-	@cp -a $< $@
+	@cp -a "$<" "$@"
 
 $(BUILD_VDEV_CONFIG)/actions/%: actions/%
 	@mkdir -p $(shell dirname "$@")
-	@cat $< > $@
+	@cat "$<" > "$@"
 
 $(BUILD_VDEV_INITRAMFS)/%: initramfs/%
 	@mkdir -p $(shell dirname "$@")
-	@cp -a $< $@
+	@cp -a "$<" "$@"
 
 $(CONF_INSTALL): $(CONF_BUILD)
 	@mkdir -p $(shell dirname "$@")
-	@cat $< > $@
+	@cat "$<" > "$@"
 
 $(IFNAMES_INSTALL): $(IFNAMES_BUILD)
 	@mkdir -p $(shell dirname "$@")
-	@cat $< > $@
+	@cat "$<" > "$@"
 
 $(INITSCRIPT_INSTALL): $(INITSCRIPT_BUILD)
 	@mkdir -p $(shell dirname "$@")
-	@cp -a $< $@
+	@cp -a "$<" "$@"
 
 $(INSTALL_VDEV_CONFIG)/actions/%: $(BUILD_VDEV_CONFIG)/actions/%
 	@mkdir -p $(shell dirname "$@")
-	@cat $< > $@
+	@cat "$<" > "$@"
 
 $(INSTALL_VDEV_INITRAMFS)/%: $(BUILD_VDEV_INITRAMFS)/%
 	@mkdir -p $(shell dirname "$@")
-	@cp -a $< $@
+	@cp -a "$<" "$@"
 
 .PHONY: initramfs
 initramfs: $(VDEV_CONFIG_INSTALL) $(INITSCRIPT_INSTALL)
