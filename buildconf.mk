@@ -20,6 +20,7 @@ LIBDIR         ?= $(PREFIX)/lib
 INCLUDEDIR     ?= $(INCLUDE_PREFIX)/include
 ETCDIR         ?= $(PREFIX)/etc
 ETCDIR_VDEV    ?= $(PREFIX)/etc/vdev
+SHAREDIR       ?= $(PREFIX)/share
 
 # libvdev (NOTE: not an installable target; just common code)
 LIBVDEV_ROOT := $(ROOT_DIR)/libvdev 
@@ -53,7 +54,7 @@ BUILD_VDEV_INITRAMFS := $(BUILD_USRSHARE)/initramfs-tools
 BUILD_VDEV_CONFIG_DIRS := $(BUILD_VDEV_CONFIG)
 INSTALL_VDEV_CONFIG := $(DESTDIR)$(ETCDIR)/vdev
 INSTALL_VDEV_INITSCRIPT := $(DESTDIR)$(ETCDIR)/init.d
-INSTALL_VDEV_INITRAMFS := $(DESTDIR)$(USRSHAREDIR)/initramfs-tools
+INSTALL_VDEV_INITRAMFS := $(DESTDIR)$(SHAREDIR)/initramfs-tools
 
 # hwdb 
 BUILD_HWDB := $(BUILD_LIBDIR)/vdev/hwdb
