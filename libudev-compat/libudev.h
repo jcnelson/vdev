@@ -31,7 +31,6 @@
 
 #include <stdarg.h>
 #include <sys/types.h>
-// #include "util.h"
 
 #include <time.h>
 
