@@ -230,7 +230,7 @@ for dirp in "events" "events/global"; do
    test -d "$VDEV_MOUNTPOINT/$dirp" || /bin/mkdir -p "$VDEV_MOUNTPOINT/$dirp"
 done
 
-/bin/chmod 0777 "$VDEV_MOUNTPOINT/events"
+/bin/chmod 1777 "$VDEV_MOUNTPOINT/events"
 /bin/chmod 0750 "$VDEV_MOUNTPOINT/events/global"
 
 # add vdevd's metadata directories 
@@ -243,7 +243,7 @@ for dirp in "metadata/udev/tags" "metadata/udev/data" "metadata/udev/links" "met
    test -d "$VDEV_MOUNTPOINT/$dirp" || /bin/mkdir -m 0755 -p "$VDEV_MOUNTPOINT/$dirp"
 done
 
-/bin/chmod 0777 "$VDEV_MOUNTPOINT/metadata/udev/events" 
+/bin/chmod 1777 "$VDEV_MOUNTPOINT/metadata/udev/events" 
 /bin/chmod 0750 "$VDEV_MOUNTPOINT/metadata/udev/events/global"
 
 # attach the hardware database, if we have one 
