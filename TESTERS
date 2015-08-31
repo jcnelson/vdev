@@ -4,6 +4,8 @@ Scooby
 * hardware database testing
 * LVM testing
 * performance testing
+* build testing with DESTDIR
+* testing with lots of loopback devices
 
 lepoitr
 * pre-alpha vdevd testing
@@ -22,3 +24,17 @@ Didier Kryn
 Jack L. Frost, aka fbt@fleshless.org 
 * pre-alpha vdevd testing with /dev/snd/by-id
 * hardware database build testing
+* build testing with vdev's dependencies
+* packaging testing with PREFIX and DESTDIR and other Makefile conventions
+* event-push testing
+* AUR packages for vdev
+
+usr_one
+* early boot testing
+
+tilt
+* early boot testing
+
+onimatrix81
+* Gentoo testing
+* early boot testing
