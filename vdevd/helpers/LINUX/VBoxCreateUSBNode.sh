@@ -17,6 +17,8 @@
 # hope that it will be useful, but WITHOUT ANY WARRANTY of any kind.
 #
 
+umask 022
+
 # Constant, from the USB specifications
 usb_class_hub=09
 
