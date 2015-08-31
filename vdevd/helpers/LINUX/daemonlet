@@ -109,10 +109,18 @@ daemonlet_read_environ() {
          
          eval "$_ENV_NAME=\"$_ENV_VALUE\""
          _ALL_ENV="$_ENV_NAME $_ALL_ENV"
-      
+     
+      elif [ $# -eq 1 ]; then 
+
+         # just define the empty variable 
+         _ENV_NAME="$1"
+         eval "$_ENV_NAME=\"\""
+         _ALL_ENV="$_ENV_NAME $_ALL_ENV"
+         
       else 
          
-         # no '=' in string 
+         # no '=' in string
+         echo "Unparseable by $$: \'$_ENV_NAME_AND_VALUE\'" >> /tmp/daemonlet.log
          return 2
       fi
       
@@ -120,7 +128,6 @@ daemonlet_read_environ() {
 
    if [ $_COUNT -eq 0 ]; then 
       # dead
-      echo "$0 $$ dead" >> /tmp/daemonlet.log
       return 1
    fi
 
@@ -174,12 +181,14 @@ while true; do
    daemonlet_read_environ
    DAEMONLET_ENVIRON_RC=$?
 
-   if [ $DAEMONLET_ENVIRON_RC -eq 1 ]; then 
+   if [ $DAEMONLET_ENVIRON_RC -eq 1 ]; then
+      echo "ENVIRON tells $$ to die" >> /tmp/daemonlet.log 
       # were told to exit 
       exit 0
 
    elif [ $DAEMONLET_ENVIRON_RC -eq 2 ]; then 
       # bad environment variable 
+      echo "ENVIRON for $$ has a bad variable" >> /tmp/daemonlet.log
       exit 1
    fi
 
