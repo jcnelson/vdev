@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/dash
 
 # Helper to push device events to listening processes.
 
