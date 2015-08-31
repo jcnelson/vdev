@@ -12,5 +12,5 @@ kryn@in2p3.fr
 Kylie McClain - Makefile variable standardization 
 somasis@exherbo.org
 
-Jack Frost - Fixing bugs in the sound.sh helper 
+Jack Frost - Fixing bugs in the sound.sh helper, fixing packaging-related bugs in the build system 
 fbt@fleshless.org
