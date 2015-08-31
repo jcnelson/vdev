@@ -175,7 +175,7 @@ int main( int argc, char** argv ) {
          vdev_error("vdev_main rc = %d\n", rc );
       }
       
-      // if only doing coldplug (once), find and remove all stale coldplug devices.
+      // if only doing coldplug, find and remove all stale coldplug devices.
       // use the metadata directory to figure this out
       if( vdev.config->once ) {
          

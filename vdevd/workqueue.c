@@ -96,7 +96,7 @@ static void* vdev_wq_main( void* cls ) {
          break;
       }
 
-      // exchange buffers--we have work to do
+      // we have work to do
       pthread_mutex_lock( &wq->work_lock );
 
       work_itr = wq->work;
@@ -115,7 +115,7 @@ static void* vdev_wq_main( void* cls ) {
          
          if( coldplug_finished ) {
          
-            // coldplug has finished!  signal anyone waiting for us
+            // coldplug has finished!  signal the parent to exit.
             vdev_signal_coldplug_finished( state, 0 );
          }
          

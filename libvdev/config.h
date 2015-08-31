@@ -87,7 +87,7 @@ struct vdev_config {
    // path to where /dev lives 
    char* mountpoint;
    
-   // populate/update /dev and exit
+   // coldplug only?
    bool once;
    
    // run in the foreground 
