@@ -65,12 +65,12 @@ while true; do
 done
 
 # For dependency ordered mkinitramfs hook scripts.
-. $INITRAMFS_TOOLS/scripts/functions
-. $INITRAMFS_TOOLS/hook-functions
+. "$INITRAMFS_TOOLS/scripts/functions"
+. "$INITRAMFS_TOOLS/hook-functions"
 
 . "${CONFDIR}/initramfs.conf"
 EXTRA_CONF=''
-for i in $INITRAMFS_TOOLS/conf.d/* ${CONFDIR}/conf.d/*; do
+for i in "$INITRAMFS_TOOLS"/conf.d/* ${CONFDIR}/conf.d/*; do
 	[ -e $i ] && EXTRA_CONF="${EXTRA_CONF} $(basename $i \
 		| grep '^[[:alnum:]][[:alnum:]\._-]*$' | grep -v '\.dpkg-.*$')";
 done
@@ -81,13 +81,13 @@ for i in ${EXTRA_CONF}; do
 		echo "Warning: ${CONFDIR}/conf.d/${i} is a directory instead of file, ignoring."
 	elif [ -e  ${CONFDIR}/conf.d/${i} ]; then
 		. ${CONFDIR}/conf.d/${i}
-   elif [ -e  $INITRAMFS_TOOLS/conf.d/${i} ]; then
-      . $INITRAMFS_TOOLS/conf.d/${i}
+   elif [ -e  "$INITRAMFS_TOOLS"/conf.d/${i} ]; then
+      . "$INITRAMFS_TOOLS"/conf.d/${i}
 	fi
 done
 
 # source package confs
-for i in $INITRAMFS_TOOLS/conf-hooks.d/*; do
+for i in "$INITRAMFS_TOOLS"/conf-hooks.d/*; do
 	if [ -d "${i}" ]; then
 		echo "Warning: ${i} is a directory instead of file, ignoring."
 	elif [ -e "${i}" ]; then
@@ -207,7 +207,7 @@ for x in modules.builtin modules.order; do
 done
 
 # MODULES=list case.  Always honour.
-for x in "${CONFDIR}/modules" $INITRAMFS_TOOLS/modules.d/*; do
+for x in "${CONFDIR}/modules" "$INITRAMFS_TOOLS"/modules.d/*; do
 	if [ -f "${x}" ]; then
 		add_modules_from_file "${x}"
 	fi
@@ -239,10 +239,10 @@ esac
 hidden_dep_add_modules
 
 # First file executed by linux
-cp -p $INITRAMFS_TOOLS/init ${DESTDIR}/init
+cp -p "$INITRAMFS_TOOLS/init" ${DESTDIR}/init
 
 # add existant boot scripts
-for b in $(cd $INITRAMFS_TOOLS/scripts/ && find . \
+for b in $(cd "$INITRAMFS_TOOLS/scripts/" && find . \
 	-regextype posix-extended -regex '.*/[[:alnum:]\._-]+$' -type f); do
 	[ -d "${DESTDIR}/scripts/$(dirname "${b}")" ] \
 		|| mkdir -p "${DESTDIR}/scripts/$(dirname "${b}")"
@@ -291,7 +291,7 @@ if [ "$DPKG_ARCH" = arm ] || [ "$DPKG_ARCH" = armeb ]; then
 	cp -a /lib/libgcc_s.so.1 "${DESTDIR}/lib/"
 fi
 
-run_scripts $INITRAMFS_TOOLS/hooks
+run_scripts "$INITRAMFS_TOOLS/hooks"
 run_scripts "${CONFDIR}"/hooks
 
 # cache boot run order
