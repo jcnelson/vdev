@@ -23,8 +23,8 @@ The steps to check out, compile and install vdev, libudev-compat, and host-speci
     $ sudo make -C libudev-compat install PREFIX= INCLUDE_PREFIX=/usr
     $ sudo update-rc.d udev disable
     $ sudo update-rc.d udev-finish disable
-    $ make -C example
-    $ sudo make -C example install
+    $ make -C example PREFIX= 
+    $ sudo make -C example install PREFIX=
 
 As a result of these commands, you will have installed `vdevd` to `/sbin/vdevd`, vdev's helpers to `/lib/vdev/`, vdev's host-specific configuration to `/etc/vdev/`, vdev's System V init script to `/etc/init.d/`, and libudev-compat to `/lib/libudev.so.1.5.2`.
 
