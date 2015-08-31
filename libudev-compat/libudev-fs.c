@@ -36,7 +36,7 @@
 #define UDEV_MAX_MONITORS 32768
 #endif
 
-static int udev_monitor_fs_events_path( char const* name, char* pathbuf );
+static int udev_monitor_fs_events_path( char const* name, char* pathbuf, int nonce );
 
 // We need to make sure that on fork, a udev_monitor listening to the underlying filesystem
 // will listen to its *own* process's events directory, at all times.  To do this, we will
@@ -69,9 +69,9 @@ static void g_monitor_table_unlock() {
    __sync_synchronize();
 }
 
-// on fork(), create a new events directory and point all existing monitors to it,
-// in order to preserve multicast semantics (i.e. both the parent and child must 
-// receive a device packet).
+// on fork(), create a new events directory for each of this process's monitors
+// and point them all to them.  This way, both the parent and child can continue 
+// to receive device packets.
 // NOTE: can only call async-safe methods
 static void udev_monitor_atfork(void) {
    
@@ -80,7 +80,6 @@ static void udev_monitor_atfork(void) {
    int i = 0;
    int cnt = 0;
    pid_t pid = getpid();
-   char pathbuf[ PATH_MAX+1 ];
    struct udev_monitor* monitor = NULL;
    int socket_fds[2];
    struct epoll_event ev;
@@ -89,23 +88,7 @@ static void udev_monitor_atfork(void) {
    
    memset( &ev, 0, sizeof(struct epoll_event) );
    
-   // try to make the directory
-   udev_monitor_fs_events_path( "", pathbuf );
-   rc = mkdir( pathbuf, 0700 );
-   
-   if( rc < 0 ) {
-      // failed, we have.
-      // child will not get any notifications  
-      rc = -errno;
-      write( STDERR_FILENO, "Failed to mkdir ", strlen("Failed to mkdir ") );
-      write( STDERR_FILENO, pathbuf, strlen(pathbuf) );
-      write( STDERR_FILENO, "\n", 1 );
-      
-      errno = errsv;
-      return;
-   }
-   
-   // reset each monitor's inotify fd to point to this directory instead
+   // reset each monitor's inotify fd to point to a new PID-specific directory instead
    g_monitor_table_spinlock();
    
    if( g_pid != pid ) {
@@ -155,6 +138,8 @@ static void udev_monitor_atfork(void) {
             
             // not much we can do here, except log an error 
             write( STDERR_FILENO, "Failed to generate a socketpair\n", strlen( "Failed to generate a socketpair\n" ) );
+
+            udev_monitor_fs_shutdown( monitor );
             g_monitor_table[i] = NULL;
             continue;
          }
@@ -174,12 +159,8 @@ static void udev_monitor_atfork(void) {
             
             // not much we can do here, except log an error 
             write( STDERR_FILENO, "Failed to add monitor socket\n", strlen("Failed to add monitor socket\n") );
-            
-            close( monitor->sock_fs );
-            close( monitor->sock );
-            
-            monitor->sock_fs = -1;
-            monitor->sock = -1;
+          
+            udev_monitor_fs_shutdown( monitor );
             g_monitor_table[i] = NULL;
             continue;
          }
@@ -202,7 +183,7 @@ static void udev_monitor_atfork(void) {
                // not much we can do here, except log an error 
                write( STDERR_FILENO, "Invalid inotify handle\n", strlen("Invalid inotify handle"));
                
-               monitor->inotify_fd = -1;
+               udev_monitor_fs_shutdown( monitor );
                g_monitor_table[i] = NULL;
                continue;
             }
@@ -210,15 +191,31 @@ static void udev_monitor_atfork(void) {
          
          if( rc == 0 ) {
             
-            udev_monitor_fs_events_path( "", monitor->events_dir );
+            udev_monitor_fs_events_path( "", monitor->events_dir, i );
             
+            // try to create a new directory for this monitor
+            rc = mkdir( monitor->events_dir, 0700 );
+   
+            if( rc < 0 ) {
+               // failed, we have.
+               // child will not get any notifications from this monitor
+               rc = -errno;
+               write( STDERR_FILENO, "Failed to mkdir ", strlen("Failed to mkdir ") );
+               write( STDERR_FILENO, monitor->events_dir, strlen(monitor->events_dir) );
+               write( STDERR_FILENO, "\n", 1 );
+      
+               udev_monitor_fs_shutdown( monitor );
+               g_monitor_table[i] = NULL;
+               return;
+            }
+
             // reconnect to the new directory
-            monitor->events_wd = inotify_add_watch( monitor->inotify_fd, pathbuf, UDEV_FS_WATCH_DIR_FLAGS );
+            monitor->events_wd = inotify_add_watch( monitor->inotify_fd, monitor->events_dir, UDEV_FS_WATCH_DIR_FLAGS );
             if( monitor->events_wd < 0 ) {
                
                // there's not much we can safely do here, besides log an error
                write( STDERR_FILENO, "Failed to watch ", strlen( "Failed to watch " ) );
-               write( STDERR_FILENO, pathbuf, strlen(pathbuf) );
+               write( STDERR_FILENO, monitor->events_dir, strlen(monitor->events_dir) );
                write( STDERR_FILENO, "\n", 1 );
             }
          }
@@ -272,8 +269,8 @@ static int udev_monitor_register( struct udev_monitor* monitor ) {
    }
    
    g_monitor_table_unlock();
-   
-   return rc;
+
+   return rc;   
 }
 
 
@@ -408,7 +405,7 @@ int udev_monitor_fs_setup( struct udev_monitor* monitor ) {
    }
    
    // create our monitor directory /dev/events/libudev-$PID
-   udev_monitor_fs_events_path( "", monitor->events_dir );
+   udev_monitor_fs_events_path( "", monitor->events_dir, monitor->slot );
    rc = mkdir( monitor->events_dir, 0700 );
    if( rc != 0 ) {
       
@@ -655,14 +652,20 @@ void itoa10_safe( int val, char* str ) {
    }
    
    // consume, lowest-order to highest-order
-   while( val > 0 ) {
-      
-      int r = val % 10;
-      
-      str[i] = '0' + r;
+   if( val == 0 ) {
+      str[i] = '0';
       i++;
+   }
+   else {
+      while( val > 0 ) {
       
-      val /= 10;
+         int r = val % 10;
+      
+         str[i] = '0' + r;
+         i++;
+      
+         val /= 10;
+      }
    }
    
    if( neg ) {
@@ -691,19 +694,24 @@ void itoa10_safe( int val, char* str ) {
 // path to a named event for this process to consume
 // pathbuf must have at least PATH_MAX bytes
 // NOTE: must be async-safe, since it's used in a pthread_atfork() callback
-static int udev_monitor_fs_events_path( char const* name, char* pathbuf ) {
+static int udev_monitor_fs_events_path( char const* name, char* pathbuf, int nonce ) {
    
    // do the equivalent of:
-   //    snprintf( pathbuf, PATH_MAX, UDEV_FS_EVENTS_DIR "/libudev-%d/%s", getpid(), name );
+   //    snprintf( pathbuf, PATH_MAX, UDEV_FS_EVENTS_DIR "/libudev-%d-%d/%s", getpid(), nonce, name );
    
    char pidbuf[10];
    pidbuf[9] = 0;
+
+   char nonce_buf[50];
+   nonce_buf[49] = 0;
    
    pid_t pid = getpid();
    
    itoa10_safe( pid, pidbuf );
+   itoa10_safe( nonce, nonce_buf );
    
    size_t pidbuf_len = strnlen(pidbuf, 10);
+   size_t nonce_buf_len = strnlen( nonce_buf, 50 );
    size_t prefix_len = strlen( UDEV_FS_EVENTS_DIR );
    size_t dirname_prefix_len = strlen( "/libudev-" );
    int off = 0;
@@ -716,6 +724,12 @@ static int udev_monitor_fs_events_path( char const* name, char* pathbuf ) {
    
    memcpy( pathbuf + off, pidbuf, pidbuf_len );
    off += pidbuf_len;
+
+   memcpy( pathbuf + off, "-", 1 );
+   off += 1;
+
+   memcpy( pathbuf + off, nonce_buf, nonce_buf_len );
+   off += nonce_buf_len;
    
    pathbuf[off] = '/';
    off++;
@@ -829,7 +843,7 @@ static int udev_monitor_fs_push_event( int fd, struct udev_monitor* monitor ) {
 }
 
 
-// reset the oneshot inotify watch, so it will trip on the next create
+// reset the oneshot inotify watch, so it will trip on the next create.
 // consume pending events, if there are any, and re-watch the directory.
 // if the pid has changed since last time, watch the new directory.
 // return 0 on success
@@ -897,7 +911,10 @@ static int udev_monitor_fs_watch_reset( struct udev_monitor* monitor ) {
    // has the PID changed?
    // need to regenerate events path 
    if( getpid() != monitor->pid ) {
-      udev_monitor_fs_events_path( "", monitor->events_dir );
+
+      log_trace("Switch PID from %d to %d", monitor->pid, getpid());
+
+      udev_monitor_fs_events_path( "", monitor->events_dir, monitor->slot );
       
       rc = mkdir( monitor->events_dir, 0700 );
       if( rc != 0 ) {
@@ -1123,7 +1140,7 @@ int main( int argc, char** argv ) {
    }
    
    // make sure events dir exists 
-   log_debug("events directory '%s'", UDEV_FS_EVENTS_DIR);
+   log_trace("events directory '%s'", UDEV_FS_EVENTS_DIR);
    
    rc = mkdir( UDEV_FS_EVENTS_DIR, 0700 );
    if( rc != 0 ) {
@@ -1135,7 +1152,7 @@ int main( int argc, char** argv ) {
       }
    }
    
-   udev_monitor_fs_events_path( "", pathbuf );
+   udev_monitor_fs_events_path( "", pathbuf, 0 );
    
    printf("Watching '%s'\n", pathbuf );
    
