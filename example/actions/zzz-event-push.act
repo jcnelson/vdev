@@ -4,5 +4,3 @@ OS_SEQNUM=
 OS_SUBSYSTEM=
 OS_DEVPATH=
 helper=event-push.sh
-daemonlet=true
-async=true

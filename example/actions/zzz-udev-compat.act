@@ -1,5 +1,3 @@
 [vdev-action]
 event=any
 helper=udev-compat.sh
-daemonlet=true
-async=true
