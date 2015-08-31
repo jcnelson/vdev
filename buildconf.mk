@@ -19,7 +19,7 @@ SBINDIR        ?= $(PREFIX)/sbin
 LIBDIR         ?= $(PREFIX)/lib
 INCLUDEDIR     ?= $(INCLUDE_PREFIX)/include
 ETCDIR         ?= $(PREFIX)/etc
-ETCDIR_VDEV    ?= $(PREFIX)/etc/vdev
+ETCDIR_VDEV    ?= $(ETCDIR)/vdev
 SHAREDIR       ?= $(PREFIX)/share
 
 # libvdev (NOTE: not an installable target; just common code)
