@@ -242,7 +242,8 @@ int help( char const* progname ) {
       "   DEVGID=(device node GID)\n",
       "\n",
       "Keys marked with [REQUIRED] must be present.\n",
-      "NOTE: events are limited to 8192 bytes.\n"
+      "NOTE: events are limited to 8192 bytes.\n",
+      NULL
    };
    
    for( i = 0; help_text[i] != NULL; i++ ) {
@@ -425,7 +426,7 @@ int main( int argc, char** argv ) {
       if( strstr( event_buf, required_fields[i] ) == NULL ) {
          
          // head of line? with no leading '\n'?
-         if( strncmp( event_buf, required_fields[i] + 1, strlen(required_fields[i]) ) != 0 ) {
+         if( strncmp( event_buf, required_fields[i] + 1, strlen(required_fields[i]) - 1 ) != 0 ) {
             
             fprintf(stderr, "Missing required field '%s'\n", required_fields[i] + 1 );
             fprintf(stderr, "Pass -h for a list of required fields\n" );
