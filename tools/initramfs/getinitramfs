@@ -1,0 +1,18 @@
+#!/bin/sh
+
+INITRAMFS="$1"
+DIR="$2"
+if [ -z "$DIR" ]; then 
+   DIR="$(mktemp -d)"
+fi
+
+zcat "$1" > "$DIR"/initramfs.cpio || exit 1
+cd "$DIR"
+mkdir initramfs
+cd initramfs
+cpio -vid < ../initramfs.cpio || exit 1
+
+echo ""
+echo "$DIR/initramfs"
+
+exit 0
