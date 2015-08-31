@@ -7,6 +7,6 @@ hwdb=@PREFIX@/lib/vdev/hwdb/hwdb.squashfs
 ifnames=@CONF_DIR@/ifnames.conf
 pidfile=@PREFIX@/run/vdev/vdevd.pid
 default_permissions=0600
-loglevel=warn
+loglevel=debug
 logfile=@PREFIX@/run/vdev/vdevd.log
 preseed=@PREFIX@/lib/vdev/dev-setup.sh
