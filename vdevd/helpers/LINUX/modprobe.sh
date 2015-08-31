@@ -1,7 +1,7 @@
 #!/bin/dash
 
 main() {
-   /sbin/modprobe -b -q "$VDEV_OS_MODALIAS" 
+   /sbin/modprobe -b -q -- "$VDEV_OS_MODALIAS" 
    return 0
 }
 
