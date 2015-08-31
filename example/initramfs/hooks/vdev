@@ -125,3 +125,6 @@ copy_exec /lib/x86_64-linux-gnu/libnss_files.so.2
 # since vdevd is multi-threaded, libpthread will dynamically load libgcc_s
 # (and copy_exec won't detect this)
 copy_exec /lib/`gcc -print-multiarch`/libgcc_s.so.1
+
+# until we're confident that the scripts work with busybox's sh, use dash
+copy_exec /bin/dash
