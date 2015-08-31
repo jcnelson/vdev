@@ -2,6 +2,7 @@
 
 # common subroutines for adding and removing devices 
 VDEV_PROGNAME=$0
+umask 022
 
 # add a device symlink, but remember which device node it was for,
 # so we can remove it later even when the device node no longer exists.
