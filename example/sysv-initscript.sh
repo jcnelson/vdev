@@ -112,7 +112,7 @@ vdevd_start() {
 
       vdev_pid_dir="$(echo "$vdev_config_pidfile" | sed 's/[^/]\+$//g')"
 
-      if [ -n "$vdev_pid_dir "]; then 
+      if [ -n "$vdev_pid_dir" ]; then 
          mkdir -p "$vdev_pid_dir"
       fi
    fi
