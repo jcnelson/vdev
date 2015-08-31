@@ -13,8 +13,11 @@ event_print_properties() {
    if [ -z "$_METADATA" ]; then 
       _METADATA="$VDEV_METADATA"
    fi
-   
-   /bin/cat "$_METADATA/properties"
+  
+   if [ -f "$_METADATA/properties" ]; then  
+      /bin/cat "$_METADATA/properties"
+   fi
+
    return 0
 }
 
