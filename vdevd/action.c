@@ -666,14 +666,14 @@ int vdev_action_run_sync( struct vdev_device_request* vreq, char const* command,
    
    if( rc != 0 ) {
       
-      vdev_error("vdev_subprocess('%s') rc = %d\n", command, rc );
+      vdev_error("vdev_subprocess('%s', use_shell=%d) rc = %d\n", command, use_shell, rc );
       
       return rc;
    }
    
    if( exit_status != 0 ) {
       
-      vdev_error("vdev_subprocess('%s') exit status = %d\n", command, exit_status );
+      vdev_error("vdev_subprocess('%s', use_shell=%d) exit status = %d\n", command, use_shell, exit_status );
    }
    
    return exit_status;
