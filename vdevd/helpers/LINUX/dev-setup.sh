@@ -29,39 +29,60 @@ VDEV_CONFIG_FILE="$2"
 # TODO: exponential back-off, in case we race
 attach_hwdb() {
 
-   local _HWDB_PATH _HWDB_LOOP _LOOP_MINOR
+   local _HWDB_PATH _HWDB_LOOP _LOOP_MINOR _RC _CREATED _MOUNT_TYPE
    
    _HWDB_PATH="$1"
    _HWDB_LOOP="$2"
 
+   # is the hwdb already attached?
+   if [ -n "$(/bin/cat /proc/mounts | /bin/grep "$VDEV_MOUNTPOINT/metadata/hwdb")" ]; then 
+   
+      # already mounted 
+      return 0
+   fi
+
    # deduce minor number 
    _LOOP_MINOR="${_HWDB_LOOP##loop}"
    
+   _RC=0
+   _CREATED=0
+
    # attempt to mount the hardware database
-   /bin/mknod "$VDEV_MOUNTPOINT/$_HWDB_LOOP" b 7 $_LOOP_MINOR
-   RC=$?
-   
-   if [ $RC -ne 0 ]; then 
-      return $RC
-   fi 
+   if ! [ -b "$VDEV_MOUNTPOINT/$_HWDB_LOOP" ]; then 
+      /bin/mknod "$VDEV_MOUNTPOINT/$_HWDB_LOOP" b 7 $_LOOP_MINOR
+      _RC=$?
+
+      if [ $_RC -ne 0 ]; then 
+         return $_RC
+      fi 
+
+      _CREATED=1
+   fi
    
    /sbin/losetup "$VDEV_MOUNTPOINT/$_HWDB_LOOP" "$_HWDB_PATH"
-   RC=$?
+   _RC=$?
    
-   if [ $RC -ne 0 ]; then 
+   if [ $_RC -ne 0 ]; then 
       
-      /bin/rm -f "$VDEV_MOUNTPOINT/$_HWDB_LOOP"
-      return $RC
+      if [ $_CREATED -ne 0 ]; then 
+         /bin/rm -f "$VDEV_MOUNTPOINT/$_HWDB_LOOP"
+      fi
+
+      return $_RC
    fi 
    
    /bin/mount -t squashfs "$VDEV_MOUNTPOINT/$_HWDB_LOOP" "$VDEV_MOUNTPOINT/metadata/hwdb"
-   RC=$?
+   _RC=$?
    
-   if [ $RC -ne 0 ]; then 
+   if [ $_RC -ne 0 ]; then 
       
       /sbin/losetup -d "$VDEV_MOUNTPOINT/$_HWDB_LOOP"
-      /bin/rm -f "$VDEV_MOUNTPOINT/$_HWDB_LOOP"
-      return $RC
+
+      if [ $_CREATED -ne 0 ]; then 
+         /bin/rm -f "$VDEV_MOUNTPOINT/$_HWDB_LOOP"
+      fi
+
+      return $_RC
    fi 
 
    # make sure vdevd still processes the loop device
@@ -175,25 +196,30 @@ feed_static_nodes_kmod() {
 umask 022
 
 # add /dev/fd
-/bin/ln -sf /proc/self/fd "$VDEV_MOUNTPOINT/fd"
+test -L "$VDEV_MOUNTPOINT/fd" || /bin/ln -sf /proc/self/fd "$VDEV_MOUNTPOINT/fd"
 
 # add /dev/core 
-/bin/ln -sf /proc/kcore "$VDEV_MOUNTPOINT/core"
+test -L "$VDEV_MOUNTPOINT/fd" || /bin/ln -sf /proc/kcore "$VDEV_MOUNTPOINT/core"
 
 # feed /dev/null into vdev, and make it locally
-echo "c null 1 3"
-/bin/mknod "$VDEV_MOUNTPOINT/null" c 1 3
+if ! [ -c "$VDEV_MOUNTPOINT/null" ]; then 
+   echo "c null 1 3"
+   /bin/mknod "$VDEV_MOUNTPOINT/null" c 1 3
+   /bin/chmod 0666 "$VDEV_MOUNTPOINT/null"
+fi
 
 # add /dev/stdin, /dev/stdout, /dev/stderr
-/bin/ln -sf /proc/self/fd/0 "$VDEV_MOUNTPOINT/stdin"
-/bin/ln -sf /proc/self/fd/1 "$VDEV_MOUNTPOINT/stdout"
-/bin/ln -sf /proc/self/fd/2 "$VDEV_MOUNTPOINT/stderr"
+test -L "$VDEV_MOUNTPOINT/stdin" || /bin/ln -sf /proc/self/fd/0 "$VDEV_MOUNTPOINT/stdin"
+test -L "$VDEV_MOUNTPOINT/stdout" || /bin/ln -sf /proc/self/fd/1 "$VDEV_MOUNTPOINT/stdout"
+test -L "$VDEV_MOUNTPOINT/stderr" || /bin/ln -sf /proc/self/fd/2 "$VDEV_MOUNTPOINT/stderr"
 
 # add MAKEDEV
-if [ -e /sbin/MAKEDEV ]; then
-   /bin/ln -sf /sbin/MAKEDEV "$VDEV_MOUNTPOINT/MAKEDEV"
-else
-   /bin/ln -sf /bin/true "$VDEV_MOUNTPOINT/MAKEDEV"
+if ! [ -e "$VDEV_MOUNTPOINT/MAKEDEV" ]; then 
+   if [ -e /sbin/MAKEDEV ]; then
+      /bin/ln -sf /sbin/MAKEDEV "$VDEV_MOUNTPOINT/MAKEDEV"
+   else
+      /bin/ln -sf /bin/true "$VDEV_MOUNTPOINT/MAKEDEV"
+   fi
 fi
 
 # add /dev/shm
@@ -204,15 +230,21 @@ for dirp in "events" "events/global"; do
    test -d "$VDEV_MOUNTPOINT/$dirp" || /bin/mkdir -p "$VDEV_MOUNTPOINT/$dirp"
 done
 
+/bin/chmod 0777 "$VDEV_MOUNTPOINT/events"
+/bin/chmod 0750 "$VDEV_MOUNTPOINT/events/global"
+
 # add vdevd's metadata directories 
 for dirp in "metadata/dev" "metadata/hwdb"; do
-   test -d "$VDEV_MOUNTPOINT/$dirp" || /bin/mkdir -p "$VDEV_MOUNTPOINT/$dirp"
+   test -d "$VDEV_MOUNTPOINT/$dirp" || /bin/mkdir -m 0755 -p "$VDEV_MOUNTPOINT/$dirp"
 done
 
 # add udev compatibility, including udev-formatted events
 for dirp in "metadata/udev/tags" "metadata/udev/data" "metadata/udev/links" "metadata/udev/events/global"; do
-   test -d "$VDEV_MOUNTPOINT/$dirp" || /bin/mkdir -p "$VDEV_MOUNTPOINT/$dirp"
+   test -d "$VDEV_MOUNTPOINT/$dirp" || /bin/mkdir -m 0755 -p "$VDEV_MOUNTPOINT/$dirp"
 done
+
+/bin/chmod 0777 "$VDEV_MOUNTPOINT/metadata/udev/events" 
+/bin/chmod 0750 "$VDEV_MOUNTPOINT/metadata/udev/events/global"
 
 # attach the hardware database, if we have one 
 HWDB_VAR="$(/bin/fgrep "hwdb=" "$VDEV_CONFIG_FILE")"
