@@ -529,7 +529,20 @@ int udev_monitor_fs_shutdown( struct udev_monitor* monitor ) {
          monitor->epoll_fd = -1;
       }
    }
-   
+  
+   if( monitor->events_wd >= 0 ) {
+
+      if( monitor->inotify_fd >= 0 ) {
+         rc = inotify_rm_watch( monitor->inotify_fd, monitor->events_wd );
+         if( rc < 0 ) {
+            rc = -errno;
+            log_error("close(events_wd %d) rc = %d", monitor->events_wd, rc );
+         }
+         else {
+            monitor->events_wd = -1;
+         }
+      }
+   } 
    if( monitor->inotify_fd >= 0 ) {
       rc = close( monitor->inotify_fd );
       if( rc < 0 ) {
@@ -616,7 +629,8 @@ int udev_monitor_fs_destroy( struct udev_monitor* monitor ) {
       }
       
    } while( result != NULL );
-   
+  
+   // NOTE: closes dirfd
    closedir( dirh );
    
    if( can_rmdir ) {
@@ -1081,7 +1095,11 @@ int udev_monitor_fs_push_events( struct udev_monitor* monitor ) {
    }
    
 udev_monitor_fs_push_events_cleanup:
-   
+ 
+   if( dirfd >= 0 ) { 
+      close( dirfd );
+   }
+
    if( events != NULL ) {
       for( i = 0; i < num_events; i++ ) {
          
