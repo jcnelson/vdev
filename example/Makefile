@@ -97,12 +97,12 @@ clean:
 .PHONY: uninstall
 uninstall:
 	rm -f $(VDEV_CONFIG_INSTALL)
-	update-rc.d -f vdev remove
+	update-rc.d -f vdev remove || true
 	@echo ""
 	@echo "vdev configuration and init scripts have been removed."
 	@echo "You will need to re-enable your previous device manager."
 	@echo ""
-	@echo "Example:"
+	@echo "Example (on Debian systems):"
 	@echo "   $$ sudo update-rc.d udev defaults"
 	@echo "   $$ sudo update-rc.d udev-finish defaults"
 	@echo "   $$ sudo insserv"
