@@ -124,6 +124,18 @@ bool streq_ptr(const char *a, const char *b);
 #define ALIGN(l) ALIGN4(l)
 #endif
 
+#ifndef MAX_HANDLE_SZ
+#define MAX_HANDLE_SZ	128
+
+struct file_handle
+{
+  unsigned int handle_bytes;
+  int handle_type;
+  /* File identifier.  */
+  unsigned char f_handle[0];
+};
+#endif
+
 union file_handle_union {
         struct file_handle handle;
         char padding[sizeof(struct file_handle) + MAX_HANDLE_SZ];
