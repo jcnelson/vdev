@@ -3,29 +3,30 @@ vdev: a virtual device manager and filesystem
 
 **This system is a work-in-progress.  If you would like to help, please see the [Issue Tracker](https://github.com/jcnelson/vdev/issues)**.
 
-Vdev is a userspace device manager and filesystem that exposes attached devices as device files for UNIX-like operating systems.  It differs from FreeBSD's devfs or Linux's udev, eudev, and mdev in that it offers an optional filesystem interface that implements a *per-process view of /dev* in a portable manner, providing the necessary functionality for the host administrator to control device node visibility and access based on arbitrary criteria (e.g. process UID, process session, process seat, etc.).
+Vdev is a portable userspace device-file manager for UNIX-like operating systems.  It differs from existing device-file managers in that it provides an optional filesystem interface that implements a *per-process view of /dev*, thereby giving the host administrator the means to control device node access based on arbitrary criteria (such as process session ID, process seat assignment, etc.).
+
+The Linux port of vdev aims to be a drop-in replacement for udev.
 
 More information is available in the [design document](http://judecnelson.blogspot.com/2015/01/introducing-vdev.html).
 
 Project Goals
 -------------
-* **Portable Architecture**.  Vdev is designed to be portable across (modern) *nix.  It can interface with both the kernel and synthetic device event sources, such as another vdev instance, or an existing /dev tree.  It can be statically linked and can compile with multiple libc's.
+* **Portable Architecture**.  Vdev is designed to be portable across (modern) *nix.  It can interface with both the kernel and synthetic device event sources, including another vdev instance, or an existing `/dev` tree.  It can also be statically linked and can compile with multiple libc's.
 * **Event-driven**.  Vdev's core logic is built around reacting to events from its back-end event source.  It creates and removes device files and metadata in response to devices being plugged in or unplugged.
-* **Scriptable**.  Vdev aims to keep device management policy and mechanisms as separate as possible.  It offers an easy-to-understand programming model for matching a device event to a sequence administrator-defined programs to run.
-* **Advanced Access Control**.  Vdev comes with an optional userspace filesystem that lets the administrator control how individual processes see the files under /dev.  The criteria include not only the process's effective UID and GID, but also the process image's inode number, absolute path, binary checksum, sets of open files, seat assignment, and so on.  *Any* process information can be used to control access.
-* **Container Friendly**.  Vdev can run in containers and chroots, and offers the administrator an easy-to-understand way to restrict, reorder, and rewrite the device events the contained vdevd will observe.  Importantly, the Linux port of vdev does *not* rely on netlink sockets to propagate events to client programs.
-* **Backwards Compatible**.  Vdev works with existing device management frameworks on the host OS.  The Linux port in particular comes with scripts to maintain a /dev tree that is backwards-compatible with udev, and comes with a "libudev-compat" library that is ABI-compatible with libudev 219.  The Linux port's udev-compatibility scripts generate and propagate device events and maintain device information in /run/udev, and libudev-compat allows libudev-dependent programs to continue working without modification.
+* **Scriptable**.  Vdev aims to keep device management policy and mechanisms as separate as possible.  It offers an easy-to-understand programming model for matching a device event to a sequence of administrator-defined programs to handle it.
+* **Advanced Access Control**.  Vdev comes with an optional userspace filesystem that lets the administrator control how individual processes see the files under `/dev`.  The criteria are programmatically selected and thus arbitrary--*any* process information can be used to control access.
+* **Container Friendly**.  Vdev can run in containers and chroots, and offers the administrator an easy-to-understand way to restrict, filter, and modify the device events the contained vdevd will observe.  Importantly, the Linux port of vdev does *not* rely on netlink sockets to propagate events to client programs.
+* **Sensible, Backwards-Compatible Defaults**.  Vdev comes with a reference configuration and set of helper programs that make it usable out-of-the-box, with no subsequent tweaking required.  The Linux port is a drop-in replacement for udev:  it generates an equivalent `/dev` tree, as well as an equivalent `/run/udev` tree.  It also ships with a "libudev-compat" library that is ABI-compatible with libudev 219.  Libudev-linked software such as the X.org X server can use vdev and libudev-compat without recompilation.  In addition, the Linux port interoperates with but does not depend on the `devtmpfs` filesystem.
 
 Project Non-Goals
 -----------------
 * **Init system integration**.  Vdev is meant to run with full functionality regardless of which init system, daemon manager, service manager, plumbing layer, etc. the user runs, since they address orthogonal concerns.  It will coexist with and complement them, but neither forcibly replace them nor require them to be present.
-* **New client libraries, language bindings, or D-bus APIs**.  Vdev will exprose all of the necessary state and device metadata via the /dev filesystem directly.  Any wrappers that present this information via higher-level APIs (such as libudev) will be supported only to provide backwards compatibility.
-* **Devtmpfs dependency**.  The Linux port of vdev does *not* require devtmpfs.
+* **New client libraries, language bindings, or Dbus APIs**.  Vdev will exprose all of the necessary state and device metadata via the /dev filesystem directly.  Any wrappers that present this information via higher-level APIs (such as libudev) will be supported only to provide backwards compatibility.
 
 Dependencies
 -----------
 
-There are two binaries in vdev:  the hotplug daemon vdevd, and the userspace filesystem vdevfs.  You can use one without the other.  If you only intend to replace udevd, you can ignore vdevfs.
+There are two binaries in vdev:  the hotplug daemon vdevd, and the userspace filesystem vdevfs.  You can use one without the other.  **If you only intend to replace udevd, you can ignore vdevfs.**
 
 To build vdevd, you'll need:
 * libc
@@ -81,12 +82,14 @@ To build and install vdevfs to `/usr/local/sbin/`, type:
     $ make -C fs
     $ sudo make -C fs install
 
-By default, vdevd is installed to `/usr/local/sbin/vdevd`, vdevd's helper programs and hardware database are installed to `/usr/local/lib/vdev/`, and vdevfs is installed to `/usr/local/sbin/vdevfs`.  You can override any of these directory choices at build-time by setting the "PREFIX=" variable on the command-line (e.g. `make -C vdevd PREFIX=/`), and you can specify an alternative installation root by setting "DESTDIR=" at install-time (e.g. `sudo make -C vdevd install DESTDIR=/opt`).  You can also control where header files are installed by setting the "INCLUDE_PREFIX" variable (e.g. `make -C libudev-compat install HEADER_PREFIX=/usr`).
+You can override the installation directories at build-time by setting the `PREFIX` variable on the command-line (e.g. `make -C vdevd PREFIX=/`), and you can specify an alternative installation root by setting `DESTDIR` at install-time (e.g. `sudo make -C vdevd install DESTDIR=/opt`).  You can also control where header files are installed by setting the `INCLUDE_PREFIX` variable (e.g. `make -C libudev-compat install INCLUDE_PREFIX=/usr`).
 
 Replacing udev on Linux
 -----------------------
 
-If you want to replace udev with vdev, you should consider installing the binaries to your root partition and the libudev-compat headers to `/usr`.  This is done by setting `DESTDIR= PREFIX= INCLUDE_PREFIX=/usr` when installing.  If you have an initramfs and rely on udevd during early boot, you will need to rebuild your initramfs so it will start vdevd instead.  If you are installing on Debian or Devuan, please first read Appendix B of the [how-to-test.md](https://github.com/jcnelson/vdev/blob/master/how-to-test.md) document, since it contains instructions on how to install vdevd's init script and rebuild your initramfs via the Debian/Devuan initramfs tools.
+If you want to replace udev with vdev, it is recommended that you install the binaries to your root partition and the libudev-compat headers to `/usr`.  This is done by setting `DESTDIR= PREFIX= INCLUDE_PREFIX=/usr` when installing.
+
+If you have an initramfs and rely on udevd during early boot, you will need to rebuild your initramfs so it will start vdevd instead.  If you are installing on Debian or Devuan, please first read Appendix B of the [how-to-test.md](https://github.com/jcnelson/vdev/blob/master/how-to-test.md) document, since it contains instructions on how to install vdevd's init script and rebuild your initramfs via the Debian/Devuan initramfs tools.
 
 **If you are replacing udev and libudev, you should back up their init scripts, header files, and libraries before installing vdev.  You may need to revert to them if vdev does not work for you.**
 
