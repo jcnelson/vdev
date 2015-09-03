@@ -3,7 +3,7 @@ include ../../../buildconf.mk
 C_SRCS:= $(wildcard *.c) 
 CXSRCS:= $(wildcard *.cpp) 
 OBJ   := $(patsubst %.c,$(BUILD_VDEVD_HELPERS)/%.o,$(C_SRCS)) $(patsubst %.cpp,$(BUILD_VDEVD_HELPERS)/%.o,$(CXSRCS))
-LIB   :=
+LIB   := -lrt
 
 HELPER_SCRIPTS := $(wildcard *.sh) daemonlet
 HELPERS := stat_optical stat_ata stat_input stat_scsi stat_v4l stat_net stat_usb stat_bus stat_path event-put echo_n $(HELPER_SCRIPTS)
