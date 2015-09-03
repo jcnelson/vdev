@@ -14,3 +14,5 @@ somasis@exherbo.org
 
 Jack Frost - Fixing bugs in the sound.sh helper, fixing packaging-related bugs in the build system 
 fbt@fleshless.org
+
+tilt12345678 - Get libudev-compat to build on Debian Wheezy
