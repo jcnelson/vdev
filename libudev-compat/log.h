@@ -28,8 +28,11 @@
 #include <syslog.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define LIBUDEV_COMPAT_WHERESTR "%05d: [%16s:%04u] %s: "
+#define LIBUDEV_COMPAT_DEBUG_ENVAR "LIBUDEV_COMPAT_DEBUG"
 
 #define log_trace( fmt, ... ) log_impl( -1, LIBUDEV_COMPAT_WHERESTR fmt "\n", (int)getpid(), __FILE__, __LINE__, __func__, __VA_ARGS__ )
 #define log_debug( fmt, ... ) log_impl( LOG_DEBUG, LIBUDEV_COMPAT_WHERESTR fmt "\n", (int)getpid(), __FILE__, __LINE__, __func__, __VA_ARGS__ )
