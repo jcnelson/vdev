@@ -1,5 +1,5 @@
-vdev: a virtual device manager and filesystem
-=============================================
+vdev: a device-file manager and filesystem
+==========================================
 
 **This system is a work-in-progress.  If you would like to help, please see the [Issue Tracker](https://github.com/jcnelson/vdev/issues)**.
 
