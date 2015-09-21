@@ -67,6 +67,7 @@ install: $(LIBUDEV_COMPAT_FILES_INSTALL) $(LIBUDEV_COMPAT_HEADERS_INSTALL)
 
 $(INSTALL_LIBUDEV_COMPAT)/%: $(BUILD_LIBUDEV_COMPAT)/%
 	@mkdir -p $(shell dirname "$@")
+	test -e "$@" && rm -f "$@"
 	cp -a "$<" "$@"
 
 $(INSTALL_LIBUDEV_COMPAT_HEADERS)/%.h: $(BUILD_LIBUDEV_COMPAT_HEADERS)/%.h
