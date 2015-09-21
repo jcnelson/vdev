@@ -37,7 +37,7 @@ For vdevfs, you'll need all of the above, plus:
 * [libpstat](https://github.com/jcnelson/libpstat)
 * [fskit](https://github.com/jcnelson/fskit)
 
-** Recommended Packages **
+**Recommended Packages**
 
 Vdevd comes with a set of scripts that provide udev compatibility for the Linux port, and these scripts make use of the following packages.  Vdevd's scripts can work without them, but some functionality will be missing:
 * lvm2
