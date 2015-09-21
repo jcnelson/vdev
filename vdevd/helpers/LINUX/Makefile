@@ -32,6 +32,7 @@ $(BUILD_VDEVD_HELPERS)/daemonlet: daemonlet
 install: $(HELPERS_INSTALL)
 $(INSTALL_VDEVD_HELPERS)/%: $(BUILD_VDEVD_HELPERS)/%
 	@mkdir -p "$(shell dirname "$@")"
+	test -e "$@" && rm -f "$@"
 	cp -a "$<" "$@"
 
 .PHONY: uninstall
