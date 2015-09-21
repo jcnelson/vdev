@@ -2,5 +2,7 @@
 event=add
 path=^audio$
 OS_SUBSYSTEM=sound
-command=exit 0
-# command=test -f "$VDEV_MOUNTPOINT/$VDEV_PATH" || (/bin/mknod "$VDEV_MOUNTPOINT/$VDEV_PATH" c $VDEV_MAJOR $VDEV_MINOR && exit $?); exit 0
+helper=permissions.sh
+VAR_PERMISSIONS_OWNER=root
+VAR_PERMISSIONS_GROUP=audio
+VAR_PERMISSIONS_MODE=0660
