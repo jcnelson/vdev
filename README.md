@@ -36,11 +36,14 @@ For vdevfs, you'll need all of the above, plus:
 * [libpstat](https://github.com/jcnelson/libpstat)
 * [fskit](https://github.com/jcnelson/fskit)
 
-Vdevd comes with a set of scripts that provide udev compatibility for the Linux port.  To run them, you will additionally need:
+** Recommended Packages **
+
+Vdevd comes with a set of scripts that provide udev compatibility for the Linux port, and these scripts make use of the following packages.  Vdevd's scripts can work without them, but some functionality will be missing:
 * lvm2
 * iproute2
 
-Vdevd's scripts can work without them, but some functionality will be missing.
+Vdev's libudev-compat library removes the netlink connection to udev in favor of creating and watching a process- and `udev_monitor`-specific directory, which vdevd's helper scripts discover and use to send serialized device events by writing them as files.  It is highly recommended that users install [eventfs](https://github.com/jcnelson/eventfs) and use it to host libudev-compat's event directories.  Eventfs is optimized for this use-case--it will ensure that libudev-compat's directories are backed by RAM, easily accessed in FIFO order, and automatically removed once the libudev-compat process that created them exits.
+
 
 Building
 --------
