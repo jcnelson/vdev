@@ -210,7 +210,7 @@ int vdev_parse_gid( char const* gid_str, gid_t* gid ) {
    // not a number?
    if( !parsed ) {
       
-      // probably a username 
+      // probably a group name 
       char* grp_buf = NULL;
       struct group grp;
       
@@ -218,7 +218,7 @@ int vdev_parse_gid( char const* gid_str, gid_t* gid ) {
       rc = vdev_get_group( gid_str, &grp, &grp_buf );
       if( rc != 0 ) {
          
-         vdev_error("vdev_get_passwd(%s) rc = %d\n", gid_str, rc );
+         vdev_error("vdev_get_group(%s) rc = %d\n", gid_str, rc );
          return rc;
       }
       
