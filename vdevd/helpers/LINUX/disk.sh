@@ -212,7 +212,7 @@ main() {
 
          # could not find parent metadata...maybe we didn't process it yet?  but this would be a bug, since we process devices in 
          # breadth-first order, from parents to children
-         vdev_error "partition not found: no metadata on parent device of $VDEV_OS_DEVPATH ($PARENT_DEVICE_PATH)"
+         vdev_error "partition not found: no metadata on parent device of $VDEV_OS_DEVPATH (at $VDEV_GLOBAL_METADATA/sysfs/$SERIALIZED_PARENT_DEVICE_PATH)"
          return 5
       fi
 
