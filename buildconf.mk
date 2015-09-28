@@ -10,6 +10,7 @@ BUILD_USRSHARE := $(BUILD)/usr/share
 BUILD_USRSBIN := $(BUILD)/usr/sbin
 BUILD_INCLUDEDIR := $(BUILD)/include
 BUILD_ETCDIR := $(BUILD)/etc
+BUILD_PKGCONFIG := $(BUILD)/usr/share/pkgconfig
 
 # install environment
 PREFIX         ?= /usr/local
@@ -21,6 +22,7 @@ INCLUDEDIR     ?= $(INCLUDE_PREFIX)/include
 ETCDIR         ?= $(PREFIX)/etc
 ETCDIR_VDEV    ?= $(ETCDIR)/vdev
 SHAREDIR       ?= $(PREFIX)/share
+PKGCONFIG	   ?= $(INCLUDE_PREFIX)/share/pkgconfig
 
 # libvdev (NOTE: not an installable target; just common code)
 LIBVDEV_ROOT := $(ROOT_DIR)/libvdev 
@@ -34,6 +36,7 @@ BUILD_LIBUDEV_COMPAT_HEADERS := $(BUILD_INCLUDEDIR)
 BUILD_LIBUDEV_COMPAT_DIRS := $(BUILD_LIBUDEV_COMPAT) $(BUILD_LIBUDEV_COMPAT_HEADERS)
 INSTALL_LIBUDEV_COMPAT := $(DESTDIR)$(LIBDIR)
 INSTALL_LIBUDEV_COMPAT_HEADERS := $(DESTDIR)$(INCLUDEDIR)
+LIBUDEV_VERSION := 219
 
 # vdevd 
 BUILD_VDEVD := $(BUILD_SBINDIR)

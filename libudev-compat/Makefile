@@ -33,12 +33,16 @@ LIBUDEV_COMPAT_FILES_INSTALL := $(patsubst $(BUILD_LIBUDEV_COMPAT)/%,$(INSTALL_L
 
 LIBUDEV_COMPAT_HEADERS_INSTALL := $(patsubst $(BUILD_LIBUDEV_COMPAT_HEADERS)/%.h,$(INSTALL_LIBUDEV_COMPAT_HEADERS)/%.h,$(LIBUDEV_COMPAT_INSTALL_HEADERS))
 
-all: $(LIBUDEV_COMPAT_FILES) $(LIBUDEV_COMPAT_HEADERS)
+LIBUDEV_COMPAT_PC_IN := libudev.pc.in
+BUILD_LIBUDEV_COMPAT_PC := $(BUILD_PKGCONFIG)/libudev.pc
+INSTALL_LIBUDEV_COMPAT_PC := $(PKGCONFIG)/libudev.pc
+
+all: $(LIBUDEV_COMPAT_FILES) $(LIBUDEV_COMPAT_HEADERS) $(BUILD_LIBUDEV_COMPAT_PC)
 
 test: $(BUILD_LIBUDEV_COMPAT)/libudev-fs 
 
 $(LIBUDEV_COMPAT): $(OBJ) $(SYM_BUILD)
-	@mkdir -p $(shell dirname "$@")
+	@mkdir -p "$(shell dirname "$@")"
 	$(CC) -shared -Wl,--version-script=libudev.sym,-soname,$(LIBUDEV_COMPAT_SONAME) -o "$@" $(OBJ) $(LIBINC) $(LIB)
 
 $(LIBUDEV_COMPAT_LIB): $(LIBUDEV_COMPAT)
@@ -52,26 +56,39 @@ $(BUILD_LIBUDEV_COMPAT)/libudev-fs-test.o: libudev-fs.c $(LIBUDEV_COMPAT_HEADERS
 	$(CC) -o "$@" -c "$<" -DTEST
 
 $(BUILD_LIBUDEV_COMPAT_HEADERS)/%.h: %.h
-	@mkdir -p $(shell dirname "$@")
+	@mkdir -p "$(shell dirname "$@")"
 	cp -a "$<" "$@"
 
 $(BUILD_LIBUDEV_COMPAT)/%.o: %.c $(LIBUDEV_COMPAT_HEADERS)
-	@mkdir -p $(shell dirname "$@")
+	@mkdir -p "$(shell dirname "$@")"
 	$(CC) -o "$@" -c "$<"
 
 $(BUILD_LIBUDEV_COMPAT)/%.sym: %.sym
-	@mkdir -p $(shell dirname "$@")
+	@mkdir -p "$(shell dirname "$@")"
 	cp -a "$<" "$@"
 
-install: $(LIBUDEV_COMPAT_FILES_INSTALL) $(LIBUDEV_COMPAT_HEADERS_INSTALL)
+$(BUILD_LIBUDEV_COMPAT_PC): $(LIBUDEV_COMPAT_PC_IN)
+	@mkdir -p "$(shell dirname "$@")"
+	@cat "$<" | \
+		sed -e 's~@prefix@~/$(PREFIX)~g; ' \
+			 -e 's~//~/~g; ' \
+			 -e 's~@libdir@~$(LIBDIR)~g; ' \
+			 -e 's~@includedir@~$(INCLUDEDIR)~g; ' \
+			 -e 's~@VERSION@~$(LIBUDEV_VERSION)~g; ' > "$@"
+
+install: $(LIBUDEV_COMPAT_FILES_INSTALL) $(LIBUDEV_COMPAT_HEADERS_INSTALL) $(INSTALL_LIBUDEV_COMPAT_PC)
 
 $(INSTALL_LIBUDEV_COMPAT)/%: $(BUILD_LIBUDEV_COMPAT)/%
-	@mkdir -p $(shell dirname "$@")
+	@mkdir -p "$(shell dirname "$@")"
 	@rm -f "$@"
 	cp -a "$<" "$@"
 
 $(INSTALL_LIBUDEV_COMPAT_HEADERS)/%.h: $(BUILD_LIBUDEV_COMPAT_HEADERS)/%.h
-	@mkdir -p $(shell dirname "$@")
+	@mkdir -p "$(shell dirname "$@")"
+	cp -a "$<" "$@"
+
+$(INSTALL_LIBUDEV_COMPAT_PC): $(BUILD_LIBUDEV_COMPAT_PC)
+	@mkdir -p "$(shell dirname "$@")"
 	cp -a "$<" "$@"
 
 .PHONY: uninstall

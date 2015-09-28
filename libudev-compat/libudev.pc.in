@@ -1,3 +1,7 @@
+#  libudev.pc.in.  Forked from systemd on 28 Sept 2015.
+#  All changes from the original are copyright Jude Nelson (judecn@gmail.com)
+#  Original copyright notice reproduced below:
+#  
 #  This file is part of systemd.
 #
 #  systemd is free software; you can redistribute it and/or modify it
@@ -6,7 +10,7 @@
 #  (at your option) any later version.
 
 prefix=@prefix@
-exec_prefix=@exec_prefix@
+exec_prefix=${prefix}
 libdir=@libdir@
 includedir=@includedir@
 
