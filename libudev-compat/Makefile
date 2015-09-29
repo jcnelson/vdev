@@ -3,7 +3,7 @@ include ../buildconf.mk
 CFLAGS := -Wall -g -fPIC -fstack-protector -fstack-protector-all -pthread -Wno-unused-variable -Wno-unused-but-set-variable
 INC := $(INC) -I$(BUILD_LIBUDEV_COMPAT_HEADERS)
 DEFS := $(DEFS) -D_POSIX_C_SOURCE=200809L -D_BSD_SOURCE -D_GNU_SOURCE
-CC   := cc $(CFLAGS) $(INC) $(DEFS)
+CC   := cc
 
 C_SRCS:= $(wildcard *.c)
 SYM_SRCS:= $(wildcard *.sym)
@@ -21,7 +21,7 @@ VERSION_PATCH := 2
 LIBUDEV_COMPAT := $(BUILD_LIBUDEV_COMPAT)/libudev.so.$(VERSION_MAJOR)
 LIBUDEV_COMPAT_SONAME := libudev.so.$(VERSION_MAJOR)
 LIBUDEV_COMPAT_LIB := $(BUILD_LIBUDEV_COMPAT)/libudev.so.$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_PATCH)
- 
+
 LIBUDEV_COMPAT_FILES := $(LIBUDEV_COMPAT) $(LIBUDEV_COMPAT_LIB)
 
 LIBUDEV_COMPAT_HEADERS := $(patsubst %.h,$(BUILD_LIBUDEV_COMPAT_HEADERS)/%.h,$(HEADERS))
@@ -39,21 +39,21 @@ INSTALL_LIBUDEV_COMPAT_PC := $(DESTDIR)$(PKGCONFIG)/libudev.pc
 
 all: $(LIBUDEV_COMPAT_FILES) $(LIBUDEV_COMPAT_HEADERS) $(BUILD_LIBUDEV_COMPAT_PC)
 
-test: $(BUILD_LIBUDEV_COMPAT)/libudev-fs 
+test: $(BUILD_LIBUDEV_COMPAT)/libudev-fs
 
 $(LIBUDEV_COMPAT): $(OBJ) $(SYM_BUILD)
 	@mkdir -p "$(shell dirname "$@")"
-	$(CC) -shared -Wl,--version-script=libudev.sym,-soname,$(LIBUDEV_COMPAT_SONAME) -o "$@" $(OBJ) $(LIBINC) $(LIB)
+	$(CC) $(CFLAGS) $(INC) $(DEFS) -shared -Wl,--version-script=libudev.sym,-soname,$(LIBUDEV_COMPAT_SONAME) -o "$@" $(OBJ) $(LIBINC) $(LIB)
 
 $(LIBUDEV_COMPAT_LIB): $(LIBUDEV_COMPAT)
 	@mkdir -p "$(shell dirname "$@")"
 	@ln -sf "$(shell basename "$<")" "$@"
 
 $(BUILD_LIBUDEV_COMPAT)/libudev-fs: $(BUILD_LIBUDEV_COMPAT)/libudev-fs-test.o $(OBJ_TEST)
-	$(CC) -o "$@" "$<" $(OBJ_TEST) $(LIB) $(LIBINC) 
+	$(CC) $(CFLAGS) $(INC) $(DEFS) -o "$@" "$<" $(OBJ_TEST) $(LIB) $(LIBINC)
 
 $(BUILD_LIBUDEV_COMPAT)/libudev-fs-test.o: libudev-fs.c $(LIBUDEV_COMPAT_HEADERS)
-	$(CC) -o "$@" -c "$<" -DTEST
+	$(CC) $(CFLAGS) $(INC) $(DEFS) -o "$@" -c "$<" -DTEST
 
 $(BUILD_LIBUDEV_COMPAT_HEADERS)/%.h: %.h
 	@mkdir -p "$(shell dirname "$@")"
@@ -61,7 +61,7 @@ $(BUILD_LIBUDEV_COMPAT_HEADERS)/%.h: %.h
 
 $(BUILD_LIBUDEV_COMPAT)/%.o: %.c $(LIBUDEV_COMPAT_HEADERS)
 	@mkdir -p "$(shell dirname "$@")"
-	$(CC) -o "$@" -c "$<"
+	$(CC) $(CFLAGS) $(INC) $(DEFS) -o "$@" -c "$<"
 
 $(BUILD_LIBUDEV_COMPAT)/%.sym: %.sym
 	@mkdir -p "$(shell dirname "$@")"
@@ -95,6 +95,6 @@ $(INSTALL_LIBUDEV_COMPAT_PC): $(BUILD_LIBUDEV_COMPAT_PC)
 uninstall:
 	rm -f $(LIBUDEV_COMPAT_FILES_INSTALL) $(LIBUDEV_COMPAT_HEADERS_INSTALL)
 
-.PHONY: clean 
+.PHONY: clean
 clean:
 	rm -f $(LIBUDEV_COMPAT_FILES) $(LIBUDEV_COMPAT_HEADERS) $(OBJ) $(SYM_BUILD)
