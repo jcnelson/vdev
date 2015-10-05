@@ -177,7 +177,7 @@ main() {
       LINECNT=$((LINECNT+1))
       
       # skip comments 
-      if [ -n "$(echo $IFNAME | /bin/egrep "^#")" ]; then 
+      if [ -n "$(echo "$IFNAME" | /bin/egrep "^#")" ]; then 
          continue 
       fi 
 
@@ -233,14 +233,16 @@ main() {
       fi
 
       # do the rename 
-      rename_if $IFNAME $IFNAME_ORIG
-      RC=$?
-      
-      if [ $RC -ne 0 ]; then 
-         
-         # failed to rename 
-         vdev_warn "Failed to rename '$IFNAME_ORIG' to '$IFNAME'"
-         continue 
+      if [ "$IFNAME" != "$IFNAME_ORIG" ]; then 
+         rename_if "$IFNAME" "$IFNAME_ORIG"
+         RC=$?
+        
+         if [ $RC -ne 0 ]; then 
+            
+            # failed to rename 
+            vdev_warn "Failed to rename '$IFNAME_ORIG' to '$IFNAME' ($IP exit code $RC)"
+            continue 
+         fi
       fi
       
    done < $VDEV_IFNAMES_PATH
