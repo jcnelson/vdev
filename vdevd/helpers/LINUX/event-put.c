@@ -29,7 +29,7 @@
 
 #define DEFAULT_DEV_EVENTS "/dev/events/global"
 
-// path to /dev/events (overrideable in command-line)
+// path to device events directory (overrideable in command-line)
 static char g_dev_events[PATH_MAX+1];
 
 // make a path to an event in the global queue 
@@ -357,7 +357,7 @@ int main( int argc, char** argv ) {
       {0, 0, 0, 0}
    };
    
-   char const* optstr = "n:s:vh";
+   char const* optstr = "n:s:h";
    
    while( rc == 0 && c != -1 ) {
       
@@ -370,14 +370,9 @@ int main( int argc, char** argv ) {
       switch( c ) {
          
          case 's': {
-            
+      
+            memset( g_dev_events, 0, PATH_MAX );      
             strncpy( g_dev_events, optarg, PATH_MAX );
-            break;
-         }
-         
-         case 't': {
-            
-            strncpy( target_queues, optarg, PATH_MAX );
             break;
          }
          
