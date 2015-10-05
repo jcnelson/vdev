@@ -388,7 +388,7 @@ int vdev_action_sanity_check( struct vdev_action* act ) {
 
 
 // perform misc. post-processing on an action:
-// * if the command is NULL but the helper is not, then set command to be the full path to the helper.
+// * if the command is NULL but the helper is not, then set command to be the full path to the helper, and don't use a shell
 // return 0 on success 
 // return -ENOMEM on OOM 
 int vdev_action_postprocess( struct vdev_config* config, struct vdev_action* act ) {
@@ -1218,6 +1218,7 @@ static int vdev_action_daemonlet_read_int64( int fd, int64_t* ret ) {
 }
 
 
+// TODO: try restarting once
 // carry out a command by sending it to a running daemonlet.
 // start the daemonlet if we need to.
 // return 0 on success
@@ -1524,7 +1525,7 @@ int vdev_action_create_path( struct vdev_device_request* vreq, struct vdev_actio
          }
          
          // generate the new name
-         rc = vdev_action_run_sync( vreq, acts[i].rename_command, acts[i].helper_vars, acts[i].use_shell, &new_path, PATH_MAX + 1 );
+         rc = vdev_action_run_sync( vreq, acts[i].rename_command, acts[i].helper_vars, true, &new_path, PATH_MAX + 1 );
          if( rc < 0 ) {
             
             vdev_error("vdev_action_run_sync('%s') rc = %d\n", acts[i].rename_command, rc );
