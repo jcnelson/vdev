@@ -149,42 +149,42 @@ static int vdevfs_scandirat_context_callback( int dirfd, struct dirent* dent, vo
    if( S_ISREG( sb.st_mode ) ) {
       
       method_name = "fskit_entry_init_file";
-      rc = fskit_entry_init_file( child, sb.st_ino, dent->d_name, sb.st_uid, sb.st_gid, sb.st_mode & 0777 );
+      rc = fskit_entry_init_file( child, sb.st_ino, sb.st_uid, sb.st_gid, sb.st_mode & 0777 );
    }
    
    // directory?
    else if( S_ISDIR( sb.st_mode ) ) {
       
       method_name = "fskit_entry_init_dir";
-      rc = fskit_entry_init_dir( child, ctx->parent_dir, sb.st_ino, dent->d_name, sb.st_uid, sb.st_gid, sb.st_mode & 0777 );
+      rc = fskit_entry_init_dir( child, ctx->parent_dir, sb.st_ino, sb.st_uid, sb.st_gid, sb.st_mode & 0777 );
    }
    
    // named pipe?
    else if( S_ISFIFO( sb.st_mode ) ) {
       
       method_name = "fskit_entry_init_fifo";
-      rc = fskit_entry_init_fifo( child, sb.st_ino, dent->d_name, sb.st_uid, sb.st_gid, sb.st_mode & 0777 );
+      rc = fskit_entry_init_fifo( child, sb.st_ino, sb.st_uid, sb.st_gid, sb.st_mode & 0777 );
    }
    
    // unix domain socket?
    else if( S_ISSOCK( sb.st_mode ) ) {
       
       method_name = "fskit_entry_init_sock";
-      rc = fskit_entry_init_sock( child, sb.st_ino, dent->d_name, sb.st_uid, sb.st_gid, sb.st_mode & 0777 );
+      rc = fskit_entry_init_sock( child, sb.st_ino, sb.st_uid, sb.st_gid, sb.st_mode & 0777 );
    }
    
    // character device?
    else if( S_ISCHR( sb.st_mode ) ) {
       
       method_name = "fskit_entry_init_chr";
-      rc = fskit_entry_init_chr( child, sb.st_ino, dent->d_name, sb.st_uid, sb.st_gid, sb.st_mode, sb.st_rdev );
+      rc = fskit_entry_init_chr( child, sb.st_ino, sb.st_uid, sb.st_gid, sb.st_mode, sb.st_rdev );
    }
    
    // block device?
    else if( S_ISBLK( sb.st_mode ) ) {
       
       method_name = "fskit_entry_init_blk";
-      rc = fskit_entry_init_blk( child, sb.st_ino, dent->d_name, sb.st_uid, sb.st_gid, sb.st_mode, sb.st_rdev );
+      rc = fskit_entry_init_blk( child, sb.st_ino, sb.st_uid, sb.st_gid, sb.st_mode, sb.st_rdev );
    }
    
    // symbolic link?
@@ -211,7 +211,7 @@ static int vdevfs_scandirat_context_callback( int dirfd, struct dirent* dent, vo
       }
       
       method_name = "fskit_entry_init_symlink";
-      rc = fskit_entry_init_symlink( child, sb.st_ino, dent->d_name, linkbuf );
+      rc = fskit_entry_init_symlink( child, sb.st_ino, linkbuf );
    }
    
    // success?
@@ -226,7 +226,7 @@ static int vdevfs_scandirat_context_callback( int dirfd, struct dirent* dent, vo
    }
    
    // insert into parent 
-   rc = fskit_entry_attach_lowlevel( ctx->parent_dir, child );
+   rc = fskit_entry_attach_lowlevel( ctx->parent_dir, child, dent->d_name );
    if( rc != 0 ) {
       
       // OOM 
@@ -406,7 +406,7 @@ int vdevfs_init( struct vdevfs* vdev, int argc, char** argv ) {
    // library setup 
    vdev_setup_global();
    
-   struct fskit_fuse_state* fs = VDEV_CALLOC( struct fskit_fuse_state, 1 );
+   struct fskit_fuse_state* fs = fskit_fuse_state_new();
    
    if( fs == NULL ) {
       return -ENOMEM;
@@ -1235,7 +1235,7 @@ int vdevfs_readdir( struct fskit_core* core, struct fskit_route_metadata* grp, s
       sb.st_gid = fskit_sb.st_gid;
       sb.st_mode = fskit_sb.st_mode;
       
-      child_path = fskit_fullpath( fskit_route_metadata_get_path( grp ), fskit_entry_get_name( child ), NULL );
+      child_path = fskit_fullpath( fskit_route_metadata_get_path( grp ), fskit_route_metadata_get_name( grp ), NULL );
       if( child_path == NULL ) {
          
          // can't continue; OOM
@@ -1254,7 +1254,7 @@ int vdevfs_readdir( struct fskit_core* core, struct fskit_route_metadata* grp, s
       else if( rc == 0 || (sb.st_mode & 0777) == 0 ) {
          
          // omit this one 
-         vdev_debug("Filter '%s'\n", fskit_entry_get_name( child ) );
+         vdev_debug("Filter '%s'\n", fskit_route_metadata_get_name( grp ) );
          omitted[ omitted_idx ] = i;
          omitted_idx++;
          
