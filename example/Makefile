@@ -40,7 +40,9 @@ $(CONF_BUILD): vdevd.conf.in
 	@mkdir -p $(shell dirname "$@")
 	@cat "$<" | \
 		sed -e 's~@PREFIX@~$(PREFIX)~g;' \
-		    -e 's~@CONF_DIR@~$(ETCDIR_VDEV)~g;' > "$@"
+		    -e 's~@CONF_DIR@~$(ETCDIR_VDEV)~g;' \
+		    -e 's~@RUNDIR@~$(RUNDIR)~g;' \
+		    -e 's~@LOGDIR@~$(LOGDIR)~g;' > "$@"
 
 $(IFNAMES_BUILD): ifnames.conf.in 
 	@mkdir -p $(shell dirname "$@")

@@ -23,6 +23,8 @@ ETCDIR         ?= $(PREFIX)/etc
 ETCDIR_VDEV    ?= $(ETCDIR)/vdev
 SHAREDIR       ?= $(PREFIX)/share
 PKGCONFIG	   ?= $(INCLUDE_PREFIX)/share/pkgconfig
+RUNDIR         ?= $(PREFIX)/run/vdev
+LOGDIR         ?= $(PREFIX)/var/log/vdev
 
 # libvdev (NOTE: not an installable target; just common code)
 LIBVDEV_ROOT := $(ROOT_DIR)/libvdev 
