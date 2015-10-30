@@ -8,6 +8,7 @@ http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/20-sdio-classes.hwdb
 http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/20-sdio-vendor-model.hwdb
 http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/20-usb-classes.hwdb
 http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/20-usb-vendor-model.hwdb
+http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/60-evdev.hwdb
 http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/60-keyboard.hwdb
 http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/70-mouse.hwdb
 http://cgit.freedesktop.org/systemd/systemd/plain/hwdb/70-touchpad.hwdb
