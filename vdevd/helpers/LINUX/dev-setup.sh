@@ -103,6 +103,8 @@ guess_subsystem() {
 
    if [ "$devname" = "snd/seq" ]; then 
       echo "sound"
+   elif [ "$devname" == "snd/timer" ]; then 
+      echo "sound"
    fi
 }
 
