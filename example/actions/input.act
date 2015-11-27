@@ -2,4 +2,3 @@
 event=any
 OS_SUBSYSTEM=input
 helper=input.sh
-daemonlet=true
