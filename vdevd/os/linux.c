@@ -481,7 +481,7 @@ int vdev_os_next_device( struct vdev_device_request* vreq, void* cls ) {
    struct msghdr hdr;
    struct iovec iov;
    struct sockaddr_nl cnls;
-   
+
    pthread_mutex_lock( &ctx->initial_requests_lock );
    
    // do we have initial requests?
@@ -507,9 +507,9 @@ int vdev_os_next_device( struct vdev_device_request* vreq, void* cls ) {
       
       return 0;
    }
-   else if( ctx->os_ctx->state->once ) {
+   else if( ctx->os_ctx->coldplug_only ) {
       
-      // out of requests; die 
+      // out of coldplug requests; die 
       pthread_mutex_unlock( &ctx->initial_requests_lock );
       return 1;
    }
@@ -1201,8 +1201,8 @@ static int vdev_linux_context_init( struct vdev_os_context* os_ctx, struct vdev_
    
    ctx->os_ctx = os_ctx;
    
-   // if we're just running once, don't set up the netlink socket 
-   if( !os_ctx->state->config->once ) {
+   // if we're just handling coldplug, don't set up the netlink socket 
+   if( !os_ctx->coldplug_only ) {
       
       ctx->nl_addr.nl_family = AF_NETLINK;
       ctx->nl_addr.nl_pid = getpid();
@@ -1423,6 +1423,7 @@ static int vdev_linux_mountpoint_on_devtmpfs( char const* mountpoint ) {
 
 // set up Linux-specific vdev state.
 // this is early initialization, so don't start anything yet
+// NOTE: this should only be called from reload-safe code--i.e. a reload can't occur while this method runs
 int vdev_os_init( struct vdev_os_context* os_ctx, void** cls ) {
    
    int rc = 0;
