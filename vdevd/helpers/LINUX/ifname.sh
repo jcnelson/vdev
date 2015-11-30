@@ -41,7 +41,6 @@ if [ -z "$IP" ]; then
    exit 1
 fi
 
-
 # rename an interface 
 # $1    desired interface name 
 # $2    original interface name 
@@ -198,23 +197,19 @@ main() {
          mac)
 
             # find the interface with this MAC address
-            if_mac "$ID_ARG"
-            IFNAME_ORIG=$(if_mac "$ID_ARG")
-
+            IFNAME_ORIG="$(if_mac "$ID_ARG")"
             ;;
 
          devpath)
 
             # find the interface with this sysfs device path
-            IFNAME_ORIG=$(if_devpath "$ID_ARG")
-            
+            IFNAME_ORIG="$(if_devpath "$ID_ARG")"
             ;;
 
          *)
             
             # unsupported 
             vdev_error "Unsupported interface identifier '$ID_TYPE'"
-            
             continue
             ;;
       esac
@@ -245,7 +240,7 @@ main() {
          fi
       fi
       
-   done < $VDEV_IFNAMES_PATH
+   done < "$VDEV_IFNAMES_PATH"
 
    return 0
 }

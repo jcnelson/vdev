@@ -4,7 +4,7 @@
 
 . "$VDEV_HELPERS/subr.sh"
 
-# entry point 
+# entry point for daemonlet 
 # return 0 on success
 # return 2 if a helper fails
 main() {

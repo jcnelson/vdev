@@ -47,7 +47,7 @@ main() {
    fi
 
    # set up capability environment variables 
-   OPTICAL_DATA=$($VDEV_HELPERS/stat_optical "$VDEV_MOUNTPOINT/$VDEV_PATH")
+   OPTICAL_DATA="$($VDEV_HELPERS/stat_optical "$VDEV_MOUNTPOINT/$VDEV_PATH")"
    STAT_RC=$?
 
    # verify that we stat'ed the optical device...

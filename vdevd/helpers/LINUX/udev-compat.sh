@@ -533,25 +533,25 @@ main() {
    if [ "$VDEV_ACTION" = "add" ]; then 
       
       # add udev data
-      echo "udev_generate_data $_DEVICE_ID" >> /tmp/udev-compat.log
+      # echo "udev_generate_data $_DEVICE_ID" >> /tmp/udev-compat.log
       udev_generate_data "$_DEVICE_ID" "$VDEV_METADATA" "$VDEV_GLOBAL_METADATA" "$VDEV_MOUNTPOINT" || vdev_error "Failed to generate udev data for $VDEV_PATH"
       
-      echo "udev_generate_links $_DEVICE_ID" >> /tmp/udev-compat.log
+      # echo "udev_generate_links $_DEVICE_ID" >> /tmp/udev-compat.log
       udev_generate_links "$_DEVICE_ID" "$VDEV_METADATA" "$VDEV_GLOBAL_METADATA" "$VDEV_MOUNTPOINT" || vdev_error "Failed to generate udev links for $VDEV_PATH"
 
-      echo "udev_generate_tags $_DEVICE_ID" >> /tmp/udev-compat.log 
+      # echo "udev_generate_tags $_DEVICE_ID" >> /tmp/udev-compat.log 
       udev_generate_tags "$_DEVICE_ID" "$VDEV_METADATA" "$VDEV_GLOBAL_METADATA" || vdev_error "Failed to generate udev tags for $VDEV_PATH"
 
    elif [ "$VDEV_ACTION" = "remove" ]; then 
 
       # remove udev data
-      echo "udev_remove_data $_DEVICE_ID" >> /tmp/udev-compat.log 
+      # echo "udev_remove_data $_DEVICE_ID" >> /tmp/udev-compat.log 
       udev_remove_data "$_DEVICE_ID" "$VDEV_GLOBAL_METADATA" || vdev_error "Failed to remove udev data for $VDEV_PATH"
 
-      echo "udev_remove_links $_DEVICE_ID" >> /tmp/udev-compat.log
+      # echo "udev_remove_links $_DEVICE_ID" >> /tmp/udev-compat.log
       udev_remove_links "$_DEVICE_ID" "$VDEV_METADATA" "$VDEV_GLOBAL_METADATA" "$VDEV_MOUNTPOINT" || vdev_error "Failed to remove udev links for $VDEV_PATH"
 
-      echo "udev_remove_tags $_DEVICE_ID" >> /tmp/udev-compat.log
+      # echo "udev_remove_tags $_DEVICE_ID" >> /tmp/udev-compat.log
       udev_remove_tags "$_DEVICE_ID" "$VDEV_METADATA" || vdev_error "Failed to remove udev tags for $VDEV_PATH"
    fi
    
