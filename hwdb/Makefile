@@ -14,8 +14,8 @@ $(HWDB_BUILD): $(HWDB_BUILD_INPUT) $(HWDB_BUILD_GEN)
 	if [ -f hwdb.squashfs ]; then \
 	  	cp -a hwdb.squashfs "$@"; \
 	else \
-		@echo "Generating hardware database"; \
-		@mkdir -p "$@.dir"; \
+		echo "Generating hardware database"; \
+		mkdir -p "$@.dir"; \
 		$(BUILD_HWDB)/gen_database.sh -o "$@.dir" $(BUILD_HWDB)/input/*.hwdb; \
 		mksquashfs "$@.dir" "$@" -force-uid 0 -force-gid 0; \
 	fi
