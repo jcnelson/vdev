@@ -290,7 +290,7 @@ static void test_key (const unsigned long* bitmask_ev,
 
 void usage(char const* program_name ) {
    
-   fprintf(stderr, "Usage: %s /path/to/input/device/file\n", program_name);
+   fprintf(stderr, "[ERROR] %s: Usage: %s /path/to/input/device/file\n", program_name, program_name);
    
 }
 
@@ -324,13 +324,13 @@ int main( int argc, char** argv ) {
    if( rc != 0 ) {
       
       rc = -errno;
-      fprintf(stderr, "stat('%s') errno = %d\n", argv[1], rc );
+      fprintf(stderr, "[ERROR] %s: stat('%s') errno = %d\n", argv[0], argv[1], rc );
       exit(2);
    }
    
    if( !S_ISCHR( sb.st_mode ) ) {
       
-      fprintf(stderr, "FATAL: '%s' is not a character device file\n", argv[1] );
+      fprintf(stderr, "[ERROR] %s: '%s' is not a character device file\n", argv[0], argv[1] );
       usage(argv[0]);
       exit(2);
    }
@@ -374,7 +374,7 @@ int main( int argc, char** argv ) {
    snprintf( sysdev_path, 4096, "/sys/dev/char/%s:%s/subsystem", major, minor );
    rc = readlink( sysdev_path, subsystem, 4096 );
    if( rc < 0 ) {
-      fprintf(stderr, "readlink('%s'): %s\n", sysdev_path, strerror( rc ) );
+      fprintf(stderr, "[ERROR] %s: readlink('%s'): %s\n", argv[0], sysdev_path, strerror( rc ) );
       exit(1);
    }
    

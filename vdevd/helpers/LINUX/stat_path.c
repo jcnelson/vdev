@@ -1381,7 +1381,7 @@ static int handle_ccw( char const* parent, char const* dev, char **path, char** 
 
 void usage( char const* progname ) {
    
-   fprintf(stderr, "Usage: %s /sysfs/path/to/device | /path/to/device/node\n", progname );
+   fprintf(stderr, "[ERROR] %s: Usage: %s /sysfs/path/to/device | /path/to/device/node\n", progname, progname );
 }
 
 
@@ -1429,7 +1429,7 @@ int main( int argc, char** argv ) {
       rc = vdev_sysfs_get_syspath_from_device( "/sys", sb.st_mode, major( sb.st_rdev ), minor( sb.st_rdev ), &dev, &dev_len );
       if( rc != 0 ) {
          
-         fprintf(stderr, "vdev_sysfs_get_syspath_from_device rc = %d\n", rc );
+         fprintf(stderr, "[ERROR] %s: vdev_sysfs_get_syspath_from_device rc = %d\n", argv[0], rc );
          usage(argv[0]);
          exit(1);
       }

@@ -1440,7 +1440,7 @@ static int set_options( int argc, char **argv, char *maj_min_dev) {
             else if (streq(optarg, "pre-spc3-83"))
                default_page_code = PAGE_83_PRE_SPC3;
             else {
-               fprintf(stderr, "Unknown page code '%s'\n", optarg);
+               fprintf(stderr, "[ERROR] %s: Unknown page code '%s'\n", argv[0], optarg);
                return -1;
             }
             break;
@@ -1448,7 +1448,7 @@ static int set_options( int argc, char **argv, char *maj_min_dev) {
       case 's':
             sg_version = atoi(optarg);
             if (sg_version < 3 || sg_version > 4) {
-               fprintf(stderr, "Unknown SG version '%s'\n", optarg);
+               fprintf(stderr, "[ERROR] %s: Unknown SG version '%s'\n", argv[0], optarg);
                return -1;
             }
             break;
@@ -1468,7 +1468,7 @@ static int set_options( int argc, char **argv, char *maj_min_dev) {
             return -1;
 
       default:
-            fprintf(stderr, "Unknown option -%c\n", option);
+            fprintf(stderr, "[ERROR] %s: Unknown option -%c\n", argv[0], option);
             return -1;
    }
 

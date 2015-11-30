@@ -397,7 +397,7 @@ int main( int argc, char** argv ) {
          
          default: {
             
-            fprintf(stderr, "Unrecognized option '%c'\n", c );
+            fprintf(stderr, "[ERROR] %s: Unrecognized option '%c'\n", argv[0], c );
             usage(argv[0]);
             exit(1);
          }
@@ -411,7 +411,7 @@ int main( int argc, char** argv ) {
    if( nr <= 0 ) {
       
       rc = -errno;
-      fprintf( stderr, "Failed to read event from stdin: %s\n", strerror( -rc ) );
+      fprintf( stderr, "[ERROR] %s: Failed to read event from stdin: %s\n", argv[0], strerror( -rc ) );
       exit(1);
    }
    
@@ -423,8 +423,8 @@ int main( int argc, char** argv ) {
          // head of line? with no leading '\n'?
          if( strncmp( event_buf, required_fields[i] + 1, strlen(required_fields[i]) - 1 ) != 0 ) {
             
-            fprintf(stderr, "Missing required field '%s'\n", required_fields[i] + 1 );
-            fprintf(stderr, "Pass -h for a list of required fields\n" );
+            fprintf(stderr, "[ERROR] %s: Missing required field '%s'\n", argv[0], required_fields[i] + 1 );
+            fprintf(stderr, "[ERROR] %s: Pass -h for a list of required fields\n", argv[0] );
             exit(1);
          }
       }
@@ -438,7 +438,7 @@ int main( int argc, char** argv ) {
       // go find it in the device event
       if( seqnum_str == NULL ) {
          
-         fprintf(stderr, "Missing SEQNUM.  Pass -n or include SEQNUM= in the input.\n");
+         fprintf(stderr, "[ERROR] %s: Missing SEQNUM.  Pass -n or include SEQNUM= in the input.\n", argv[0]);
          exit(1);
       }
       
@@ -447,7 +447,7 @@ int main( int argc, char** argv ) {
       if( seqnum == 0 && (tmp == seqnum_str + strlen("SEQNUM=") || *tmp != '\n') ) {
          
          // invalid seqnum 
-         fprintf(stderr, "Invalid SEQNUM.  Pass -n or include a valid SEQNUM in the input.\n");
+         fprintf(stderr, "[ERROR] %s: Invalid SEQNUM.  Pass -n or include a valid SEQNUM in the input.\n", argv[0]);
          exit(1);
       }
    }
@@ -458,14 +458,14 @@ int main( int argc, char** argv ) {
    fd = open_event( event_path );
    if( fd < 0 ) {
       
-      fprintf(stderr, "Failed to open '%s': %s\n", event_path, strerror( -fd ) );
+      fprintf(stderr, "[ERROR] %s: Failed to open '%s': %s\n", argv[0], event_path, strerror( -fd ) );
       exit(1);
    }
    
    rc = write_uninterrupted( fd, event_buf, nr );
    if( rc < 0 ) {
       
-      fprintf(stderr, "Failed to write '%s': %s\n", event_path, strerror( -fd ) );
+      fprintf(stderr, "[ERROR] %s: Failed to write '%s': %s\n", argv[0], event_path, strerror( -fd ) );
       
       clear_event( event_buf );
       close( fd );
@@ -476,7 +476,7 @@ int main( int argc, char** argv ) {
    rc = multicast_event( seqnum, event_path );
    if( rc < 0 ) {
       
-      fprintf(stderr, "Failed to multicast '%s': %s\n", event_path, strerror( -rc ) );
+      fprintf(stderr, "[ERROR] %s: Failed to multicast '%s': %s\n", argv[0], event_path, strerror( -rc ) );
       
       clear_event( event_buf );
       close( fd );
