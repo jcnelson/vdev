@@ -21,16 +21,24 @@
 
 #include "main.h"
 
+// global vdev state
+static struct vdev_state vdev;
+
+// reload handler 
+void vdev_reload_sighup( int ignored ) {
+    
+   vdev_reload( &vdev );
+}
+
 // run! 
 int main( int argc, char** argv ) {
    
    int rc = 0;
-   struct vdev_state vdev;
    int coldplug_quiesce_pipe[2];
    bool is_child = false;
    bool is_parent = false;
    ssize_t nr = 0;
-   
+
    int coldplug_finished_fd = -1;   // FD to write to once we finish flushing the initial device requests
    
    memset( &vdev, 0, sizeof(struct vdev_state) );
@@ -90,7 +98,7 @@ int main( int argc, char** argv ) {
          }
       }
       
-      if( !vdev.config->once ) {
+      if( !vdev.config->coldplug_only ) {
          
          // will become a daemon after handling coldplug. 
          // set up a pipe between parent and child, so the child can 
@@ -134,6 +142,9 @@ int main( int argc, char** argv ) {
                   exit(4);
                }
             }
+
+            // set reload handler 
+            signal( SIGHUP, vdev_reload_sighup );
             
             is_child = true;
          }
@@ -146,7 +157,7 @@ int main( int argc, char** argv ) {
       }
    }
    
-   if( !is_parent || vdev.config->foreground || vdev.config->once ) {
+   if( !is_parent || vdev.config->foreground || vdev.config->coldplug_only ) {
          
       // child, or foreground, or coldplug only.  start handling (coldplug) device events
       rc = vdev_start( &vdev );
@@ -158,7 +169,7 @@ int main( int argc, char** argv ) {
          vdev_shutdown( &vdev, false );
          
          // if child, and we're connected to the parent, then tell the parent to exit failure 
-         if( is_child && !vdev.config->foreground && !vdev.config->once ) {
+         if( is_child && !vdev.config->foreground && !vdev.config->coldplug_only ) {
             
             write( coldplug_quiesce_pipe[1], &rc, sizeof(rc) );
             close( coldplug_quiesce_pipe[1] );
@@ -166,7 +177,7 @@ int main( int argc, char** argv ) {
          
          exit(5);
       }
-         
+      
       // main loop: get events from the OS and process them.
       // wake up the parent once we finish the coldplugged devices
       rc = vdev_main( &vdev, coldplug_finished_fd );
@@ -177,7 +188,7 @@ int main( int argc, char** argv ) {
       
       // if only doing coldplug, find and remove all stale coldplug devices.
       // use the metadata directory to figure this out
-      if( vdev.config->once ) {
+      if( vdev.config->coldplug_only ) {
          
          rc = vdev_remove_unplugged_devices( &vdev );
          if( rc != 0 ) {
@@ -198,7 +209,7 @@ int main( int argc, char** argv ) {
       
       // clean up
       // keep the pidfile unless we're doing coldplug only (in which case don't touch it)
-      vdev_shutdown( &vdev, !vdev.config->once );
+      vdev_shutdown( &vdev, !vdev.config->coldplug_only );
       
       return rc;
    }
