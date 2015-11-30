@@ -35,7 +35,7 @@ void vdev_set_debug_level( int d ) {
       _VDEV_INFO_MESSAGES = 1;
    }
    if( d >= 2 ) {
-      _VDEV_DEBUG_MESSAGES = d;
+      _VDEV_DEBUG_MESSAGES = 1;
    }
 }
 
@@ -372,11 +372,13 @@ char* vdev_basename( char const* path, char* dest ) {
 
 // run a subprocess, optionally in the system shell.
 // gather the output into the output buffer (allocating it if needed).
+// send stderr to stderr_fd (if it is non-negative)
+// stderr will NOT be captured.
 // return 0 on success
 // return 1 on output truncate 
 // return negative on error
 // set the subprocess exit status in *exit_status
-int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t max_output, int* exit_status, bool use_shell ) {
+int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t max_output, int stderr_fd, int* exit_status, bool use_shell ) {
    
    int p[2];
    int rc = 0;
@@ -417,11 +419,22 @@ int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t m
          close( p[1] );
          exit(rc);
       }
+
+      // optionally redirect stderr (or just close it)
+      if( stderr_fd >= 0 ) {
+         rc = dup2( stderr_fd, STDERR_FILENO );
+         if( rc < 0 ) {
+
+            rc = errno;
+            close( p[1] );
+            exit(rc);
+         }
+      }
       
-      // close everything else but stdout
+      // close everything else but stdout and optionally stderr.
       for( int i = 0; i < max_fd; i++ ) {
          
-         if( i != STDOUT_FILENO ) {
+         if( i != STDOUT_FILENO && i != stderr_fd ) {
             close( i );
          }
       }
