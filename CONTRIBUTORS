@@ -16,3 +16,7 @@ Jack Frost - Fixing bugs in the sound.sh helper, fixing packaging-related bugs i
 fbt@fleshless.org
 
 tilt12345678 - Get libudev-compat to build on Debian Wheezy
+
+Suedi - daemonlet debugging; race condition debugging
+
+Obarun - hardware database support for evdev devices; race condition debugging
