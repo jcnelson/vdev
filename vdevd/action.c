@@ -630,6 +630,7 @@ int vdev_action_load_all( struct vdev_config* config, struct vdev_action** ret_a
 
 
 // carry out a command, synchronously, using an environment given by vreq.
+// stdout will be captured to *output
 // return the exit status on success (non-negative)
 // return negative on error
 int vdev_action_run_sync( struct vdev_device_request* vreq, char const* command, vdev_params* helper_vars, bool use_shell, char** output, size_t max_output ) {
@@ -653,7 +654,7 @@ int vdev_action_run_sync( struct vdev_device_request* vreq, char const* command,
       vdev_debug("command env: '%s'\n", req_env[i] );
    }
    
-   rc = vdev_subprocess( command, req_env, output, max_output, &exit_status, use_shell );
+   rc = vdev_subprocess( command, req_env, output, max_output, vreq->state->error_fd, &exit_status, use_shell );
    
    vdev_debug("exit status %d\n", exit_status );
    
@@ -827,6 +828,7 @@ static int vdev_action_daemonlet_clean( struct vdev_action* act ) {
 }
 
 // start up a daemonlet, using the daemonlet helper program at $VDEV_HELPERS/daemonlet.
+// stderr will be routed to /dev/null
 // return 0 on success, and fill in the relevant information to act.
 // return 0 if the daemonlet is already running
 // return -errno from stat(2) if we couldn't find the daemonlet runner (i.e. -ENOENT)
@@ -836,10 +838,9 @@ static int vdev_action_daemonlet_clean( struct vdev_action* act ) {
 // return -errno from fork(2) if we could not fork
 // return -ECHILD if the daemonlet died before it could signal readiness
 // NOTE: /dev/null *must* exist already--this should be taken care of by the pre-seed script.
-static int vdev_action_daemonlet_start( struct vdev_config* config, struct vdev_action* act ) {
+static int vdev_action_daemonlet_start( struct vdev_state* state, struct vdev_action* act ) {
    
    int rc = 0;
-   int null_fd = -1;
    pid_t pid = 0;
    int daemonlet_pipe_stdin[2];
    int daemonlet_pipe_stdout[2];
@@ -848,7 +849,8 @@ static int vdev_action_daemonlet_start( struct vdev_config* config, struct vdev_
    char null_path[ PATH_MAX+1 ];
    long max_open = sysconf( _SC_OPEN_MAX );
    struct stat sb;
-   
+   struct vdev_config* config = state->config;
+
    char* daemonlet_argv[] = {
       "vdevd-daemonlet",
       act->command,
@@ -902,26 +904,7 @@ static int vdev_action_daemonlet_start( struct vdev_config* config, struct vdev_
       close( daemonlet_pipe_stdin[1] );
       return rc;
    }
-   
-   if( act->async ) {
-      
-      // asynchronous action: will redirect to /dev/null
-      snprintf( null_path, PATH_MAX, "%s/null", config->mountpoint );
-      null_fd = open( null_path, O_WRONLY );
-      if( null_fd < 0 ) {
-         
-         rc = -errno;
-         vdev_error( "open('%s') rc = %d\n", null_path, rc );
-         
-         close( daemonlet_pipe_stdin[0] );
-         close( daemonlet_pipe_stdin[1] );
-         close( daemonlet_pipe_stdout[0] );
-         close( daemonlet_pipe_stdout[1] );
-         
-         return rc;
-      }
-   }
-   
+  
    pid = fork();
    if( pid == 0 ) {
       
@@ -937,22 +920,22 @@ static int vdev_action_daemonlet_start( struct vdev_config* config, struct vdev_
          exit(1);
       }
       
-      // reroute output back to vdevd.
-      rc = dup2( daemonlet_pipe_stdout[1], STDERR_FILENO );
-      if( rc < 0 ) {
-            
-         vdev_error_async_safe("dup2 stderr to stdout failed\n");
-         _exit(1);
-      }
-         
       rc = dup2( daemonlet_pipe_stdout[1], STDOUT_FILENO );
       if( rc < 0 ) {
          
          vdev_error_async_safe("dup2 stdout to vdevd failed\n");
          _exit(1);
       }
+
+      rc = dup2( state->error_fd, STDERR_FILENO );
+      if( rc < 0 ) {
+
+         vdev_error_async_safe("dup2 stderr to null failed\n");
+         _exit(1);
+      }
       
-      // close all non-standard-io descriptors
+      // close everything else
+      // the daemonlet should capture stderr itself
       for( int i = 3; i < max_open; i++ ) {
          
          close( i );
@@ -978,10 +961,6 @@ static int vdev_action_daemonlet_start( struct vdev_config* config, struct vdev_
       // parent vdevd 
       close( daemonlet_pipe_stdin[0] );
       close( daemonlet_pipe_stdout[1] );
-      
-      if( null_fd >= 0 ) {
-         close( null_fd );
-      }
       
       // wait for child to indicate readiness, if running synchronously
       if( !act->async ) {
@@ -1029,10 +1008,6 @@ static int vdev_action_daemonlet_start( struct vdev_config* config, struct vdev_
       // fork() error 
       rc = -errno;
       vdev_error("fork() rc = %d\n", rc );
-      
-      if( null_fd >= 0 ) {
-         close( null_fd );
-      }
       
       close( daemonlet_pipe_stdin[0] );
       close( daemonlet_pipe_stdin[1] );
@@ -1179,11 +1154,13 @@ int vdev_action_daemonlet_stop_all( struct vdev_action* actions, size_t num_acti
 // return -errno on I/O error (such as -EPIPE)
 // return -EAGAIN if we got EOF
 static int vdev_action_daemonlet_read_int64( int fd, int64_t* ret ) {
-   
+  
    int64_t value = 0;
-   
+  
+   int cnt = 0; 
    int c = 0;
    int rc = 0;
+   int s = 1;
    
    while( 1 ) {
       
@@ -1202,7 +1179,10 @@ static int vdev_action_daemonlet_read_int64( int fd, int64_t* ret ) {
          break;
       }
       
-      if( c < '0' || c > '9' ) {
+      if( cnt == 0 && c == '-' ) {
+         s = -1;
+      }
+      else if( c < '0' || c > '9' ) {
          
          // invalid 
          rc = -EINVAL;
@@ -1211,48 +1191,31 @@ static int vdev_action_daemonlet_read_int64( int fd, int64_t* ret ) {
       
       value *= 10;
       value += (c - '0');
+
+      cnt++;
    }
    
-   *ret = value;
+   *ret = value * s;
    return 0;
 }
 
 
-// TODO: try restarting once
-// carry out a command by sending it to a running daemonlet.
-// start the daemonlet if we need to.
-// return 0 on success
+// issue a command to a daemonlet, and get back its return code.
+// the daemonlet should already be running (or thought to be running) before calling this method.
+// if this method fails, the caller should consider restarting the daemonlet.
+// return 0 on success, and set *daemonlet_rc
 // return -ENOMEM on OOM
-// return -EPERM if the daemonlet was not responding, and we could not stop it.  A subsequent call probably won't succeed.
-// return -EAGAIN if the daemonlet was not responding, but we were able to stop it.  A subsequent call might succeed.
-// return -EINVAL if the action is not a daemonlet.
-// return a positive exit code if the daemonlet failed to process the device request
-// NOTE: if this method fails to communicate with the daemonlet, it will try to "reset" the daemonlet by stopping it, and allowing a subsequent call to start it.
-int vdev_action_run_daemonlet( struct vdev_device_request* vreq, struct vdev_action* act ) {
-   
+// return -EAGAIN if the daemonlet needs to be restarted and the request retried.
+// return -EPERM on permanent daemonlet failure
+static int vdev_action_daemonlet_send_command( struct vdev_device_request* vreq, struct vdev_action* act, int64_t* daemonlet_rc ) {
+    
    int rc = 0;
    char** req_env = NULL;
    size_t num_env = 0;
    char env_buf[ PATH_MAX+1 ];
-   int64_t daemonlet_rc = 0;
-   
-   if( !act->is_daemonlet ) {
-      return -EINVAL;
-   }
-   
+
    memset( env_buf, 0, PATH_MAX+1 );
-   
-   // do we need to start it?
-   if( act->daemonlet_pid <= 0 ) {
-      
-      rc = vdev_action_daemonlet_start( vreq->state->config, act );
-      if( rc < 0 ) {
-         
-         vdev_error("vdev_action_daemonlet_start('%s') rc = %d\n", act->name, rc );
-         return -EPERM;
-      }
-   }
-   
+
    // generate the environment...
    rc = vdev_device_request_to_env( vreq, act->helper_vars, &req_env, &num_env, 1 );
    if( rc != 0 ) {
@@ -1266,10 +1229,9 @@ int vdev_action_run_daemonlet( struct vdev_device_request* vreq, struct vdev_act
    
    for( unsigned int i = 0; i < num_env; i++ ) {
       vdev_debug("daemonlet env: '%s'\n", req_env[i] );
-   }
+   } 
    
-   
-   // feed it in...
+   // feed environment variables
    for( unsigned int i = 0; i < num_env; i++ ) {
       
       snprintf( env_buf, PATH_MAX, "%s\n", req_env[i] );
@@ -1285,7 +1247,7 @@ int vdev_action_run_daemonlet( struct vdev_device_request* vreq, struct vdev_act
    
    if( rc > 0 ) {
       
-      // feed daemonlet flag 
+      // feed end-of-environment flag
       rc = vdev_write_uninterrupted( act->daemonlet_stdin, "done\n", strlen("done\n") );
       if( rc < 0 ) {
          
@@ -1296,64 +1258,138 @@ int vdev_action_run_daemonlet( struct vdev_device_request* vreq, struct vdev_act
    VDEV_FREE_LIST( req_env );
    
    if( rc < 0 ) {
-      
-      // failed to send stdin.
-      // stop the daemonlet; will try restarting it on the next action
-      rc = vdev_action_daemonlet_stop( act );
-      if( rc < 0 ) {
-         
-         vdev_error("vdev_action_daemonlet_stop('%s', PID=%d) rc = %d\n", act->name, act->daemonlet_pid, rc );
-         return -EPERM;
+
+      // -EPIPE means the daemonlet is dead, and the caller should restart it
+      if( rc == -EPIPE ) {
+         return -EAGAIN;
       }
       else {
-         return -EAGAIN;
+         return -EPERM;
       }
    }
    
    // if we're running asynchronously, then we don't care about getting back the reply (stdout is routed to /dev/null anyway)
    if( act->async ) {
+      *daemonlet_rc = 0;
       return 0;
    }
    
    // wait for a status code reply 
-   rc = vdev_action_daemonlet_read_int64( act->daemonlet_stdout, &daemonlet_rc );
+   rc = vdev_action_daemonlet_read_int64( act->daemonlet_stdout, daemonlet_rc );
    if( rc < 0 ) {
       
       vdev_error("vdev_action_daemonlet_read_int64('%s') rc = %d\n", act->name, rc );
-      
-      // no return code 
-      // stop the daemonlet; will try restarting it on the next action
-      rc = vdev_action_daemonlet_stop( act );
-      if( rc < 0 ) {
-         
-         vdev_error("vdev_action_daemonlet_stop('%s') rc = %d\n", act->name, rc );
-         return -EPERM;
-      }
-      else {
+
+      // -EPIPE means the daemonlet is dead, and the caller should restart it 
+      if( rc == -EPIPE ) {
          return -EAGAIN;
       }
+      else {
+         return -EPERM;
+      } 
    }
    
-   vdev_debug("daemonlet returned %d\n", (int)daemonlet_rc );
+   if( *daemonlet_rc < 0 || *daemonlet_rc > 255 ) {
+      
+      // invalid daemonlet return code 
+      // caller should consider restarting the daemonlet and trying again
+      vdev_error("vdev_daemonlet_read_int64('%s', PID=%d) exit status %d\n", act->name, act->daemonlet_pid, (int)*daemonlet_rc );
+      return -EAGAIN;
+   }
    
-   if( daemonlet_rc < 0 || daemonlet_rc > 255 ) {
+   return 0;
+}
+
+
+// carry out a command by sending it to a running daemonlet.
+// restart the daemonlet if we need to (e.g. if it hasn't been started, or it died since the last device request).
+// return the daemonlet's exit status on success (will be positive if the daemonlet failed in error).
+// return -ENOMEM on OOM
+// return -EPERM if the daemonlet could not be started, or was not responding and we could not restart it.  A subsequent call probably won't succeed.
+// return -EAGAIN if the daemonlet was not responding, but we were able to stop it.  A subsequent call might succeed in starting it up and feeding it the request.
+// return -EINVAL if the action is not a daemonlet.
+// return a positive exit code if the daemonlet failed to process the device request
+// NOTE: if this method fails to communicate with the daemonlet, it will try to "reset" the daemonlet by stopping it, and allowing a subsequent call to start it.
+// NOTE: not reload-safe; call while the reload lock is held
+int vdev_action_run_daemonlet( struct vdev_device_request* vreq, struct vdev_action* act ) {
+   
+   int rc = 0;
+   int64_t daemonlet_rc = 0;
+   int num_attempts = 0;
+
+   if( !act->is_daemonlet ) {
+      return -EINVAL;
+   }
+   
+   // do we need to start it?
+   if( act->daemonlet_pid <= 0 ) {
       
-      // invalid daemonlet exit code 
-      vdev_error("vdev_daemonlet_read_int64('%s', PID=%d) exit status %d\n", act->name, act->daemonlet_pid, (int)daemonlet_rc );
-      
-      // stop the daemonlet; will try restarting it on the next action
-      rc = vdev_action_daemonlet_stop( act );
+      rc = vdev_action_daemonlet_start( vreq->state, act );
       if( rc < 0 ) {
          
-         vdev_error("vdev_action_daemonlet_stop('%s', PID=%d) rc = %d\n", act->name, act->daemonlet_pid, rc );
+         vdev_error("vdev_action_daemonlet_start('%s') rc = %d\n", act->name, rc );
          return -EPERM;
       }
+   }
+  
+   // try twice, in case we need to stop and start it.
+   while( num_attempts < 2 ) {
+
+      rc = vdev_action_daemonlet_send_command( vreq, act, &daemonlet_rc );
+      if( rc != 0 ) {
+         
+         vdev_error("vdev_action_daemonlet_send_command('%s') rc = %d\n", act->name, rc );
+
+         if( rc == -EAGAIN ) {
+
+            // try restarting and re-dispatching the command 
+            rc = vdev_action_daemonlet_stop( act );
+            if( rc < 0 ) {
+
+               vdev_error("vdev_action_daemonlet_stop('%s', PID=%d) rc = %d\n", act->name, act->daemonlet_pid, rc );
+               rc = -EPERM;
+               break;
+            }
+            else {
+
+               rc = vdev_action_daemonlet_start( vreq->state, act );
+               if( rc < 0 ) {
+
+                   vdev_error("vdev_action_daemonlet_start('%s') rc = %d\n", act->name, rc );
+                   rc = -EPERM;
+                   break;
+               }
+               else {
+
+                  // try again  
+                  num_attempts++;
+                  continue;
+               }
+            }
+         }
+         else {
+            
+            // permanent failure 
+            rc = -EPERM;
+            break;
+         }
+      }
       else {
-         return -EAGAIN;
+
+         // successfully dispatched the request, and (if not async) received an exit status via daemonlet_rc
+         break;
       }
    }
-   
-   return (int)daemonlet_rc;
+
+   if( rc == 0 ) {
+
+       vdev_debug("daemonlet '%s' returned %d\n", act->name, (int)daemonlet_rc );
+       return (int)daemonlet_rc;
+   }
+   else {
+      
+       return rc;
+   }
 }
 
 
@@ -1623,7 +1659,8 @@ int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_acti
                break;
             }
             else {
-               
+              
+               // device already exists, but this is not considered by the .act file to be an error 
                continue;
             }
          }
@@ -1631,16 +1668,18 @@ int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_acti
          // benchmark this...
          clock_gettime( CLOCK_MONOTONIC, &start );
          
-         // what kind of action?
+         // what kind of action to take?
          if( !acts[i].is_daemonlet ) {
          
             if( acts[i].async ) {
                
+               // fork a subprocess and handle asynchronously
                method = "vdev_action_run_async";
                rc = vdev_action_run_async( vreq, acts[i].command, acts[i].helper_vars, acts[i].use_shell );
             }
             else {
                
+               // run as a subprocess, wait, and join with it
                method = "vdev_action_run_sync";
                rc = vdev_action_run_sync( vreq, acts[i].command, acts[i].helper_vars, acts[i].use_shell, NULL, 0 );
             }
@@ -1649,10 +1688,12 @@ int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_acti
             
             if( acts[i].async ) {
                
+               // run as a daemonlet, feed it the request, but don't wait for a reply
                method = "vdev_action_run_daemonlet_async";
             }
             else {
                
+               // run as a daemonlet, feed the request, and wait for a reply
                method = "vdev_action_run_daemonlet";
             }
             
