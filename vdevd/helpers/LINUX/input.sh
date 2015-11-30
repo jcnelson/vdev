@@ -17,14 +17,13 @@ setup_input_permissions() {
    _INPUT_CLASS="$1"
    
    # permissions...
-   MODE=0660
    if [ "$_INPUT_CLASS" = "js" ]; then 
 
       # joysticks are world-readable
-      MODE=0664
+      VDEV_VAR_INPUT_MODE=0664
    fi
 
-   vdev_permissions root:input $MODE "$VDEV_MOUNTPOINT/$VDEV_PATH"
+   vdev_permissions $VDEV_VAR_INPUT_OWNER:$VDEV_VAR_INPUT_GROUP $VDEV_VAR_INPUT_MODE "$VDEV_MOUNTPOINT/$VDEV_PATH"
    return $?
 }
 

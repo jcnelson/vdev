@@ -2,5 +2,8 @@
 event=any
 OS_DEVTYPE=disk
 OS_SUBSYSTEM=block
+VAR_DISK_OWNER=root
+VAR_DISK_GROUP=disk
+VAR_DISK_MODE=0660
 helper=disk.sh
 daemonlet=true

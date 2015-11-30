@@ -593,7 +593,7 @@ main() {
    fi
 
    # set ownership and bits 
-   vdev_permissions root:disk 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
+   vdev_permissions $VDEV_VAR_DISK_OWNER:$VDEV_VAR_DISK_GROUP $VDEV_VAR_DISK_MODE "$VDEV_MOUNTPOINT/$VDEV_PATH"
 
    # device properties 
    VDEV_PART_ENTRY_TYPE="$PART_ENTRY_TYPE"

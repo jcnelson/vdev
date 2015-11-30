@@ -105,7 +105,7 @@ main() {
    fi
 
    # set up permissions...
-   vdev_permissions root:video 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
+   vdev_permissions $VDEV_VAR_V4L_OWNER:$VDEV_VAR_V4L_GROUP $VDEV_VAR_V4L_MODE "$VDEV_MOUNTPOINT/$VDEV_PATH"
 
    return 0
 }

@@ -70,7 +70,7 @@ main() {
    add_capability_link "$VDEV_PATH" $VDEV_OPTICAL_DVD_RAM "dvdrw"
 
    # set ownership and bits 
-   vdev_permissions root:cdrom 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
+   vdev_permissions $VDEV_VAR_OPTICAL_OWNER:$VDEV_VAR_OPTICAL_GROUP $VDEV_VAR_OPTICAL_MODE "$VDEV_MOUNTPOINT/$VDEV_PATH"
 }
 
 
