@@ -6,6 +6,9 @@ Scooby
 * performance testing
 * build testing with DESTDIR
 * testing with lots of loopback devices
+* daemonlet testing
+* race condition testing
+* syslog testing
 
 lepoitr
 * pre-alpha vdevd testing
@@ -38,3 +41,11 @@ tilt
 onimatrix81
 * Gentoo testing
 * early boot testing
+
+fsmithred
+* pre-alpha vdevd testing
+
+Obarun
+* testing on Arch Linux
+* race condition testing
+* syslog testing
