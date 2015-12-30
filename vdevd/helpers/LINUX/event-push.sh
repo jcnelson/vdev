@@ -24,7 +24,7 @@ EOF
    return $?
 }
 
-if [ $VDEV_DAEMONLET -eq 0 ]; then 
+if [ "$VDEV_DAEMONLET" -eq 0 ]; then 
    main 
    exit $?
 fi
