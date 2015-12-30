@@ -46,6 +46,7 @@ $(CONF_BUILD): vdevd.conf.in
 
 $(IFNAMES_BUILD): ifnames.conf.in 
 	@mkdir -p $(shell dirname "$@")
+	@rm -f "$@"
 	@cat "$<" > "$@"
 	$(GEN_IFNAMES) >> "$@"
 
@@ -55,6 +56,7 @@ $(INITSCRIPT_BUILD): sysv-initscript.sh
 
 $(BUILD_VDEV_CONFIG)/actions/%: actions/%
 	@mkdir -p $(shell dirname "$@")
+	@rm -f "$@"
 	@cat "$<" > "$@"
 
 $(BUILD_VDEV_INITRAMFS)/%: initramfs/%
@@ -63,10 +65,12 @@ $(BUILD_VDEV_INITRAMFS)/%: initramfs/%
 
 $(CONF_INSTALL): $(CONF_BUILD)
 	@mkdir -p $(shell dirname "$@")
+	@rm -f "$@"
 	@cat "$<" > "$@"
 
 $(IFNAMES_INSTALL): $(IFNAMES_BUILD)
 	@mkdir -p $(shell dirname "$@")
+	@rm -f "$@"
 	@cat "$<" > "$@"
 
 $(INITSCRIPT_INSTALL): $(INITSCRIPT_BUILD)
@@ -75,6 +79,7 @@ $(INITSCRIPT_INSTALL): $(INITSCRIPT_BUILD)
 
 $(INSTALL_VDEV_CONFIG)/actions/%: $(BUILD_VDEV_CONFIG)/actions/%
 	@mkdir -p $(shell dirname "$@")
+	@rm -f "$@"
 	@cat "$<" > "$@"
 
 $(INSTALL_VDEV_INITRAMFS)/%: $(BUILD_VDEV_INITRAMFS)/%
