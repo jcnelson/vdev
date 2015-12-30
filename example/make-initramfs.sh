@@ -5,6 +5,16 @@ BUILD_INITRAMFS_CONFDIR=../build/etc/initramfs-tools
 VDEV_INITRAMFS_FILES=initramfs
 MKINITRAMFS=../tools/initramfs/mkinitramfs
 
+KERNEL_VERSION=`uname -r`
+if [ -n "$1" ]; then 
+   if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then 
+      echo "Usage: $0 [-h|--help] [kernel_version]" >&2
+      exit 0
+   fi
+
+   KERNEL_VERSION="$1"
+fi
+
 trap "rm -rf \"$BUILD_INITRAMFS\" \"$BUILD_INITRAMFS_CONFDIR\"" 0 1 2 3 15
 
 mkdir -p "$BUILD_INITRAMFS"
@@ -59,13 +69,13 @@ cp -a "$VDEV_INITRAMFS_FILES"/* "$BUILD_INITRAMFS_CONFDIR"/
 rm "$BUILD_INITRAMFS_CONFDIR"/init
 
 # build it!
-echo "Generating initrd.img-`uname -r`"
-"$MKINITRAMFS" -t "$BUILD_INITRAMFS" -d "$BUILD_INITRAMFS_CONFDIR" -o initrd.img-`uname -r`
+echo "Generating initrd.img-$KERNEL_VERSION"
+"$MKINITRAMFS" -t "$BUILD_INITRAMFS" -d "$BUILD_INITRAMFS_CONFDIR" -o "initrd.img-$KERNEL_VERSION" "$KERNEL_VERSION"
 
 if [ $? -eq 0 ]; then 
-   echo "Generated initrd.img-`uname -r`"
+   echo "Generated initrd.img-$KERNEL_VERSION"
    echo ""
-   echo "You must install initrd.img-`uname -r` via your"
+   echo "You must install initrd.img-$KERNEL_VERSION via your"
    echo "bootloader.  GRUB2 users can simply overwrite the"
    echo "original initramfs image."
    echo ""
