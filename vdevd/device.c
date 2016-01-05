@@ -838,10 +838,10 @@ int vdev_device_add( struct vdev_device_request* req ) {
       vdev_error("vdev_action_create_path('%s') rc = %d\n", req->path, rc);
       
       // done with this request
+      vdev_reload_unlock( req->state );
       vdev_device_request_free( req );
       free( req );
    
-      vdev_reload_unlock( req->state );
       return rc;
    }
    
@@ -852,10 +852,10 @@ int vdev_device_add( struct vdev_device_request* req ) {
       if( req->renamed_path == NULL && req->path != NULL ) {
          
          // done with this request
+         vdev_reload_unlock( req->state );
          vdev_device_request_free( req );
          free( req );
       
-         vdev_reload_unlock( req->state );
          return -ENOMEM;
       }
    }
@@ -878,10 +878,10 @@ int vdev_device_add( struct vdev_device_request* req ) {
                vdev_error("vdev_device_mkdirs('%s/%s') rc = %d\n", req->state->mountpoint, req->renamed_path, rc );
                
                // done with this request 
+               vdev_reload_unlock( req->state );
                vdev_device_request_free( req );
                free( req );
 
-               vdev_reload_unlock( req->state );
                return rc;
             }
             
@@ -1011,10 +1011,10 @@ int vdev_device_remove( struct vdev_device_request* req ) {
       vdev_error("vdev_action_create_path('%s') rc = %d\n", req->path, rc);
       
       // done with this request
+      vdev_reload_unlock( req->state );
       vdev_device_request_free( req );
       free( req );
       
-      vdev_reload_unlock( req->state );
       return rc;
    }
    
@@ -1024,10 +1024,10 @@ int vdev_device_remove( struct vdev_device_request* req ) {
       if( req->renamed_path == NULL && req->path == NULL ) {
          
          // done with this request
+         vdev_reload_unlock( req->state );
          vdev_device_request_free( req );
          free( req );
       
-         vdev_reload_unlock( req->state );
          return -ENOMEM;
       }
    }
@@ -1087,11 +1087,12 @@ int vdev_device_remove( struct vdev_device_request* req ) {
       }
    }
    
+   vdev_reload_unlock( req->state );
+
    // done with this request 
    vdev_device_request_free( req );
    free( req );
    
-   vdev_reload_unlock( req->state );
    return rc;
 }
 
@@ -1124,10 +1125,10 @@ int vdev_device_change( struct vdev_device_request* req ) {
       vdev_error("vdev_action_create_path('%s') rc = %d\n", req->path, rc);
       
       // done with this request
+      vdev_reload_unlock( req->state );
       vdev_device_request_free( req );
       free( req );
    
-      vdev_reload_unlock( req->state );
       return rc;
    }
    
@@ -1138,10 +1139,9 @@ int vdev_device_change( struct vdev_device_request* req ) {
       if( req->renamed_path == NULL && req->path != NULL ) {
          
          // done with this request
+         vdev_reload_unlock( req->state );
          vdev_device_request_free( req );
          free( req );
-       
-         vdev_reload_unlock( req->state );
          return -ENOMEM;
       }
    }
@@ -1158,11 +1158,12 @@ int vdev_device_change( struct vdev_device_request* req ) {
       }  
    }
    
+   vdev_reload_unlock( req->state );
+
    // done with this request
    vdev_device_request_free( req );
    free( req ); 
 
-   vdev_reload_unlock( req->state );
    return 0;
 }
 
