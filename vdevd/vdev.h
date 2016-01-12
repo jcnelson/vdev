@@ -69,7 +69,8 @@ struct vdev_state {
 
    // error thread that listens to an error FIFO
    // that helper processes use to send error
-   // messages to vdev's log 
+   // messages to vdev's log
+   bool error_thread_running; 
    pthread_t error_thread;
 
    // fd to the error pipe, to be passed to subprocesses

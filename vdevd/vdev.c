@@ -421,9 +421,12 @@ int vdev_error_thread_start( struct vdev_state* vdev ) {
       return -rc;
    }
 
+   vdev->error_thread_running = true;
+
    rc = pthread_create( &vdev->error_thread, &attrs, vdev_error_thread_main, &vdev->error_fd );
    if( rc != 0 ) {
 
+      vdev->error_thread_running = false;
       vdev_error("pthread_crate: %s\n", strerror(rc) );
       return -rc;
    }
@@ -437,6 +440,10 @@ int vdev_error_thread_start( struct vdev_state* vdev ) {
 int vdev_error_thread_stop( struct vdev_state* vdev ) {
 
    int rc = 0;
+   if( !vdev->error_thread_running ) {
+      // already stopped
+      return 0;
+   }
 
    if( vdev->error_fd >= 0 ) {
       
@@ -457,6 +464,8 @@ int vdev_error_thread_stop( struct vdev_state* vdev ) {
 
       vdev_error("pthread_join: %s\n", strerror(rc) );
    }
+
+   vdev->error_thread_running = false;
 
    return 0;
 }

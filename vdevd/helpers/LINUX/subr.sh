@@ -406,7 +406,7 @@ vdev_add_properties() {
 
 # set permissions and ownership on a device 
 # do not change permissions if the owner/group isn't defined 
-# $1    the "owner.group" string, to be fed into chmod 
+# $1    the "owner:group" string, to be fed into chmod 
 # $2    the (octal) permissions, to be fed into chown
 # $3    the device path 
 # return 0 on success
