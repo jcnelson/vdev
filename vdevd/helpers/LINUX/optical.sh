@@ -47,7 +47,7 @@ main() {
    fi
 
    # set up capability environment variables 
-   OPTICAL_DATA=$($VDEV_HELPERS/stat_optical "$VDEV_MOUNTPOINT/$VDEV_PATH")
+   OPTICAL_DATA="$($VDEV_HELPERS/stat_optical "$VDEV_MOUNTPOINT/$VDEV_PATH")"
    STAT_RC=$?
 
    # verify that we stat'ed the optical device...
@@ -70,7 +70,7 @@ main() {
    add_capability_link "$VDEV_PATH" $VDEV_OPTICAL_DVD_RAM "dvdrw"
 
    # set ownership and bits 
-   vdev_permissions root:cdrom 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
+   vdev_permissions $VDEV_VAR_OPTICAL_OWNER:$VDEV_VAR_OPTICAL_GROUP $VDEV_VAR_OPTICAL_MODE "$VDEV_MOUNTPOINT/$VDEV_PATH"
 }
 
 

@@ -1,5 +1,8 @@
 [vdev-action]
 event=any
 path=^sr[0-9]*$
+VAR_OPTICAL_OWNER=root
+VAR_OPTICAL_GROUP=cdrom
+VAR_OPTICAL_MODE=0660
 helper=optical.sh
 daemonlet=true

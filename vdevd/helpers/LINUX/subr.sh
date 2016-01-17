@@ -27,7 +27,7 @@ vdev_symlink() {
 
    test -d $_DIRNAME || /bin/mkdir -p "$_DIRNAME"
 
-   /bin/ln -s "$_LINK_SOURCE" "$_LINK_TARGET"
+   /bin/ln -sf "$_LINK_SOURCE" "$_LINK_TARGET"
    _RC=$?
 
    if [ 0 -eq $_RC ]; then
@@ -56,42 +56,44 @@ vdev_rmlinks() {
 
    done < "$_METADATA/links"
 
-   _OLDIFS="$IFS"
+   IFS="$_OLDIFS"
    
    return 0
 }
 
 
 # log a message to the logfile, or stdout 
+# this is at the 'info' log level.
 # arguments:
 #   $1  message to log 
 vdev_log() {
+  
+   if [ -z "$VDEV_LOGLEVEL" ]; then 
+      # assume warning
+      return 0
    
-   if [ -z "$VDEV_LOGFILE" ]; then
-      # stdout 
-      echo "[helpers] INFO: $1"
-   else
+   elif [ "$VDEV_LOGLEVEL" != "info" ] && [ "$VDEV_LOGLEVEL" != "debug" ]; then 
+      # not debug or info--must be 'warning' or 'error'
+      return 0
+   fi
 
-      # logfile 
-      echo "[helpers] INFO: $1" >> "$VDEV_LOGFILE"
-   fi 
+   echo "[helpers] [INFO]: $1" >&2
+   return 0
 }
-
 
 
 # log a warning to the logfile, or stdout 
 # arguments:
 #   $1  message to log 
 vdev_warn() {
-   
-   if [ -z "$VDEV_LOGFILE" ]; then
-      # stdout 
-      echo "[helpers] WARN: $1"
-   else
 
-      # logfile 
-      echo "[helpers] WARN: $1" >> "$VDEV_LOGFILE"
-   fi 
+   if [ "$VDEV_LOGLEVEL" = "error" ]; then 
+      # highest-priority loglevel only; ignore 
+      return 0
+   fi
+  
+   echo "[helpers] [WARN]: $1" >&2
+   return 0
 }
 
 
@@ -99,16 +101,11 @@ vdev_warn() {
 # arguments:
 #   $1  message to log 
 vdev_error() {
-   
-   if [ -z "$VDEV_LOGFILE" ]; then
-      # stdout 
-      echo "[helpers] ERROR: $1"
-   else
-
-      # logfile 
-      echo "[helpers] ERROR: $1" >> "$VDEV_LOGFILE"
-   fi 
+  
+   echo "[helpers] [ERROR]: $1" >&2 
+   return 0
 }
+
 
 # print the list of device drivers in a sysfs device path 
 #   $1  sysfs device path
@@ -409,7 +406,7 @@ vdev_add_properties() {
 
 # set permissions and ownership on a device 
 # do not change permissions if the owner/group isn't defined 
-# $1    the "owner.group" string, to be fed into chmod 
+# $1    the "owner:group" string, to be fed into chmod 
 # $2    the (octal) permissions, to be fed into chown
 # $3    the device path 
 # return 0 on success

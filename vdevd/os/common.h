@@ -24,16 +24,18 @@
 
 #include "libvdev/util.h"
 
-// connection to the OS's device notification 
+// connection to the OS's device notification system 
 struct vdev_os_context {
    
    void* os_cls;        // OS-specific data
    
    bool running;
-   
+  
+   bool coldplug_only; 
    bool coldplug_finished;
    
-   // reference to global state 
+   // reference to global state
+   // ACCESS WITH CAUTION--ENSURE RELOAD SAFETY 
    struct vdev_state* state;
 };
 

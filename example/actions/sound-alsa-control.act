@@ -3,4 +3,7 @@ event=any
 path=^snd/.+$
 OS_SUBSYSTEM=sound
 helper=sound.sh
+VAR_SOUND_OWNER=root
+VAR_SOUND_GROUP=audio
+VAR_SOUND_MODE=0660
 daemonlet=true

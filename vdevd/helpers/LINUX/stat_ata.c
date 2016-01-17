@@ -471,7 +471,7 @@ int main(int argc, char **argv ) {
    
    // check usage 
    if( argc != 2 ) {
-      fprintf(stderr, "Usage: %s /path/to/device/file\n", argv[0]);
+      fprintf(stderr, "[ERROR] %s: Usage: %s /path/to/device/file\n", argv[0], argv[0]);
       exit(1);
    }
    
@@ -479,7 +479,7 @@ int main(int argc, char **argv ) {
 
    fd = open(node, O_RDONLY|O_NONBLOCK|O_CLOEXEC);
    if (fd < 0) {
-      fprintf(stderr, "unable to open '%s'\n", node);
+      fprintf(stderr, "[ERROR] %s: unable to open '%s'\n", argv[0], node);
       exit(1);
    }
 
@@ -514,7 +514,7 @@ int main(int argc, char **argv ) {
       /* If this fails, then try HDIO_GET_IDENTITY */
       if (ioctl(fd, HDIO_GET_IDENTITY, &id) != 0) {
          int errsv = -errno;
-         fprintf( stderr, "HDIO_GET_IDENTITY failed for '%s': errno = %d\n", node, errsv);
+         fprintf( stderr, "[ERROR] %s: HDIO_GET_IDENTITY failed for '%s': errno = %d\n", argv[0], node, errsv);
          close(fd);
          exit(2);
       }

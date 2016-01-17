@@ -38,7 +38,7 @@ int vdev_os_main( struct vdev_os_context* vos ) {
          // OOM
          break;
       }
-      
+
       // next device request
       rc = vdev_device_request_init( vreq, vos->state, VDEV_DEVICE_INVALID, NULL );
       if( rc != 0 ) {
@@ -53,7 +53,7 @@ int vdev_os_main( struct vdev_os_context* vos ) {
          break;
       }
       
-      // yield the next device 
+      // yield the next device
       rc = vdev_os_next_device( vreq, vos->os_cls );
       if( rc != 0 ) {
          
@@ -113,6 +113,7 @@ int vdev_os_main( struct vdev_os_context* vos ) {
 }
 
 // set up a vdev os context
+// NOTE: not reload-safe
 int vdev_os_context_init( struct vdev_os_context* vos, struct vdev_state* state ) {
    
    int rc = 0;
@@ -120,6 +121,7 @@ int vdev_os_context_init( struct vdev_os_context* vos, struct vdev_state* state 
    memset( vos, 0, sizeof(struct vdev_os_context) );
    
    vos->state = state;
+   vos->coldplug_only = state->coldplug_only;
    
    // set up OS state 
    rc = vdev_os_init( vos, &vos->os_cls );

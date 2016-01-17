@@ -52,7 +52,7 @@ Building
 By default, everything installs under `/usr/local`.  To build and install everything with default options, run:
 
     $ make
-    $ sudo make install 
+    $ sudo make install
 
 To build and install vdevd (with no configuration) to `/usr/local/sbin`, type:
 
@@ -85,7 +85,7 @@ To build and install vdevfs to `/usr/local/sbin/`, type:
     $ make -C fs
     $ sudo make -C fs install
 
-You can override the installation directories at build-time by setting the `PREFIX` variable on the command-line (e.g. `make -C vdevd PREFIX=/`), and you can specify an alternative installation root by setting `DESTDIR` at install-time (e.g. `sudo make -C vdevd install DESTDIR=/opt`).  You can also control where header files are installed by setting the `INCLUDE_PREFIX` variable (e.g. `make -C libudev-compat install INCLUDE_PREFIX=/usr`).
+You can override the installation directories at build-time by setting the `PREFIX` variable on the command-line (e.g. `make -C vdevd PREFIX=/`), and you can specify an alternative installation root by setting `DESTDIR` at install-time (e.g. `sudo make -C vdevd install DESTDIR=/opt`).  You can also control where header files are installed by setting the `INCLUDE_PREFIX` variable (e.g. `make -C libudev-compat install PREFIX=/ INCLUDE_PREFIX=/usr`).
 
 Replacing udev on Linux
 -----------------------

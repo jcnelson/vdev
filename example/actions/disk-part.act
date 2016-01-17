@@ -3,4 +3,7 @@ event=any
 OS_SUBSYSTEM=block
 OS_DEVTYPE=partition
 helper=disk.sh
+VAR_DISK_OWNER=root
+VAR_DISK_GROUP=disk
+VAR_DISK_MODE=0660
 daemonlet=true

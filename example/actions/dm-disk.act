@@ -3,4 +3,7 @@ event=any
 OS_DEVTYPE=disk
 OS_SUBSYSTEM=block
 helper=dm-disk.sh
+VAR_DM_DISK_OWNER=root
+VAR_DM_DISK_GROUP=disk
+VAR_DM_DISK_MODE=0660
 daemonlet=true

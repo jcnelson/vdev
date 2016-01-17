@@ -103,6 +103,8 @@ guess_subsystem() {
 
    if [ "$devname" = "snd/seq" ]; then 
       echo "sound"
+   elif [ "$devname" == "snd/timer" ]; then 
+      echo "sound"
    fi
 }
 
@@ -199,7 +201,7 @@ umask 022
 test -L "$VDEV_MOUNTPOINT/fd" || /bin/ln -sf /proc/self/fd "$VDEV_MOUNTPOINT/fd"
 
 # add /dev/core 
-test -L "$VDEV_MOUNTPOINT/fd" || /bin/ln -sf /proc/kcore "$VDEV_MOUNTPOINT/core"
+test -L "$VDEV_MOUNTPOINT/core" || /bin/ln -sf /proc/kcore "$VDEV_MOUNTPOINT/core"
 
 # feed /dev/null into vdev, and make it locally
 if ! [ -c "$VDEV_MOUNTPOINT/null" ]; then 

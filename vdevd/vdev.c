@@ -272,6 +272,205 @@ int vdev_remove_unplugged_devices( struct vdev_state* state ) {
 }
 
 
+// create the path to the error FIFO
+// that helpers use to write error messages.
+// return 0 on success
+// return -EPERM on overflow
+int vdev_error_fifo_path( char const* mountpoint, char* path, size_t path_len ) {
+
+   int rc = 0;
+   rc = snprintf( path, path_len, "%s/%s/err.pipe", mountpoint, VDEV_METADATA_PREFIX );
+   if( rc >= path_len ) {
+      return -EPERM;
+   }
+
+   return 0;
+}
+
+
+// get a handle to the error FIFO, creating the FIFO if it doesn't yet exist.
+// the handle will be in read/write mode
+// return 0 on success, and set *fd
+// return -errno on failure to create the FIFO 
+int vdev_error_fifo_get_or_create( char const* mountpoint, int* fd ) {
+
+   int rc = 0;
+   char fifo_path[PATH_MAX+1];
+   struct stat sb;
+   memset( fifo_path, 0, PATH_MAX+1 );
+
+   rc = vdev_error_fifo_path( mountpoint, fifo_path, PATH_MAX );
+   if( rc < 0 ) {
+      return rc;
+   }
+
+   rc = stat( fifo_path, &sb );
+   if( rc != 0 ) {
+      
+      rc = -errno;
+      if( rc != -ENOENT ) {
+
+          vdev_error("failed to create FIFO '%s': %s\n", fifo_path, strerror( -rc ) );
+          return rc;
+      }
+
+      // create
+      rc = mkfifo( fifo_path, 0600 );
+      if( rc != 0 ) {
+
+         rc = -errno;
+         vdev_error("mkfifo('%s'): %s\n", fifo_path, strerror( -rc ) );
+         return rc;
+      }
+   }
+
+   *fd = open( fifo_path, O_RDWR );
+   if( *fd < 0 ) {
+
+      rc = -errno;
+      vdev_error("open('%s'): %s\n", fifo_path, strerror( -rc ) );
+      return rc;
+   }
+
+   return 0;
+}
+
+
+
+// thread for gathering error messages from the helpers and forwarding
+// them to our logging system.
+// *arg is an int, which is the error pipe to read from
+void* vdev_error_thread_main( void* arg ) {
+
+   int rc = 0;
+   int fd = *((int*)arg);
+   char buf[4096];
+   ssize_t nr = 0;
+   int flags = 0;
+   fd_set read_fds;
+
+   // put into non-blocking mode
+   flags = fcntl( fd, F_GETFL, 0 );
+   if( flags < 0 ) {
+      rc = -errno;
+      vdev_error("fcntl(%d, F_GETFL): %s\n", fd, strerror(-rc) );
+      return NULL;
+   }
+
+   rc = fcntl( fd, F_SETFL, flags | O_NONBLOCK );
+   if( rc < 0 ) {
+      rc = -errno;
+      vdev_error("fctnl(%d, F_SETFL): %s\n", fd, strerror(-rc) );
+      return NULL;
+   }
+
+   while( 1 ) {
+
+      FD_ZERO( &read_fds );
+      FD_SET( fd, &read_fds );
+
+      rc = select( fd + 1, &read_fds, NULL, NULL, NULL );
+      if( rc == 0 ) {
+
+         // not ready
+         continue;
+      }
+
+      if( rc < 0 ) {
+
+         // pipe closed 
+         break;
+      }
+
+      nr = read( fd, buf, 4095 );
+      if( nr <= 0 ) {
+
+         // closed, invalidated, etc.
+         break;
+      }
+
+      // truncate and log
+      buf[nr] = 0;
+      
+      vdev_error( "%s", buf );
+   }
+
+   return NULL;
+}
+
+
+// start the error-listining thread 
+// return 0 on success, and set state->error_thread
+// return -errno on failure 
+int vdev_error_thread_start( struct vdev_state* vdev ) {
+
+   int rc = 0;
+   pthread_attr_t attrs;
+
+   rc = vdev_error_fifo_get_or_create( vdev->config->mountpoint, &vdev->error_fd );
+   if( rc < 0 ) {
+
+      vdev_error("vdev_error_fifo_get_or_create: %s\n", strerror(-rc) );
+      return rc;
+   }
+
+   rc = pthread_attr_init( &attrs );
+   if( rc != 0 ) {
+
+      vdev_error("pthread_attr_init: %s\n", strerror(rc) );
+      return -rc;
+   }
+
+   vdev->error_thread_running = true;
+
+   rc = pthread_create( &vdev->error_thread, &attrs, vdev_error_thread_main, &vdev->error_fd );
+   if( rc != 0 ) {
+
+      vdev->error_thread_running = false;
+      vdev_error("pthread_crate: %s\n", strerror(rc) );
+      return -rc;
+   }
+
+   return 0;
+}
+
+
+// stop the error-listening thread 
+// return 0 on success 
+int vdev_error_thread_stop( struct vdev_state* vdev ) {
+
+   int rc = 0;
+   if( !vdev->error_thread_running ) {
+      // already stopped
+      return 0;
+   }
+
+   if( vdev->error_fd >= 0 ) {
+      
+      int fd = vdev->error_fd;
+      vdev->error_fd = -1;
+
+      close( fd );
+   }
+
+   rc = pthread_cancel( vdev->error_thread );
+   if( rc != 0 ) {
+
+      vdev_error("pthread_cancel: %s\n", strerror(rc) );
+   }
+
+   rc = pthread_join( vdev->error_thread, NULL );
+   if( rc != 0 ) {
+
+      vdev_error("pthread_join: %s\n", strerror(rc) );
+   }
+
+   vdev->error_thread_running = false;
+
+   return 0;
+}
+
+
 // start up the back-end
 // return 0 on success 
 // return -ENOMEM on OOM 
@@ -290,18 +489,33 @@ int vdev_start( struct vdev_state* vdev ) {
       
       return -ENOMEM;
    }
-   
-   // start processing requests 
-   rc = vdev_wq_start( &vdev->device_wq );
+
+   // set up error capture 
+   rc = vdev_error_thread_start( vdev );
    if( rc != 0 ) {
       
-      vdev_error("vdev_wq_start rc = %d\n", rc );
-      
+      vdev_error("vdev_error_thread_start: %s\n", strerror(-rc) );
       free( vdev->os );
       vdev->os = NULL;
       return rc;
    }
-   
+
+   // start processing requests 
+   rc = vdev_wq_start( &vdev->device_wq );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_wq_start: %s\n", strerror(-rc) );
+      
+      int erc = vdev_error_thread_stop( vdev );
+      if( erc != 0 ) {
+
+         vdev_error("vdev_error_thread_stop: %s\n", strerror(-erc) );
+      }
+
+      free( vdev->os );
+      vdev->os = NULL;
+      return rc;
+   }
    
    rc = vdev_os_context_init( vdev->os, vdev );
    
@@ -315,6 +529,7 @@ int vdev_start( struct vdev_state* vdev ) {
          vdev_error("vdev_wq_stop rc = %d\n", wqrc);
       }
       
+      vdev_error_thread_stop( vdev );
       free( vdev->os );
       vdev->os = NULL;
       return rc;
@@ -486,7 +701,7 @@ int vdev_parse_device_request( struct vdev_state* state, struct vdev_device_requ
    
    // finally, does this device exist already?
    snprintf( fullpath, PATH_MAX, "%s/%s", state->config->mountpoint, name );
-   stat_rc = stat( fullpath, &sb );
+   stat_rc = lstat( fullpath, &sb );
    
    if( stat_rc == 0 ) {
       
@@ -648,7 +863,7 @@ int vdev_preseed_run( struct vdev_state* vdev ) {
    
    sprintf(command, "%s %s %s", vdev->config->preseed_path, vdev->config->mountpoint, vdev->config->config_path );
    
-   rc = vdev_subprocess( command, NULL, &output, output_len, &exit_status, true );
+   rc = vdev_subprocess( command, NULL, &output, output_len, -1, &exit_status, true );
    if( rc != 0 ) {
       
       vdev_error("vdev_subprocess('%s') rc = %d\n", command, rc );
@@ -685,24 +900,19 @@ int vdev_preseed_run( struct vdev_state* vdev ) {
 // global vdev initialization 
 int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
    
+   int rc = 0;
+
    // global setup 
    vdev_setup_global();
    
-   int rc = 0;
-   
-   int fuse_argc = 0;
-   char** fuse_argv = VDEV_CALLOC( char*, argc + 1 );
-   
-   if( fuse_argv == NULL ) {
-      
-      return -ENOMEM;
-   }
+   pthread_mutex_init( &vdev->reload_lock, NULL );
+   vdev->error_fd = -1;
+   vdev->coldplug_finished_fd = -1;
    
    // config...
    vdev->config = VDEV_CALLOC( struct vdev_config, 1 );
    if( vdev->config == NULL ) {
       
-      free( fuse_argv );
       return -ENOMEM;
    }
    
@@ -715,10 +925,7 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
    }
    
    // parse config options from command-line 
-   rc = vdev_config_load_from_args( vdev->config, argc, argv, &fuse_argc, fuse_argv );
-   
-   // not needed for vdevd
-   free( fuse_argv );
+   rc = vdev_config_load_from_args( vdev->config, argc, argv, NULL, NULL );
    
    if( rc != 0 ) {
       
@@ -767,15 +974,6 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
       vdev_set_error_level( vdev->config->error_level );
    }
    
-   // convert to absolute paths 
-   rc = vdev_config_fullpaths( vdev->config );
-   if( rc != 0 ) {
-      
-      vdev_error("vdev_config_fullpaths rc = %d\n", rc );
-      
-      return rc;
-   }
-   
    vdev_info("vdev actions dir: '%s'\n", vdev->config->acts_dir );
    vdev_info("helpers dir:      '%s'\n", vdev->config->helpers_dir );
    vdev_info("logfile path:     '%s'\n", vdev->config->logfile_path );
@@ -784,8 +982,8 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
    vdev_info("preseed script:   '%s'\n", vdev->config->preseed_path );
    
    vdev->mountpoint = vdev_strdup_or_null( vdev->config->mountpoint );
-   vdev->once = vdev->config->once;
-   
+   vdev->coldplug_only = vdev->config->coldplug_only;
+
    if( vdev->mountpoint == NULL ) {
       
       vdev_error("Failed to set mountpoint, config->mountpount = '%s'\n", vdev->config->mountpoint );
@@ -817,7 +1015,7 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
       
       return rc;
    }
-   
+
    return 0;
 }
 
@@ -870,6 +1068,108 @@ int vdev_signal_coldplug_finished( struct vdev_state* vdev, int status ) {
 }
 
 
+// prevent reload
+int vdev_reload_lock( struct vdev_state* vdev ) {
+   return pthread_mutex_lock( &vdev->reload_lock );
+}
+
+
+// allow reload 
+int vdev_reload_unlock( struct vdev_state* vdev ) {
+   return pthread_mutex_unlock( &vdev->reload_lock );
+}
+
+
+// do a reload 
+// return 0 on success, and replace the config and actions, atomically
+// return -errno on failure, and do nothing to vdev
+int vdev_reload( struct vdev_state* vdev ) {
+
+   int rc = 0;
+   struct vdev_config* config = NULL;
+   struct vdev_action* acts = NULL;
+   size_t num_acts = 0;
+
+   struct vdev_config* old_config = NULL;
+   struct vdev_action* old_acts = NULL;
+   size_t old_num_acts = 0;
+
+   config = VDEV_CALLOC( struct vdev_config, 1 );
+   if( config == NULL ) {
+      return -ENOMEM;
+   }
+
+   // config init
+   rc = vdev_config_init( config );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_config_init rc = %d\n", rc );
+      return rc;
+   }
+
+   if( config->config_path == NULL ) {
+      // default 
+      config->config_path = vdev_strdup_or_null( VDEV_CONFIG_FILE );
+      if( config->config_path == NULL ) {
+
+         vdev_config_free( config );
+         free( config );
+         return -ENOMEM;
+      }
+   }
+   
+   // parse config options from command-line 
+   rc = vdev_config_load_from_args( config, vdev->argc, vdev->argv, NULL, NULL );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_config_load_from_argv rc = %d\n", rc );
+      return rc;
+   }
+   
+   // load from file...
+   rc = vdev_config_load( config->config_path, config );
+   if( rc != 0 ) {
+      
+      vdev_error("vdev_config_load('%s') rc = %d\n", config->config_path, rc );
+      
+      vdev_config_free( config );
+      free( config );
+      return rc;
+   }
+   
+   // load actions
+   rc = vdev_action_load_all( config, &acts, &num_acts );
+   if( rc != 0) {
+      
+      vdev_error("vdev_action_load_all('%s') rc = %d\n", config->acts_dir, rc );
+      
+      vdev_config_free( config );
+      free( config );
+      return rc;
+   }
+
+   // install them
+   vdev_reload_lock( vdev );
+
+   old_config = vdev->config;
+   vdev->config = config;
+
+   old_acts = vdev->acts;
+   old_num_acts = vdev->num_acts;
+   vdev->acts = acts;
+   vdev->num_acts = num_acts;
+    
+   vdev_reload_unlock( vdev );
+
+   // free old state
+   vdev_config_free( old_config );
+   free( old_config );
+
+   vdev_action_free_all( old_acts, old_num_acts );
+
+   return rc;
+}
+
 // stop vdev 
 // NOTE: if this fails, there's not really a way to recover
 // return 0 on success
@@ -884,19 +1184,18 @@ int vdev_stop( struct vdev_state* vdev ) {
    }
    
    vdev->running = false;
-   wait_for_empty = vdev->once;         // wait for the queue to drain if running once
+   wait_for_empty = vdev->coldplug_only;         // wait for the queue to drain if running coldplug only
    
    // stop processing requests 
    rc = vdev_wq_stop( &vdev->device_wq, wait_for_empty );
    if( rc != 0 ) {
       
-      vdev_error("vdev_wq_stop rc = %d\n", rc );
+      vdev_error("vdev_wq_stop: %s\n", strerror(-rc) );
       return rc;
    }
    
    // stop all actions' daemonlets
    vdev_action_daemonlet_stop_all( vdev->acts, vdev->num_acts );
-   
    return rc;
 }
 
@@ -909,7 +1208,16 @@ int vdev_shutdown( struct vdev_state* vdev, bool unlink_pidfile ) {
    if( vdev->running ) {
       return -EINVAL;
    }
+
+   vdev_debug("%s", "vdev shutdown\n" );
    
+   // stop error thread--all daemonlets should be dead anyway 
+   int erc = vdev_error_thread_stop( vdev );
+   if( erc != 0 ) {
+
+      vdev_error("vdev_error_thread_stop: %s\n", strerror(-erc) );
+   }
+
    // remove the PID file, if we have one 
    if( vdev->config->pidfile_path != NULL && unlink_pidfile ) {
       unlink( vdev->config->pidfile_path );
@@ -938,6 +1246,8 @@ int vdev_shutdown( struct vdev_state* vdev, bool unlink_pidfile ) {
       free( vdev->mountpoint );
       vdev->mountpoint = NULL;
    }
+
+   pthread_mutex_destroy( &vdev->reload_lock );
    
    return 0;
 }

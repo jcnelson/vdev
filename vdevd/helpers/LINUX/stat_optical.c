@@ -51,7 +51,7 @@ static int stat_optical_get_caps( int fd ) {
    if( caps < 0 ) {
       
       rc = -errno;
-      fprintf(stderr, "CDROM_GET_CAPABILITY ioctl failed, rc = %d\n", rc );
+      fprintf(stderr, "[ERROR] optical: CDROM_GET_CAPABILITY ioctl failed, rc = %d\n", rc );
       return rc;
    }
    
@@ -77,7 +77,7 @@ static int stat_optical_print_caps( int capabilities ) {
 // usage statement
 static int usage( char const* prog_name ) {
    
-   fprintf(stderr, "Usage: %s /path/to/optical/device\n", prog_name );
+   fprintf(stderr, "[ERROR] %s: Usage: %s /path/to/optical/device\n", prog_name, prog_name );
    return 0;
 }
 
@@ -99,7 +99,7 @@ int main( int argc, char** argv ) {
    if( fd < 0 ) {
       
       rc = -errno;
-      fprintf(stderr, "open('%s') rc = %d\n", argv[1], rc );
+      fprintf(stderr, "[ERROR] %s: open('%s') rc = %d\n", argv[0], argv[1], rc );
       exit(2);
    }
    
@@ -109,7 +109,7 @@ int main( int argc, char** argv ) {
    
    if( capabilities < 0 ) {
       
-      fprintf(stderr, "stat_optical_get_caps('%s') rc = %d\n", argv[1], rc );
+      fprintf(stderr, "[ERROR] %s: stat_optical_get_caps('%s') rc = %d\n", argv[0], argv[1], rc );
       exit(4);
    }
    

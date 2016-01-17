@@ -526,7 +526,7 @@ int vdev_sysfs_read_attr( char const* sysfs_device_path, char const* attr_name, 
          
          rc = -errno;
          
-         fprintf(stderr, "WARN: open('%s') errno = %d\n", attr_path, rc );
+         fprintf(stderr, "[WARN]: open('%s') errno = %d\n", attr_path, rc );
          return rc;
       }
       
@@ -566,7 +566,7 @@ int vdev_sysfs_read_attr( char const* sysfs_device_path, char const* attr_name, 
       if( rc < 0 ) {
          
          rc = -errno;
-         fprintf(stderr, "readlink('%s') errno = %d\n", attr_path, rc );
+         fprintf(stderr, "[WARN]: readlink('%s') errno = %d\n", attr_path, rc );
          
          free( ret_value );
          return rc;
@@ -722,7 +722,7 @@ int vdev_sysfs_uevent_read_key( char const* sysfs_device_path, char const* ueven
    if( rc < 0 ) {
       
       if( DEBUG ) {
-         fprintf(stderr, "WARN: vdev_read_file('%s') rc = %d\n", uevent_path, rc );
+         fprintf(stderr, "[WARN]: vdev_read_file('%s') rc = %d\n", uevent_path, rc );
       }
       return rc;
    }
@@ -781,7 +781,7 @@ int vdev_sysfs_get_parent_with_subsystem_devtype( char const* sysfs_device_path,
          
          rc = -errno;
          if( rc != -ENOENT ) {
-            fprintf(stderr, "WARN: readlink('%s') errno = %d\n", subsystem_path, rc );
+            fprintf(stderr, "[WARN]: readlink('%s') errno = %d\n", subsystem_path, rc );
          }
          
          free( parent_device );
@@ -817,7 +817,7 @@ int vdev_sysfs_get_parent_with_subsystem_devtype( char const* sysfs_device_path,
          rc = vdev_read_file( uevent_path, &uevent_buf, &uevent_len );
          if( rc < 0 ) {
             
-            fprintf(stderr, "WARN: vdev_read_file('%s') rc = %d\n", uevent_path, rc );
+            fprintf(stderr, "[WARN]: vdev_read_file('%s') rc = %d\n", uevent_path, rc );
             
             free( parent_device );
             parent_device = NULL;

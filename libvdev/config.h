@@ -39,7 +39,7 @@
 #define VDEV_CONFIG_LOGFILE_PATH  "logfile"
 #define VDEV_CONFIG_LOG_LEVEL     "loglevel"
 #define VDEV_CONFIG_MOUNTPOINT    "mountpoint"
-#define VDEV_CONFIG_ONCE          "run_once"
+#define VDEV_CONFIG_COLDPLUG_ONLY "coldplug_only"
 #define VDEV_CONFIG_FOREGROUND    "foreground"
 #define VDEV_CONFIG_PRESEED       "preseed"
 
@@ -88,7 +88,7 @@ struct vdev_config {
    char* mountpoint;
    
    // coldplug only?
-   bool once;
+   bool coldplug_only;
    
    // run in the foreground 
    bool foreground;

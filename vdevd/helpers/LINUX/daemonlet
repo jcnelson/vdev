@@ -182,17 +182,17 @@ while true; do
    DAEMONLET_ENVIRON_RC=$?
 
    if [ $DAEMONLET_ENVIRON_RC -eq 1 ]; then
-      echo "ENVIRON tells $$ to die" >> /tmp/daemonlet.log 
+      echo "ENVIRON tells $$ to die" >&2
       # were told to exit 
       exit 0
 
    elif [ $DAEMONLET_ENVIRON_RC -eq 2 ]; then 
       # bad environment variable 
-      echo "ENVIRON for $$ has a bad variable" >> /tmp/daemonlet.log
+      echo "ENVIRON for $$ has a bad variable" >&2
       exit 1
    fi
 
-   # process this request
+   # process this request ('main' comes from the helper, whose path is in $DAEMONLET)
    main
    DAEMONLET_MAIN_RC=$?
 

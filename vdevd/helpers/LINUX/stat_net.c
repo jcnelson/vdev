@@ -458,7 +458,7 @@ static int names_usb( char const* dev_path, struct netnames *names) {
    char* usbdev_path = NULL;
    char* usbdev_sysname = NULL;
    size_t usbdev_path_len = 0;
-   size_t usbdev_sysname_len = NULL;
+   size_t usbdev_sysname_len =0;
    int rc = 0;
    
    rc = vdev_sysfs_get_parent_with_subsystem_devtype( dev_path, "usb", "usb_interface", &usbdev_path, &usbdev_path_len );
@@ -747,7 +747,7 @@ static int ieee_oui( char const* devpath, struct netnames *names ) {
 
 
 void usage( char const* progname ) {
-   fprintf(stderr, "Usage: %s INTERFACE\n", progname );
+   fprintf(stderr, "[ERROR] %s: Usage: %s INTERFACE\n", progname, progname );
 }
 
 int main( int argc, char **argv ) {
@@ -788,7 +788,7 @@ int main( int argc, char **argv ) {
    tmp = realpath( devpath_class, devpath );
    if( tmp == NULL ) {
       rc = -errno;
-      fprintf(stderr, "Failed to locate sysfs entry for %s\n", argv[1] );
+      fprintf(stderr, "[ERROR] %s: Failed to locate sysfs entry for %s\n", argv[0], argv[1] );
       exit(1);
    }
    
@@ -797,7 +797,7 @@ int main( int argc, char **argv ) {
    if( rc != 0 ) {
       
       // not found 
-      fprintf(stderr, "Failed to find interface type for %s (sysfs path '%s'), rc = %d\n", argv[1], devpath, rc );
+      fprintf(stderr, "[ERROR] %s: Failed to find interface type for %s (sysfs path '%s'), rc = %d\n", argv[0], argv[1], devpath, rc );
       exit(1);
    }
    

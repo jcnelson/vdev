@@ -1,5 +1,8 @@
 [vdev-action]
 event=any
 OS_SUBSYSTEM=video4linux
+VAR_V4L_OWNER=root
+VAR_V4L_GROUP=video
+VAR_V4L_MODE=0660
 helper=v4l.sh
 daemonlet=true

@@ -184,7 +184,7 @@ int vdev_enable_syslog();
 
 // system functions 
 int vdev_daemonize( void );
-int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t max_output, int* exit_status, bool use_shell );
+int vdev_subprocess( char const* cmd, char* const env[], char** output, size_t max_output, int stderr_fd, int* exit_status, bool use_shell );
 int vdev_log_redirect( char const* logfile_path );
 int vdev_pidfile_write( char const* pidfile_path );
 

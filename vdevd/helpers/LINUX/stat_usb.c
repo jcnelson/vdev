@@ -250,7 +250,7 @@ static int dev_if_packed_info( char const* sysfs_path, char *ifs_str, size_t len
 
 
 void usage(char const* progname) {
-   fprintf(stderr, "Usage: %s /path/to/sysfs/device/directory\n", progname);
+   fprintf(stderr, "[ERROR] %s: Usage: %s /path/to/sysfs/device/directory\n", progname, progname);
    exit(2);
 }
 
@@ -384,7 +384,7 @@ int main( int argc, char **argv) {
    }
    
    if( strlen(argv[1]) >= 4096 ) {
-      fprintf(stderr, "Invalid /sys/devices path\n");
+      fprintf(stderr, "[ERROR] %s: Invalid /sys/devices path\n", argv[0]);
       exit(3);
    }
    
@@ -412,7 +412,7 @@ int main( int argc, char **argv) {
    rc = vdev_sysfs_get_parent_with_subsystem_devtype( sysfs_base, "usb", "usb_interface", &if_device_path, &if_device_path_len );
    if( rc != 0 ) {
       
-      fprintf(stderr, "FATAL: unabe to access usb_interface device of '%s'\n", sysfs_base );
+      fprintf(stderr, "[ERROR] %s: unable to access usb_interface device of '%s'\n", argv[0], sysfs_base );
       exit(1);
    }
    
@@ -445,7 +445,7 @@ int main( int argc, char **argv) {
          free( devtype_str );
       }
       
-      fprintf(stderr, "FATAL: vdev_sysfs_read_attr('%s/%s') rc = %d\n", if_device_path, "bInterfaceClass", rc );
+      fprintf(stderr, "[ERROR] %s: vdev_sysfs_read_attr('%s/%s') rc = %d\n", if_device_path, "bInterfaceClass", argv[0], rc );
       exit(1);
    }
    
@@ -481,7 +481,7 @@ int main( int argc, char **argv) {
          free( devtype_str );
       }
       
-      fprintf( stderr, "FATAL: vdev_sysfs_get_parent_with_subsystem_devtype('%s', 'usb', 'usb_device') rc = %d\n", sysfs_base, rc );
+      fprintf( stderr, "[ERROR] %s: vdev_sysfs_get_parent_with_subsystem_devtype('%s', 'usb', 'usb_device') rc = %d\n", argv[0], sysfs_base, rc );
       
       exit(1);
    }

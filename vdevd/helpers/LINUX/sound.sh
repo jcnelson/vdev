@@ -90,7 +90,7 @@ main() {
    fi
 
    # set up permissions...
-   vdev_permissions root:audio 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
+   vdev_permissions $VDEV_VAR_SOUND_OWNER:$VDEV_VAR_SOUND_GROUP $VDEV_VAR_SOUND_MODE "$VDEV_MOUNTPOINT/$VDEV_PATH"
 
    return 0
 }

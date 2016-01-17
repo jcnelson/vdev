@@ -33,6 +33,9 @@ main() {
    # partition data 
    local PARENT_DEVICE_PATH SERIALIZED_PARENT_DEVICE_PATH PARENT_METADATA_DIR PARENT_PROPERTIES EXISTING
 
+   # removable 
+   local REMOVABLE_FILE
+
    # pvs 
    local PVS_DATA
    
@@ -128,8 +131,20 @@ main() {
             
             if ! [ -f "$REMOVABLE_FILE" ] || [ -n "$(/bin/fgrep "0" "$REMOVABLE_FILE")" ]; then 
 
-               # non-removable USB mass storage in a (S)ATA enclosure 
-               DISK_TYPE="ata"
+               # non-removable USB mass storage in a (S)ATA enclosure
+               # see if we can probe with stat_ata; otherwise fall back to stat_usb
+               HELPER_DATA="$($VDEV_HELPERS/stat_ata "$VDEV_MOUNTPOINT/$VDEV_PATH")"
+               STAT_RET=$?
+
+               if [ $STAT_RET -eq 0 ]; then
+
+                   # can treat as ATA disk
+                   DISK_TYPE="ata"
+               else
+
+                   # fall back to USB 
+                   DISK_TYPE="usb"
+               fi
             
             else
 
@@ -286,9 +301,12 @@ main() {
 
          HELPER="stat_ata"
 
-         # (S)ATA disk
-         HELPER_DATA="$($VDEV_HELPERS/stat_ata "$VDEV_MOUNTPOINT/$VDEV_PATH")"
-         STAT_RET=$?
+         # (S)ATA disk--probe if we haven't already
+         if [ -z "$HELPER_DATA" ]; then 
+
+            HELPER_DATA="$($VDEV_HELPERS/stat_ata "$VDEV_MOUNTPOINT/$VDEV_PATH")"
+            STAT_RET=$?
+         fi
 
          if [ $STAT_RET -eq 0 ]; then 
 
@@ -309,7 +327,7 @@ main() {
             VDEV_SERIAL="$VDEV_ATA_SERIAL"
             VDEV_SERIAL_SHORT="$VDEV_ATA_SERIAL_SHORT"
             VDEV_REVISION="$VDEV_ATA_REVISION"
-         fi
+         fi 
          
          ;;
 
@@ -550,7 +568,7 @@ main() {
    fi
 
    # is this a physical volume?
-   PVS_RC=0
+   PVS_RC=1
    PVS_DATA=""
    LVM2_PV_UUID=""
 
@@ -563,7 +581,7 @@ main() {
       vdev_warn "Could not find pvs in /sbin/pvs.  LVM physical volume symlinks in $VDEV_MOUNTPOINT/disk/by-id will not be created."
    fi
 
-   if [ $PVS_RC -eq 0 ]; then 
+   if [ $PVS_RC -eq 0 ] && [ -n "$PVS_DATA" ]; then 
       
       eval "$PVS_DATA"
 
@@ -575,7 +593,7 @@ main() {
    fi
 
    # set ownership and bits 
-   vdev_permissions root:disk 0660 "$VDEV_MOUNTPOINT/$VDEV_PATH"
+   vdev_permissions $VDEV_VAR_DISK_OWNER:$VDEV_VAR_DISK_GROUP $VDEV_VAR_DISK_MODE "$VDEV_MOUNTPOINT/$VDEV_PATH"
 
    # device properties 
    VDEV_PART_ENTRY_TYPE="$PART_ENTRY_TYPE"

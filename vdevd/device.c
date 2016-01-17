@@ -137,6 +137,7 @@ static char const* vdev_device_request_mode_to_string( mode_t mode ) {
 // if is_daemonlet is set, then set VDEV_DAEMONLET=1
 // return 0 on success 
 // return negative on error 
+// NOTE: not reload-safe; call while the reload lock is held
 int vdev_device_request_to_env( struct vdev_device_request* req, vdev_params* helper_vars, char*** ret_env, size_t* num_env, int is_daemonlet ) {
    
    // type --> VDEV_ACTION
@@ -164,6 +165,7 @@ int vdev_device_request_to_env( struct vdev_device_request* req, vdev_params* he
    char metadata_dir[ PATH_MAX + 1 ];
    char global_metadata_dir[ PATH_MAX + 1 ];
    char const* is_daemonlet_str = NULL;
+   char const* loglevel = NULL;
    
    if( is_daemonlet != 0 ) {
       is_daemonlet_str = "1";
@@ -326,6 +328,36 @@ int vdev_device_request_to_env( struct vdev_device_request* req, vdev_params* he
    
    i++;
    
+   if( vdev_get_debug_level() > 0 ) {
+     if( vdev_get_debug_level() == 1 ) {
+        loglevel = "info";
+     }
+     else {
+        loglevel = "debug";
+     }
+   }
+   else if( vdev_get_error_level() > 0 ) {
+      if( vdev_get_error_level() == 1 ) {
+         loglevel = "error";
+      }
+      else {
+         loglevel = "warning";
+      }
+   }
+
+   if( loglevel == NULL ) {
+      loglevel = "warning";
+   }
+
+   rc = vdev_device_request_make_env_str( "VDEV_LOGLEVEL", loglevel, &env[i] );
+   if( rc != 0 ) {
+
+      VDEV_FREE_LIST( env );
+      return rc;
+   }
+
+   i++;
+        
    // add all OS-specific parameters 
    for( dp = sglib_vdev_params_it_init_inorder( &itr, req->params ); dp != NULL; dp = sglib_vdev_params_it_next( &itr ) ) {
       
@@ -547,6 +579,7 @@ static int vdev_device_put_metadata_item( char* base_dir, char const* param_name
 // return -EINVAL if there is no device path defined for this request
 // return negative on I/O error
 // NOTE: the device metadata directory ($VDEV_MOUNTPOINT/$VDEV_METADATA_PREFIX/dev) must exist
+// NOTE: not reload-safe; call while the reload lock is held
 static int vdev_device_put_metadata( struct vdev_device_request* req ) {
 
    int rc = 0;
@@ -634,7 +667,7 @@ static int vdev_device_remove_metadata_file( char const* fp, void* cls ) {
    }
    
    // is this a directory?
-   rc = stat( fp, &sb );
+   rc = lstat( fp, &sb );
    if( rc != 0 ) {
       
       rc = -errno;
@@ -674,6 +707,7 @@ static int vdev_device_remove_metadata_file( char const* fp, void* cls ) {
 // remove extra metadata (i.e. vdev and OS parameters) for a deivce node 
 // return 0 on success
 // return negative on error 
+// NOTE: not reload-safe; call while the reload lock is held
 static int vdev_device_remove_metadata( struct vdev_device_request* req ) {
    
    int rc = 0;
@@ -714,6 +748,7 @@ static int vdev_device_remove_metadata( struct vdev_device_request* req ) {
 // do we have metadata logged for a device?
 // return 0 on success
 // return negative on error 
+// NOTE: not reload-safe; call while the reload lock is held
 static int vdev_device_has_metadata( struct vdev_device_request* req ) {
    
    int rc = 0;
@@ -741,6 +776,7 @@ static int vdev_device_has_metadata( struct vdev_device_request* req ) {
 // create all directories leading up to a device 
 // return 0 on success
 // return negative on error 
+// NOTE: not reload-safe; call while the reload lock is held
 static int vdev_device_mkdirs( struct vdev_device_request* req, char** dev_fullpath ) {
    
    int rc = 0;
@@ -792,6 +828,9 @@ int vdev_device_add( struct vdev_device_request* req ) {
    int do_mknod = 1;            // if 1, issue mknod.  Otherwise, check to see if the device exists by checking for metadata.
    int device_exists = 0;       // if 1, the device already exists.  only run commands with the if_exists directive set to "run"
    
+   // prevent reloads while processing   
+   vdev_reload_lock( req->state );
+
    // do the rename, possibly generating it
    rc = vdev_action_create_path( req, req->state->acts, req->state->num_acts, &req->renamed_path );
    if( rc != 0 ) {
@@ -799,6 +838,7 @@ int vdev_device_add( struct vdev_device_request* req ) {
       vdev_error("vdev_action_create_path('%s') rc = %d\n", req->path, rc);
       
       // done with this request
+      vdev_reload_unlock( req->state );
       vdev_device_request_free( req );
       free( req );
    
@@ -812,6 +852,7 @@ int vdev_device_add( struct vdev_device_request* req ) {
       if( req->renamed_path == NULL && req->path != NULL ) {
          
          // done with this request
+         vdev_reload_unlock( req->state );
          vdev_device_request_free( req );
          free( req );
       
@@ -837,8 +878,10 @@ int vdev_device_add( struct vdev_device_request* req ) {
                vdev_error("vdev_device_mkdirs('%s/%s') rc = %d\n", req->state->mountpoint, req->renamed_path, rc );
                
                // done with this request 
+               vdev_reload_unlock( req->state );
                vdev_device_request_free( req );
                free( req );
+
                return rc;
             }
             
@@ -937,9 +980,10 @@ int vdev_device_add( struct vdev_device_request* req ) {
    }
    
    // done with this request
+   vdev_reload_unlock( req->state );
    vdev_device_request_free( req );
    free( req );
-   
+                
    return 0;
 }
 
@@ -958,6 +1002,8 @@ int vdev_device_remove( struct vdev_device_request* req ) {
    
    int rc = 0;
    
+   vdev_reload_lock( req->state );
+
    // do the rename, possibly generating it
    rc = vdev_action_create_path( req, req->state->acts, req->state->num_acts, &req->renamed_path );
    if( rc != 0 ) {
@@ -965,9 +1011,10 @@ int vdev_device_remove( struct vdev_device_request* req ) {
       vdev_error("vdev_action_create_path('%s') rc = %d\n", req->path, rc);
       
       // done with this request
+      vdev_reload_unlock( req->state );
       vdev_device_request_free( req );
       free( req );
-   
+      
       return rc;
    }
    
@@ -977,6 +1024,7 @@ int vdev_device_remove( struct vdev_device_request* req ) {
       if( req->renamed_path == NULL && req->path == NULL ) {
          
          // done with this request
+         vdev_reload_unlock( req->state );
          vdev_device_request_free( req );
          free( req );
       
@@ -1039,6 +1087,8 @@ int vdev_device_remove( struct vdev_device_request* req ) {
       }
    }
    
+   vdev_reload_unlock( req->state );
+
    // done with this request 
    vdev_device_request_free( req );
    free( req );
@@ -1066,6 +1116,8 @@ int vdev_device_change( struct vdev_device_request* req ) {
    
    int rc = 0;
    
+   vdev_reload_lock( req->state );
+
    // do the rename, possibly generating it
    rc = vdev_action_create_path( req, req->state->acts, req->state->num_acts, &req->renamed_path );
    if( rc != 0 ) {
@@ -1073,6 +1125,7 @@ int vdev_device_change( struct vdev_device_request* req ) {
       vdev_error("vdev_action_create_path('%s') rc = %d\n", req->path, rc);
       
       // done with this request
+      vdev_reload_unlock( req->state );
       vdev_device_request_free( req );
       free( req );
    
@@ -1086,9 +1139,9 @@ int vdev_device_change( struct vdev_device_request* req ) {
       if( req->renamed_path == NULL && req->path != NULL ) {
          
          // done with this request
+         vdev_reload_unlock( req->state );
          vdev_device_request_free( req );
          free( req );
-      
          return -ENOMEM;
       }
    }
@@ -1105,10 +1158,12 @@ int vdev_device_change( struct vdev_device_request* req ) {
       }  
    }
    
+   vdev_reload_unlock( req->state );
+
    // done with this request
    vdev_device_request_free( req );
-   free( req );
-   
+   free( req ); 
+
    return 0;
 }
 

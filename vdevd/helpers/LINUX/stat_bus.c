@@ -24,7 +24,7 @@
 
 void usage( char const* progname ) {
    
-   fprintf(stderr, "Usage: %s /sysfs/path/to/device\n", progname );
+   fprintf(stderr, "[ERROR] %s: Usage: %s /sysfs/path/to/device\n", progname, progname );
    exit(1);
 }
 
