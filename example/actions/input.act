@@ -5,3 +5,4 @@ VAR_INPUT_OWNER=root
 VAR_INPUT_GROUP=input
 VAR_INPUT_MODE=0660
 helper=input.sh
+daemonlet=true
