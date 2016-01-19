@@ -152,6 +152,13 @@ vdev_feature_test() {
 }
 
 
+# given a newline-separated list of variables to evaluate, escape them all.
+# reads them from stdin and writes the escaped version to stdout 
+vdev_escape_vars() {
+   /bin/sed "s/^\([^=]\+\)=\(.*\)$/\1='\2'/g"
+}
+
+
 # print the list of device drivers in a sysfs device path 
 #   $1  sysfs device path
 vdev_drivers() {
