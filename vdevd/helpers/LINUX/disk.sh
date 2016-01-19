@@ -522,7 +522,9 @@ main() {
          if [ $STAT_RET -ne 0 ]; then
 
             # exit 2 means that we didn't get any information (this is okay by us)
-            vdev_warn "/sbin/blkid failed on $VDEV_MOUNTPOINT/$VDEV_PATH, exit status $STAT_RET"
+            if [ $STAT_RET -ne 2 ]; then 
+               vdev_warn "/sbin/blkid failed on $VDEV_MOUNTPOINT/$VDEV_PATH, exit status $STAT_RET"
+            fi
          else
 
             # make sure everything is properly escaped before evaluating
@@ -531,7 +533,10 @@ main() {
          fi
       fi
    else
-      vdev_warn "Could not find blkid in /sbin/blkid.  $VDEV_MOUNTPOINT/disk/by-*/ symlinks will not be added."
+      if ! vdev_feature_test "no_blkid" "$VDEV_GLOBAL_METADATA"; then 
+          vdev_warn "Could not find blkid in /sbin/blkid.  $VDEV_MOUNTPOINT/disk/by-*/ symlinks will not be added."
+          vdev_feature_set "no_blkid" "$VDEV_GLOBAL_METADATA"
+      fi
    fi
 
    # get disk WWN, if set 
@@ -579,8 +584,13 @@ main() {
       PVS="/sbin/pvs --nameprefixes --noheadings $VDEV_MOUNTPOINT/$VDEV_PATH"
       PVS_DATA="$($PVS -o pv_uuid 2>"$VDEV_MOUNTPOINT/null")"
       PVS_RC=$?
+
    else
-      vdev_warn "Could not find pvs in /sbin/pvs.  LVM physical volume symlinks in $VDEV_MOUNTPOINT/disk/by-id will not be created."
+
+      if ! vdev_feature_test "no_pvs" "$VDEV_GLOBAL_METADATA"; then
+          vdev_warn "Could not find pvs in /sbin/pvs.  LVM physical volume symlinks in $VDEV_MOUNTPOINT/disk/by-id will not be created."
+          vdev_feature_set "no_pvs" "$VDEV_GLOBAL_METADATA"
+      fi
    fi
 
    if [ $PVS_RC -eq 0 ] && [ -n "$PVS_DATA" ]; then 
