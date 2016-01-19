@@ -30,8 +30,8 @@
 #define _XOPEN_SOURCE 700
 #endif 
 
-#ifndef _BSD_SOURCE
-#define _BSD_SOURCE
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE
 #endif
 
 #include <limits.h>

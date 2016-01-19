@@ -2,7 +2,7 @@ include ../buildconf.mk
 
 CFLAGS := -Wall -g -fPIC -fstack-protector -fstack-protector-all -pthread -Wno-unused-variable -Wno-unused-but-set-variable
 INC := $(INC) -I$(BUILD_LIBUDEV_COMPAT_HEADERS)
-DEFS := $(DEFS) -D_POSIX_C_SOURCE=200809L -D_BSD_SOURCE -D_GNU_SOURCE
+DEFS := $(DEFS) -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE -D_GNU_SOURCE
 CC   := cc
 
 C_SRCS:= $(wildcard *.c)

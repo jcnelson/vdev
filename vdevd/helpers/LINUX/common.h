@@ -23,8 +23,8 @@
 #ifndef _VDEV_LINUX_HELPERS_COMMON_H_
 #define _VDEV_LINUX_HELPERS_COMMON_H_
 
-#ifndef _BSD_SOURCE
-#define _BSD_SOURCE
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE
 #endif
 
 #ifndef _POSIX_C_SOURCE
