@@ -433,6 +433,11 @@ int vdev_config_fullpaths( struct vdev_config* conf ) {
    for( int i = 0; need_fullpath[i] != NULL; i++ ) {
       
       if( need_fullpath[i] != NULL && (*need_fullpath[i]) != NULL ) {
+		 
+         // if special sentinel string "syslog" is found, don't process it 
+         if( need_fullpath[i] == &conf->logfile_path && strncmp((*need_fullpath[i]), "syslog",7) == 0 ) {      
+            continue;
+         }
          
          if( *(need_fullpath[i])[0] != '/' ) {
                
