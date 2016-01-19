@@ -528,7 +528,7 @@ main() {
          else
 
             # make sure everything is properly escaped before evaluating
-            BLKID_DATA="$(echo "$BLKID_DATA" | /bin/sed "s/^\([^=]\+\)=\(.*\)$/\1='\2'/g")"
+            BLKID_DATA="$(echo "$BLKID_DATA" | vdev_escape_vars)"
             eval "$BLKID_DATA"
          fi
       fi
@@ -594,7 +594,8 @@ main() {
    fi
 
    if [ $PVS_RC -eq 0 ] && [ -n "$PVS_DATA" ]; then 
-      
+     
+      PVS_DATA="$(echo "$PVS_DATA" | vdev_escape_vars)" 
       eval "$PVS_DATA"
 
       if [ -n "$LVM2_PV_UUID" ]; then 
