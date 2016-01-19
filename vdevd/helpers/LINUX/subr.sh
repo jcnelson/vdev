@@ -107,6 +107,51 @@ vdev_error() {
 }
 
 
+# record that a particular feature exists 
+# arguments:
+#   $1  the feature name 
+#   $2  the global metadata directory (defaults to VDEV_GLOBAL_METADATA)
+vdev_feature_set() {
+
+   local _GLOBAL_METADATA _FEATURE
+
+   _FEATURE="$1"
+   _GLOBAL_METADATA="$2"
+   
+   if [ -z "$_GLOBAL_METADATA" ]; then 
+      _GLOBAL_METADATA="$VDEV_GLOBAL_METADATA"
+   fi
+
+   /bin/mkdir -p "$_GLOBAL_METADATA/features" && echo "" > "$_GLOBAL_METADATA/features/$_FEATURE" 
+   return $?
+}
+
+
+# see if a feature was set earlier 
+# arguments:
+#    $1 the feature name
+#    $2 the global metadata directory (defaults to VDEV_GLOBAL_METADATA)
+# return 0 if set
+# return 1 if not
+vdev_feature_test() {
+
+   local _GLOBAL_METADATA _FEATURE
+
+   _FEATURE="$1"
+   _GLOBAL_METADATA="$2"
+
+   if [ -z "$_GLOBAL_METADATA" ]; then
+      _GLOBAL_METADATA="$VDEV_GLOBAL_METADATA"
+   fi
+
+   if [ -f "$_GLOBAL_METADATA/features/$_FEATURE" ]; then 
+      return 0
+   else
+      return 1
+   fi
+}
+
+
 # print the list of device drivers in a sysfs device path 
 #   $1  sysfs device path
 vdev_drivers() {
