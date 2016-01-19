@@ -474,6 +474,7 @@ Options include:\n\
                   Pass 'syslog' to log to syslog, instead of a logfile.\n\
                   \n\
    -1, --once\n\
+       --coldplug-only \n\
                   Exit once all extant devices have been processed.\n\
                   \n\
    -f, --foreground\n\
