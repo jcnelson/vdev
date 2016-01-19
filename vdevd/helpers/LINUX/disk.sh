@@ -525,6 +525,8 @@ main() {
             vdev_warn "/sbin/blkid failed on $VDEV_MOUNTPOINT/$VDEV_PATH, exit status $STAT_RET"
          else
 
+            # make sure everything is properly escaped before evaluating
+            BLKID_DATA="$(echo "$BLKID_DATA" | /bin/sed "s/^\([^=]\+\)=\(.*\)$/\1='\2'/g")"
             eval "$BLKID_DATA"
          fi
       fi
