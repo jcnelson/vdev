@@ -78,7 +78,6 @@ main() {
 
    if [ -x /sbin/blkid ]; then
       
-      # eval "$(/sbin/blkid -o export "$VDEV_MOUNTPOINT/$VDEV_PATH")"
       BLKID_DATA="$(vdev_blkid "$VDEV_MOUNTPOINT/$VDEV_PATH")"
       RC=$?
 
@@ -87,7 +86,8 @@ main() {
          return $RC
       else 
 
-         # import 
+         # import
+         BLKID_DATA="$(echo "$BLKID_DATA" | vdev_escape_vars)"
          eval "$BLKID_DATA"
       fi
       
