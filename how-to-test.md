@@ -31,7 +31,7 @@ Step 3: Generate a Fake /dev
 
 From the root of the source code repository you checked out in step 1, the command to have `vdevd` generate a fake `/dev` is:
 
-    $ sudo vdevd/vdevd -v2 -c example/vdevd.conf -l /tmp/vdev.log --once vdev-test/
+    $ sudo build/sbin/vdevd -v2 -c example/vdevd.conf -l /tmp/vdev.log --once vdev-test/
 
 `vdevd` should print out some runtime setup information to your console, run for a few seconds, and exit normally.  If you run `ls vdev-test/`, you should see a bunch of device files.  All debugging information will have been written to `/tmp/vdev.log`.
 
