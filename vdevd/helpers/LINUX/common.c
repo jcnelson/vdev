@@ -427,7 +427,7 @@ int vdev_property_print( void ) {
    if( vdev_property_head != NULL ) {
       
       for( struct vdev_property* itr = vdev_property_head; itr != NULL; itr = itr->next ) {
-         printf("%s=%s\n", itr->name, itr->value );
+         printf("%s='%s'\n", itr->name, itr->value );
       }
       
       // print the variable VDEV_PROPERTIES to include all property names 
