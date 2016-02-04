@@ -15,7 +15,7 @@
 main() {
 
    local DISK_TYPE DISK_ID DISK_SERIAL DISK_WWN DISK_NAME PART_NAME 
-   local VDEV_BUS VDEV_ATA VDEV_SCSI VDEV_CCIS VDEV_USB VDEV_IEEE1394 VDEV_LOOP VDEV_VIRTIO VDEV_MMC VDEV_SERIAL VDEV_USB_SERIAL VDEV_SERIAL_SHORT VDEV_REVISION
+   local VDEV_BUS VDEV_ATA VDEV_SCSI VDEV_CCIS VDEV_USB VDEV_IEEE1394 VDEV_LOOP VDEV_VIRTIO VDEV_MMC VDEV_SERIAL VDEV_ATA_SERIAL VDEV_ATA_SERIAL_SHORT VDEV_SCSI_SERIAL VDEV_USB_SERIAL VDEV_SERIAL_SHORT VDEV_REVISION
    local VDEV_PROPERTIES
    local HELPER STAT_RET HELPER_DATA 
    
@@ -310,7 +310,12 @@ main() {
 
          if [ $STAT_RET -eq 0 ]; then 
 
-            # success!
+            # success!  
+            VDEV_ATA_SERIAL=
+            VDEV_ATA_SERIAL_SHORT=
+            VDEV_ATA_WWN=
+            VDEV_ATA_TYPE=
+
             eval "$HELPER_DATA"
 
             # disk id is the serial number
@@ -349,6 +354,9 @@ main() {
                
             else
 
+               VDEV_SCSI_SERIAL=
+               eval "$HELPER_DATA"
+
                # generic SCSI disk 
                # disk ID is the serial number
                DISK_ID="$VDEV_SCSI_SERIAL"
@@ -372,6 +380,9 @@ main() {
          
          if [ $STAT_RET -eq 0 ]; then 
 
+            VDEV_SCSI_SERIAL=
+            eval "$HELPER_DATA"
+
             # disk ID is the serial number
             DISK_ID="$VDEV_SCSI_SERIAL"
             DISK_SERIAL="$VDEV_SCSI_SERIAL"
@@ -394,6 +405,9 @@ main() {
          STAT_RET=$?
 
          if [ $STAT_RET -eq 0 ]; then 
+
+            VDEV_USB_SERIAL=
+            eval "$HELPER_DATA"
 
             # disk id is the serial number
             DISK_ID="$VDEV_USB_SERIAL"
