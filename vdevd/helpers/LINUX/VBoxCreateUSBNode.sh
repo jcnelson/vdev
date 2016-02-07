@@ -36,7 +36,8 @@ device=`expr "$2" '%' 128 + 1`
 class="$3"
 group="$4"
 devdir="`printf "$VDEV_MOUNTPOINT/vboxusb/%.3d" $bus`"
-devpath="`printf "$VDEV_MOUNTPOINT/vboxusb/%.3d/%.3d" $bus $device`"
+reldevpath="`printf "vboxusb/%.3d/%.3d" $bus $device`"
+devpath="$VDEV_MOUNTPOINT/$reldevpath"
 case "$do_remove" in
   0)
   if test -n "$class" -a "$class" -eq "$usb_class_hub"
@@ -50,6 +51,12 @@ case "$do_remove" in
   chown root:$group "$devdir" 2>/dev/null
   mknod "$devpath" c $1 $2 -m 0660 2>/dev/null
   chown root:$group "$devpath" 2>/dev/null
+
+  # add metadata directory for this extra device node,
+  # so we can correctly clean up on coldplug device removal.
+  mkdir -p "$VDEV_GLOBAL_METADATA/dev/$reldevpath"
+  echo "$VDEV_INSTANCE" > "$VDEV_GLOBAL_METADATA/dev/$reldevpath/vdev_instance"
+
   ;;
   1)
   rm -f "$devpath"
