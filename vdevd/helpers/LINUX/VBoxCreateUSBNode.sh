@@ -56,6 +56,7 @@ case "$do_remove" in
   # so we can correctly clean up on coldplug device removal.
   mkdir -p "$VDEV_GLOBAL_METADATA/dev/$reldevpath"
   echo "$VDEV_INSTANCE" > "$VDEV_GLOBAL_METADATA/dev/$reldevpath/vdev_instance"
+  touch "$VDEV_GLOBAL_METADATA/dev/$reldevpath/links"
 
   ;;
   1)
