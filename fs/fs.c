@@ -1149,6 +1149,10 @@ int vdevfs_stat( struct fskit_core* core, struct fskit_route_metadata* grp, stru
    int rc = 0;
    struct vdevfs* vdev = (struct vdevfs*)fskit_core_get_user_data( core );
    struct fskit_fuse_state* fs_state = fskit_fuse_get_state();
+
+   if( fent == NULL ) {
+      return -ENOENT;
+   }
    
    rc = vdevfs_access_check( vdev, fs_state, "stat", fskit_route_metadata_get_path( grp ) );
    if( rc < 0 ) {
