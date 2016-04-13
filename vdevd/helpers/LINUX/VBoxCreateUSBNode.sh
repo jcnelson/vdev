@@ -38,6 +38,11 @@ group="$4"
 devdir="`printf "$VDEV_MOUNTPOINT/vboxusb/%.3d" $bus`"
 reldevpath="`printf "vboxusb/%.3d/%.3d" $bus $device`"
 devpath="$VDEV_MOUNTPOINT/$reldevpath"
+
+if [ -z "$devdir" ] || [ -z "$reldevpath" ]; then 
+   exit 0
+fi
+
 case "$do_remove" in
   0)
   if test -n "$class" -a "$class" -eq "$usb_class_hub"
