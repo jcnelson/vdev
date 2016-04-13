@@ -99,18 +99,17 @@ static int vdev_device_request_make_env_str( char const* key, char const* value,
 // action to const string 
 static char const* vdev_device_request_type_to_string( vdev_device_request_t req ) {
    
-   static char const* req_tbl[] = {
-      "add",
-      "remove",
-      "any",
-      "none"
-   };
-   
-   if( req < 0 || req > VDEV_DEVICE_ANY ) {
-      return req_tbl[3];
+   if( req == VDEV_DEVICE_ADD ) {
+      return "add";
    }
-   
-   return req_tbl[req-1];
+   if( req == VDEV_DEVICE_REMOVE ) {
+      return "remove";
+   }
+   if( req == VDEV_DEVICE_CHANGE ) {
+      return "change";
+   }
+
+   return "none";
 }
 
 
