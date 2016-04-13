@@ -1,0 +1,30 @@
+#!/bin/sh
+
+set -e
+
+PREREQ=""
+
+prereqs()
+{
+    echo "$PREREQ"
+}
+
+case $1 in
+    prereqs)
+        prereqs
+        exit 0
+        ;;
+esac
+
+. /scripts/functions
+
+# Hook for stopping smartcard reading software
+
+if [ ! -e /sbin/pcscd ]; then
+    exit 0
+fi
+
+# Start pcscd daemon nomrally.  If it was started in foregound, chances are
+# it'll harmlessly complain about missing /var/run/pcscd* files due to the root
+# filessytem being remounted.
+start-stop-daemon --stop --quiet --pidfile /var/run/pcscd.pid --name pcscd

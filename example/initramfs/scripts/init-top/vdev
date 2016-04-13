@@ -15,8 +15,10 @@ if [ -w /sys/kernel/uevent_helper ]; then
 	echo > /sys/kernel/uevent_helper
 fi
 
-/bin/mkdir -p /run/vdev/
-/sbin/vdevd -c /etc/vdev/vdevd.conf -l /run/vdev/vdevd.boot.log -p /run/vdevd.boot.pid -v2 /dev
+if ! [ -f /run/vdevd.boot.pid ]; then 
+   /bin/mkdir -p /run/vdev/
+   /sbin/vdevd -c /etc/vdev/vdevd.conf -l /run/vdev/vdevd.boot.log -p /run/vdevd.boot.pid -v2 /dev
+fi
 
 if [ -d /dev/metadata/udev ] && ! [ -e /run/udev ]; then 
    /bin/ln -s /dev/metadata/udev /run/udev || true 

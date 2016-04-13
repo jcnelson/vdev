@@ -1,0 +1,17 @@
+#!/bin/sh
+
+set -e
+
+case "${1}" in
+	prereqs)
+		exit 0
+		;;
+esac
+
+if [ "${ROOTFSTYPE}" = ntfs ] || [ "${ROOTFSTYPE}" = ntfs-3g ] || \
+   [ "${LOOPFSTYPE}" = ntfs ] || [ "${LOOPFSTYPE}" = ntfs-3g ]
+then
+	modprobe fuse
+fi
+
+exit 0

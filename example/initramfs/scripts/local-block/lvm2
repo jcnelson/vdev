@@ -1,0 +1,48 @@
+#!/bin/sh
+
+PREREQ="mdadm mdrun multipath"
+
+prereqs()
+{
+	echo "$PREREQ"
+}
+
+case $1 in
+# get pre-requisites
+prereqs)
+	prereqs
+	exit 0
+	;;
+esac
+
+if [ ! -e /sbin/lvm ]; then
+	exit 0
+fi
+
+lvchange_activate() {
+	lvm lvchange -aay -y --sysinit --ignoreskippedcluster "$@"
+}
+
+activate() {
+	local dev="$1"
+
+	case "$dev" in
+	/dev/mapper/*)
+		eval $(dmsetup splitname --nameprefixes --noheadings --rows "${dev#/dev/mapper/}")
+		if [ "$DM_VG_NAME" ] && [ "$DM_LV_NAME" ]; then
+			lvchange_activate "$DM_VG_NAME/$DM_LV_NAME"
+		fi
+		;;
+
+	/dev/*/*)
+		# Could be /dev/VG/LV; use lvs to check
+		if lvm lvs -- "$dev" >/dev/null 2>&1; then
+			lvchange_activate "$dev"
+		fi
+		;;
+	esac
+}
+
+activate "$1"
+
+exit 0

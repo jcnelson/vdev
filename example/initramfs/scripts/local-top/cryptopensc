@@ -1,0 +1,36 @@
+#!/bin/sh
+
+set -e
+
+PREREQ=""
+
+prereqs()
+{
+    echo "$PREREQ"
+}
+
+case $1 in
+    prereqs)
+        prereqs
+        exit 0
+        ;;
+esac
+
+. /scripts/functions
+
+# Hook for starting smartcard reading software
+
+if [ ! -e /sbin/pcscd ]; then
+    exit 0
+fi
+
+# Start pcscd daemon nomrally:
+#   start-stop-daemon --start --quiet \
+#       --pidfile /var/run/pcscd.pid \
+#       --exec /sbin/pcscd
+# Alternatively, start pcscd daemon in foreground so that it's pretty colored
+# output may be seen on the console, useful for watching error messages since
+# pcscd uses syslog which is not available (use --error or --critical to filter
+# out debug message clutter):
+#    /sbin/pcscd --error --foreground &
+/sbin/pcscd --foreground &

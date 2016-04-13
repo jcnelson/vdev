@@ -1,0 +1,101 @@
+#!/bin/sh
+#
+# Copyright © 2006-2008 Martin F. Krafft <madduck@debian.org>,
+#             2012 Michael Tokarev <mjt@tls.msk.ru>
+# based on the scripts in the initramfs-tools package.
+# released under the terms of the Artistic Licence.
+#
+set -eu
+
+case ${1:-} in
+  prereqs) echo "multipath"; exit 0;;
+esac
+
+. /scripts/functions
+
+maybe_break pre-mdadm
+
+if [ -e /scripts/local-top/md ]; then
+  log_warning_msg "old md initialisation script found, getting out of its way..."
+  exit 0
+fi
+
+MDADM=/sbin/mdadm
+[ -x "$MDADM" ] || exit 0
+
+verbose()
+{
+  case "$quiet" in y*|Y*|1|t*|T*)
+    return 1;;
+  *)
+    return 0;;
+  esac
+}
+
+MD_DEVS=all
+[ -s /conf/mdadm ] && . /conf/mdadm
+
+if [ "$MD_DEVS" = none ]; then
+  verbose &&
+    log_warning_msg "INITRDSTART set to \"none\" in /etc/default/mdadm, not assembling raid arrays"
+  exit 0
+fi
+
+if [ ! -f /proc/mdstat ] && ! modprobe -q md_mod; then
+  verbose && log_warning_msg "failed to load module md_mod."
+fi
+if [ ! -f /proc/mdstat ]; then
+  verbose && log_warning_msg "cannot initialise MD subsystem (/proc/mdstat missing)"
+  exit 0
+fi
+
+# handle /dev/md/X nodes
+mkdir -p /dev/md
+
+CONFIG=/etc/mdadm/mdadm.conf
+# in case the hook failed to install a configuration file, this is our last
+# attempt... the "emergency procedure"... <drumroll>
+if [ ! -e $CONFIG ]; then
+  log_warning_msg "missing mdadm.conf file, trying to create one..."
+  mkdir -p ${CONFIG%/*}
+  echo DEVICE partitions > $CONFIG
+  $MDADM --examine --scan >> $CONFIG
+  if [ -s $CONFIG ]; then
+    verbose && log_success_msg "mdadm.conf created."
+  else
+    verbose && log_failure_msg "could not create mdadm.conf, the boot will likely fail."
+  fi
+  MD_DEVS=all
+fi
+
+if [ "$MD_DEVS" = all ]; then
+
+  verbose && log_begin_msg "Assembling all MD arrays"
+  extra_args=''
+  [ -n "${MD_HOMEHOST:-}" ] && extra_args="--homehost=$MD_HOMEHOST"
+  if $MDADM --assemble --scan --run --auto=yes${extra_args:+ $extra_args}; then
+    verbose && log_success_msg "assembled all arrays."
+  else
+    log_failure_msg "failed to assemble all arrays."
+  fi
+  verbose && log_end_msg
+
+else
+  for dev in $MD_DEVS; do
+
+    verbose && log_begin_msg "Assembling MD array $dev"
+    if $MDADM --assemble --scan --run --auto=yes $dev; then
+      verbose && log_success_msg "started $dev"
+    else
+      log_failure_msg "failed to start $dev"
+    fi
+    verbose && log_end_msg
+
+  done
+fi
+
+wait_for_udev 10
+
+maybe_break post-mdadm
+
+exit 0

@@ -1,0 +1,410 @@
+#!/bin/sh
+
+PREREQ="cryptroot-prepare"
+
+#
+# Standard initramfs preamble
+#
+prereqs()
+{
+	# Make sure that cryptroot is run last in local-top
+	for req in $(dirname $0)/*; do
+		script=${req##*/}
+		if [ $script != cryptroot ]; then
+			echo $script
+		fi
+	done
+}
+
+case $1 in
+prereqs)
+	prereqs
+	exit 0
+	;;
+esac
+
+# source for log_*_msg() functions, see LP: #272301
+. /scripts/functions
+
+#
+# Helper functions
+#
+message()
+{
+	if [ -x /bin/plymouth ] && plymouth --ping; then
+		plymouth message --text="$@"
+	else
+		echo "$@" >&2
+	fi
+	return 0
+}
+
+udev_settle()
+{
+	# Wait for udev to be ready, see https://launchpad.net/bugs/85640
+	if command -v udevadm >/dev/null 2>&1; then
+		udevadm settle --timeout=30
+	elif command -v udevsettle >/dev/null 2>&1; then
+		udevsettle --timeout=30
+	fi
+	return 0
+}
+
+parse_options()
+{
+	local cryptopts
+	cryptopts="$1"
+
+	if [ -z "$cryptopts" ]; then
+		return 1
+	fi
+
+	# Defaults
+	cryptcipher=aes-cbc-essiv:sha256
+	cryptsize=256
+	crypthash=ripemd160
+	crypttarget=cryptroot
+	cryptsource=""
+	cryptheader=""
+	cryptlvm=""
+	cryptkeyscript=""
+	cryptkey="" # This is only used as an argument to an eventual keyscript
+	crypttries=3
+	crypttcrypt=""
+	cryptrootdev=""
+	cryptdiscard=""
+	CRYPTTAB_OPTIONS=""
+
+	local IFS=" ,"
+	for x in $cryptopts; do
+		case $x in
+		hash=*)
+			crypthash=${x#hash=}
+			;;
+		size=*)
+			cryptsize=${x#size=}
+			;;
+		cipher=*)
+			cryptcipher=${x#cipher=}
+			;;
+		target=*)
+			crypttarget=${x#target=}
+			export CRYPTTAB_NAME="$crypttarget"
+			;;
+		source=*)
+			cryptsource=${x#source=}
+			if [ ${cryptsource#UUID=} != $cryptsource ]; then
+				cryptsource="/dev/disk/by-uuid/${cryptsource#UUID=}"
+			elif [ ${cryptsource#LABEL=} != $cryptsource ]; then
+				cryptsource="/dev/disk/by-label/${cryptsource#LABEL=}"
+			fi
+			export CRYPTTAB_SOURCE="$cryptsource"
+			;;
+		header=*)
+			cryptheader=${x#header=}
+			if [ ! -e "$cryptheader" ] && [ -e "/conf/conf.d/cryptheader/$cryptheader" ]; then
+				cryptheader="/conf/conf.d/cryptheader/$cryptheader"
+			fi
+			export CRYPTTAB_HEADER="$cryptheader"
+			;;
+		lvm=*)
+			cryptlvm=${x#lvm=}
+			;;
+		keyscript=*)
+			cryptkeyscript=${x#keyscript=}
+			;;
+		key=*)
+			if [ "${x#key=}" != "none" ]; then
+				cryptkey=${x#key=}
+			fi
+			export CRYPTTAB_KEY="$cryptkey"
+			;;
+		tries=*)
+			crypttries="${x#tries=}"
+			case "$crypttries" in
+			  *[![:digit:].]*)
+				crypttries=3
+				;;
+			esac
+			;;
+		tcrypt)
+			crypttcrypt="yes"
+			;;
+		rootdev)
+			cryptrootdev="yes"
+			;;
+		discard)
+			cryptdiscard="yes"
+			;;
+		esac
+		PARAM="${x%=*}"
+		if [ "$PARAM" = "$x" ]; then
+			VALUE="yes"
+		else
+			VALUE="${x#*=}"
+		fi
+		CRYPTTAB_OPTIONS="$CRYPTTAB_OPTIONS $PARAM"
+		eval export CRYPTTAB_OPTION_$PARAM="\"$VALUE\""
+	done
+	export CRYPTTAB_OPTIONS
+
+	if [ -z "$cryptsource" ]; then
+		message "cryptsetup: source parameter missing"
+		return 1
+	fi
+	return 0
+}
+
+activate_vg()
+{
+	# Sanity checks
+	if [ ! -x /sbin/lvm ]; then
+		message "cryptsetup: lvm is not available"
+		return 1
+	fi
+
+	# Detect and activate available volume groups
+	/sbin/lvm vgscan
+	/sbin/lvm vgchange -a y --sysinit
+	return $?
+}
+
+setup_mapping()
+{
+	local opts count cryptopen cryptremove NEWROOT
+	opts="$1"
+
+	if [ -z "$opts" ]; then
+		return 0
+	fi
+
+	parse_options "$opts" || return 1
+
+	if [ -n "$cryptkeyscript" ] && ! type "$cryptkeyscript" >/dev/null; then
+		message "cryptsetup: error - script \"$cryptkeyscript\" missing"
+		return 1
+	fi
+
+	if [ -n "$cryptheader" ] && ! type "$cryptheader" >/dev/null; then
+		message "cryptsetup: error - LUKS header \"$cryptheader\" missing"
+		return 1
+	fi
+
+	# The same target can be specified multiple times
+	# e.g. root and resume lvs-on-lvm-on-crypto
+	if [ -e "/dev/mapper/$crypttarget" ]; then
+		return 0
+	fi
+
+	modprobe -q dm_crypt
+
+	# Make sure the cryptsource device is available
+	if [ ! -e $cryptsource ]; then
+		activate_vg
+	fi
+
+	# If the encrypted source device hasn't shown up yet, give it a
+	# little while to deal with removable devices
+
+	# the following lines below have been taken from
+	# /usr/share/initramfs-tools/scripts/local, as suggested per
+	# https://launchpad.net/bugs/164044
+	if [ ! -e "$cryptsource" ]; then
+		log_begin_msg "Waiting for encrypted source device..."
+
+		# Default delay is 180s
+		if [ -z "${ROOTDELAY}" ]; then
+			slumber=180
+		else
+			slumber=${ROOTDELAY}
+		fi
+
+		slumber=$(( ${slumber} * 10 ))
+		while [ ! -e "$cryptsource" ]; do
+			# retry for LVM devices every 10 seconds
+			if [ ${slumber} -eq $(( ${slumber}/100*100 )) ]; then
+				activate_vg
+			fi
+
+			/bin/sleep 0.1
+			slumber=$(( ${slumber} - 1 ))
+			[ ${slumber} -gt 0 ] || break
+		done
+
+		if [ ${slumber} -gt 0 ]; then
+			log_end_msg 0
+		else
+			log_end_msg 1 || true
+		fi
+ 	fi
+	udev_settle
+
+	# We've given up, but we'll let the user fix matters if they can
+	if [ ! -e "${cryptsource}" ]; then
+		
+		echo "  ALERT! ${cryptsource} does not exist."
+		echo "	Check cryptopts=source= bootarg: cat /proc/cmdline"
+		echo "	or missing modules, devices: cat /proc/modules; ls /dev"
+		panic -r "Dropping to a shell. Will skip ${cryptsource} if you can't fix."
+	fi
+
+	if [ ! -e "${cryptsource}" ]; then
+		return 1
+	fi
+
+
+	# Prepare commands
+	cryptopen="/sbin/cryptsetup -T 1"
+	if [ "$cryptdiscard" = "yes" ]; then
+		cryptopen="$cryptopen --allow-discards"
+	fi
+	if [ -n "$cryptheader" ]; then
+		cryptopen="$cryptopen --header=$cryptheader"
+	fi
+	if /sbin/cryptsetup isLuks ${cryptheader:-$cryptsource} >/dev/null 2>&1; then
+		cryptopen="$cryptopen open --type luks $cryptsource $crypttarget --key-file=-"
+	elif [ "$crypttcrypt" = "yes" ]; then
+		cryptopen="$cryptopen open --type tcrypt $cryptsource $crypttarget"
+	else
+		cryptopen="$cryptopen -c $cryptcipher -s $cryptsize -h $crypthash open --type plain $cryptsource $crypttarget --key-file=-"
+	fi
+	cryptremove="/sbin/cryptsetup remove $crypttarget"
+	NEWROOT="/dev/mapper/$crypttarget"
+
+	# Try to get a satisfactory password $crypttries times
+	count=0
+	while [ $crypttries -le 0 ] || [ $count -lt $crypttries ]; do
+		export CRYPTTAB_TRIED="$count"
+		count=$(( $count + 1 ))
+
+		if [ -z "$cryptkeyscript" ]; then
+			if [ ${cryptsource#/dev/disk/by-uuid/} != $cryptsource ]; then
+				# UUIDs are not very helpful
+				diskname="$crypttarget"
+			else
+				diskname="$cryptsource ($crypttarget)"
+			fi
+
+			if [ -x /bin/plymouth ] && plymouth --ping; then
+				cryptkeyscript="plymouth ask-for-password --prompt"
+				# Plymouth will add a : if it is a non-graphical prompt
+				cryptkey="Please unlock disk $diskname"
+			else
+				cryptkeyscript="/lib/cryptsetup/askpass"
+				cryptkey="Please unlock disk $diskname: "
+			fi
+		fi
+
+
+		if [ ! -e "$NEWROOT" ]; then
+			if ! crypttarget="$crypttarget" cryptsource="$cryptsource" \
+			     $cryptkeyscript "$cryptkey" | $cryptopen; then
+				message "cryptsetup: cryptsetup failed, bad password or options?"
+				continue
+			fi
+		fi
+
+		if [ ! -e "$NEWROOT" ]; then
+			message "cryptsetup: unknown error setting up device mapping"
+			return 1
+		fi
+
+		#FSTYPE=''
+		#eval $(fstype < "$NEWROOT")
+		FSTYPE="$(/sbin/blkid -s TYPE -o value "$NEWROOT")"
+
+		# See if we need to setup lvm on the crypto device
+		#if [ "$FSTYPE" = "lvm" ] || [ "$FSTYPE" = "lvm2" ]; then
+		if [ "$FSTYPE" = "LVM_member" ] || [ "$FSTYPE" = "LVM2_member" ]; then
+			if [ -z "$cryptlvm" ]; then
+				message "cryptsetup: lvm fs found but no lvm configured"
+				return 1
+			elif ! activate_vg; then
+				# disable error message, LP: #151532
+				#message "cryptsetup: failed to setup lvm device"
+				return 1
+			fi
+
+			# Apparently ROOT is already set in /conf/param.conf for
+			# flashed kernels at least. See bugreport #759720.
+			if [ -f /conf/param.conf ] && grep -q "^ROOT=" /conf/param.conf; then
+				NEWROOT=$(sed -n 's/^ROOT=//p' /conf/param.conf)
+			else
+				NEWROOT=${cmdline_root:-/dev/mapper/$cryptlvm}
+				if [ "$cryptrootdev" = "yes" ]; then
+					# required for lilo to find the root device
+					echo "ROOT=$NEWROOT" >>/conf/param.conf
+				fi
+			fi
+			#eval $(fstype < "$NEWROOT")
+			FSTYPE="$(/sbin/blkid -s TYPE -o value "$NEWROOT")"
+		fi
+
+		#if [ -z "$FSTYPE" ] || [ "$FSTYPE" = "unknown" ]; then
+		if [ -z "$FSTYPE" ]; then
+			message "cryptsetup: unknown fstype, bad password or options?"
+			udev_settle
+			$cryptremove
+			continue
+		fi
+
+		message "cryptsetup: $crypttarget set up successfully"
+		break
+	done
+
+	if [ $crypttries -gt 0 ] && [ $count -gt $crypttries ]; then
+		message "cryptsetup: maximum number of tries exceeded for $crypttarget"
+		return 1
+	fi
+
+	udev_settle
+	return 0
+}
+
+#
+# Begin real processing
+#
+
+# Do we have any kernel boot arguments?
+cmdline_cryptopts=''
+unset cmdline_root
+for opt in $(cat /proc/cmdline); do
+	case $opt in
+	cryptopts=*)
+		opt="${opt#cryptopts=}"
+		if [ -n "$opt" ]; then
+			if [ -n "$cmdline_cryptopts" ]; then
+				cmdline_cryptopts="$cmdline_cryptopts $opt"
+			else
+				cmdline_cryptopts="$opt"
+			fi
+		fi
+		;;
+	root=*)
+		opt="${opt#root=}"
+		case $opt in
+		/*) # Absolute path given. Not lilo major/minor number.
+			cmdline_root=$opt
+			;;
+		*) # lilo major/minor number (See #398957). Ignore
+		esac
+		;;
+	esac
+done
+
+if [ -n "$cmdline_cryptopts" ]; then
+	# Call setup_mapping separately for each possible cryptopts= setting
+	for cryptopt in $cmdline_cryptopts; do
+		setup_mapping "$cryptopt"
+	done
+	exit 0
+fi
+
+# Do we have any settings from the /conf/conf.d/cryptroot file?
+if [ -r /conf/conf.d/cryptroot ]; then
+	while read mapping <&3; do
+		setup_mapping "$mapping" 3<&-
+	done 3< /conf/conf.d/cryptroot
+fi
+
+exit 0

@@ -13,7 +13,9 @@ esac
 
 # stop vdevd 
 if [ -f /run/vdevd.boot.pid ]; then 
-   kill -s SIGTERM $(cat /run/vdevd.boot.pid)
+   kill "$(cat /run/vdevd.boot.pid)"
+   sleep 1
+   kill -0 "$(cat /run/vdevd.boot.pid)" && kill -9 "$(cat /run/vdevd.boot.pid)"
 fi
 
 # move the /dev tmpfs to the rootfs

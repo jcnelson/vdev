@@ -1,0 +1,20 @@
+#!/bin/sh
+
+PREREQ=""
+
+prereqs()
+{
+	echo $PREREQ
+}
+
+case $1 in
+# get pre-requisites
+prereqs)
+	prereqs
+	exit 0
+	;;
+esac
+
+if [ -x /scripts/local-top/cryptroot ]; then
+	exec /scripts/local-top/cryptroot
+fi
