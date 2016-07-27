@@ -1,5 +1,5 @@
 /*
-   vdev: a virtual device manager for *nix
+   Vdev: A virtual device manager for *nix
    Copyright (C) 2014  Jude Nelson
 
    This program is dual-licensed: you can redistribute it and/or modify
@@ -926,6 +926,14 @@ int vdev_init( struct vdev_state* vdev, int argc, char** argv ) {
    
    // parse config options from command-line 
    rc = vdev_config_load_from_args( vdev->config, argc, argv, NULL, NULL );
+   // help is not an error
+   if( rc == -2 ) {
+
+     vdev_config_usage( argv[0] );
+
+     return 0;
+     
+   }
    
    if( rc != 0 ) {
       

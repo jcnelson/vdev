@@ -42,6 +42,7 @@
 #define VDEV_CONFIG_COLDPLUG_ONLY "coldplug_only"
 #define VDEV_CONFIG_FOREGROUND    "foreground"
 #define VDEV_CONFIG_PRESEED       "preseed"
+#define VDEV_CONFIG_HELP          "help"              // simple commandline help
 
 #define VDEV_CONFIG_INSTANCE_NONCE_LEN 32
 #define VDEV_CONFIG_INSTANCE_NONCE_STRLEN (2*VDEV_CONFIG_INSTANCE_NONCE_LEN + 1)
@@ -104,6 +105,9 @@ struct vdev_config {
    
    // bitfield of OS-specific quirks 
    uint64_t OS_quirks;
+
+  //  help holder
+  char help;
 };
 
 C_LINKAGE_BEGIN
@@ -112,7 +116,6 @@ int vdev_config_init( struct vdev_config* conf );
 int vdev_config_load( char const* path, struct vdev_config* conf );
 int vdev_config_load_file( FILE* file, struct vdev_config* conf );
 int vdev_config_free( struct vdev_config* conf );
-
 int vdev_config_usage( char const* progname );
 int vdev_config_load_from_args( struct vdev_config* config, int argc, char** argv, int* fuse_argc, char** fuse_argv );
 int vdev_config_fullpaths( struct vdev_config* config );

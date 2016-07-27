@@ -1,7 +1,11 @@
 *~
+*.orig
+*.backup
 *.pyc
 *.o
 *.so
 *.so.*
 *.swp
 *.kate-swp
+*.patch
+*.diff

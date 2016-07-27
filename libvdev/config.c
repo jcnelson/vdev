@@ -487,9 +487,12 @@ Options include:\n\
                   \n\
    -p, --pidfile PATH\n\
                   Write the PID of the daemon to PATH.\n\
+   -h, --help\n\
+                  prints this help message.\n\
+                  and exits early.\n\
 ", progname );
   
-  return 0;
+   return 0;  
 }
 
 // get the mountpoint option, by taking the last argument that wasn't an optarg
@@ -528,6 +531,7 @@ int vdev_config_load_from_args( struct vdev_config* config, int argc, char** arg
       {"once",            no_argument,         0, '1'},
       {"coldplug-only",   no_argument,         0, 'n'},
       {"foreground",      no_argument,         0, 'f'},
+      {"help",            no_argument,         0, 'h'},
       {0, 0, 0, 0}
    };
 
@@ -536,7 +540,7 @@ int vdev_config_load_from_args( struct vdev_config* config, int argc, char** arg
    int c = 0;
    int fuse_optind = 0;
    
-   char const* optstr = "c:v:l:o:f1np:ds";
+   char const* optstr = "c:v:l:o:hf1np:ds";
   
    if( fuse_argv != NULL ) { 
        fuse_argv[fuse_optind] = argv[0];
@@ -546,8 +550,8 @@ int vdev_config_load_from_args( struct vdev_config* config, int argc, char** arg
    while(rc == 0 && c != -1) {
       
       c = getopt_long(argc, argv, optstr, vdev_options, &opt_index);
-      
-      if( c == -1 ) {
+      // break on -1 missing  arguments and -2 help
+      if( c == -1 || c == -2 ) {
          break;
       }
       
@@ -650,6 +654,13 @@ int vdev_config_load_from_args( struct vdev_config* config, int argc, char** arg
 
             break;
          }
+	   
+      case 'h': {
+	// command args line help
+	fprintf(stderr, "Command Line Options Help \n" );
+	rc = -2; 
+	break;
+      }
          
          default: {
             

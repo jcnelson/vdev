@@ -32,29 +32,40 @@ void vdev_reload_sighup( int ignored ) {
 
 // run! 
 int main( int argc, char** argv ) {
-   
-   int rc = 0;
-   int coldplug_quiesce_pipe[2];
-   bool is_child = false;
-   bool is_parent = false;
-   ssize_t nr = 0;
 
-   int coldplug_finished_fd = -1;   // FD to write to once we finish flushing the initial device requests
-   
-   memset( &vdev, 0, sizeof(struct vdev_state) );
-   
-   // ignore SIGPIPE from daemonlets 
-   signal( SIGPIPE, SIG_IGN );
-   
-   // set up global vdev state
-   rc = vdev_init( &vdev, argc, argv );
-   if( rc != 0 ) {
+  int rc = 0;
+  int coldplug_quiesce_pipe[2];
+  bool is_child = false;
+  bool is_parent = false;
+  ssize_t nr = 0;
+  
+  int coldplug_finished_fd = -1;   // FD to write to once we finish flushing the initial device requests
+  
+  memset( &vdev, 0, sizeof(struct vdev_state) );
+  
+  // ignore SIGPIPE from daemonlets 
+  signal( SIGPIPE, SIG_IGN );
+  
+  // set up global vdev state
+  rc = vdev_init( &vdev, argc, argv );
+  // help called from command line -h or --help (-2)
+  // short circuit with log/debug support
+  if( vdev.config->help ){
+    if( rc == -2 ){
       
-      vdev_error("vdev_init rc = %d\n", rc );
-      
-      vdev_shutdown( &vdev, false );
-      exit(1);
-   }
+      vdev_debug("%s", "exiting: help called at command line\n");
+      // the shutdown and clean up should be redundant ?      
+      exit(0);
+    }
+  }
+  
+  if( rc != 0 ) {
+    
+    vdev_error("vdev_init rc = %d\n", rc );
+    
+    vdev_shutdown( &vdev, false );
+    exit(1);
+  }
    
    // run the preseed command 
    rc = vdev_preseed_run( &vdev );
