@@ -1,7 +1,9 @@
 vdev: a device-file manager and filesystem
 ==========================================
 
-**This system is a work-in-progress.  If you would like to help, please see the [Issue Tracker](https://github.com/jcnelson/vdev/issues)**.
+**This system is mothballed.  It's usable if you know what you're doing--I've been using it for years on my laptop without issues--but it's not for typical users.  Expect to get your hands dirty.**
+
+**I do not have time to work on it in the foreseeable future, nor do I have time to answer support requests.**
 
 Vdev is a portable userspace device-file manager for UNIX-like operating systems.  It differs from existing device-file managers in that it provides an optional filesystem interface that implements a *per-process view of /dev*, thereby giving the host administrator the means to control device node access based on arbitrary criteria (such as process session ID, process seat assignment, etc.).
 
