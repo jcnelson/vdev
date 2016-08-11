@@ -9,3 +9,12 @@
 *.kate-swp
 *.patch
 *.diff
+
+build
+*.log
+*.notes
+*.petes
+*.tux
+*.mingus
+*.stuff
+.gitignore

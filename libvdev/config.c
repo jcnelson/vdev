@@ -135,9 +135,12 @@ static int vdev_config_ini_parser( void* userdata, char const* section, char con
             conf->error_level = VDEV_LOGLEVEL_ERROR;
          }
          else {
-            
-            fprintf(stderr, "Unrecognized value '%s' for '%s'\n", value, name );
-            return 0;
+	   // warn about unknown option value 
+	   // fallover to debug and warn 
+	   fprintf(stderr, "Unrecognized value '%s' for '%s'\n", value, name );
+	   conf->debug_level = VDEV_LOGLEVEL_DEBUG;
+	   conf->error_level = VDEV_LOGLEVEL_WARN;
+	   // return 0;
          }
          
          return 1;
@@ -406,8 +409,8 @@ int vdev_config_free( struct vdev_config* conf ) {
 // return -ENOMEM on OOM 
 // return -ERANGE if cwd is too long
 int vdev_config_fullpaths( struct vdev_config* conf ) {
-   
-   int rc = 0;
+  //   this int does not seem to be used here 
+  //   int rc = 0;
    
    char** need_fullpath[] = {
       &conf->config_path,

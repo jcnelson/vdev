@@ -1,10 +1,8 @@
 /* inih -- simple .INI file parser
 
-inih is released under the New BSD license (see LICENSE.txt). Go to the project
-home page for more info:
-
+inih is released under the New BSD license (see LICENSE.txt). 
+Go to the project home page for more info:
 http://code.google.com/p/inih/
-
 */
 
 #ifndef __INI_H__
@@ -34,17 +32,19 @@ int ini_parse(const char* filename,
               int (*handler)(void* user, const char* section,
                              const char* name, const char* value),
               void* user);
-
+  
 /* Same as ini_parse(), but takes a FILE* instead of filename. This doesn't
    close the file when it's finished -- the caller must do that. */
-int ini_parse_file(FILE* file,
-                   int (*handler)(void* user, const char* section,
-                                  const char* name, const char* value),
-                   void* user);
 
-/* Nonzero to allow multi-line value parsing, in the style of Python's
+int ini_parse_file(FILE* file,
+		   int (*handler)(void* user, const char* section,
+				  const char* name, const char* value),
+		   void* user);
+  
+  /* Nonzero to allow multi-line value parsing, in the style of Python's
    ConfigParser. If allowed, ini_parse() will call the handler with the same
    name for each subsequent line parsed. */
+
 #ifndef INI_ALLOW_MULTILINE
 #define INI_ALLOW_MULTILINE 0
 #endif

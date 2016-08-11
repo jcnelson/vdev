@@ -43,7 +43,7 @@ typedef struct vdev_param_t vdev_params;
 C_LINKAGE_BEGIN
 
 // vdev_param_t
-SGLIB_DEFINE_RBTREE_PROTOTYPES(vdev_params, left, right, color, VDEV_PARAM_CMP);
+SGLIB_DEFINE_RBTREE_PROTOTYPES(vdev_params, left, right, color, VDEV_PARAM_CMP)
 int vdev_params_add( vdev_params** params, char const* key, char const* value );
 int vdev_params_free( vdev_params* params );
 

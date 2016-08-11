@@ -23,7 +23,7 @@
 #include "action.h"
 #include "libvdev/config.h"
 
-SGLIB_DEFINE_VECTOR_FUNCTIONS( cstr );
+SGLIB_DEFINE_VECTOR_FUNCTIONS( cstr )
 
 
 // context for removing unplugged device 
@@ -211,6 +211,7 @@ int vdev_remove_unplugged_devices( struct vdev_state* state ) {
    char* devroot = vdev_strdup_or_null( state->config->mountpoint );
    char* next_dir = NULL;
    size_t next_dir_index = 0;
+   // sb ?
    struct stat sb;
    
    struct vdev_device_unplug_context unplug_ctx;

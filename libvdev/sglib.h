@@ -1986,7 +1986,7 @@ void sglib___##type##_consistency_check(type *t) {\
    \
    type sglib_##type##_vector_pop_back( struct sglib_##type##_vector* v ) { \
       if( v->len <= 0 ) { \
-         fprintf( stderr, "FATAL: pop_back on zero-length vector %p\n", v ); \
+         fprintf( stderr, "FATAL: pop_back on zero-length vector\n" ); \
          abort(); \
       } \
       type ret = v->buf[ v->len - 1 ]; \

@@ -90,28 +90,28 @@ extern int _VDEV_SYSLOG;
 
 #define vdev_debug( format, ... ) \
    do { \
-      if( _VDEV_DEBUG_MESSAGES ) { \
-         if( _VDEV_SYSLOG ) { \
-            syslog( LOG_DAEMON | LOG_DEBUG, format, __VA_ARGS__ ); \
-         } \
-         else { \
-            fprintf(stderr, VDEV_WHERESTR "DEBUG: " format, VDEV_WHEREARG, __VA_ARGS__ ); fflush(stderr);\
-         } \
-      } \
+     if( _VDEV_DEBUG_MESSAGES ) {		\
+       if( _VDEV_SYSLOG ) {					   \
+	 syslog( LOG_DAEMON | LOG_DEBUG, format, __VA_ARGS__ );	   \
+       }							   \
+       else {								\
+	 fprintf(stderr, VDEV_WHERESTR "DEBUG: " format, VDEV_WHEREARG, __VA_ARGS__ ); fflush(stderr); \
+       }								\
+     }									\
    } while(0)
 
-   
-#define vdev_info( format, ... ) \
-   do { \
+
+#define vdev_info( format, ... )		\
+  do {						\
       if( _VDEV_INFO_MESSAGES ) { \
-         if( _VDEV_SYSLOG ) { \
-            syslog( LOG_DAEMON | LOG_INFO, format, __VA_ARGS__ ); \
+	if( _VDEV_SYSLOG ) {					  \
+	  syslog( LOG_DAEMON | LOG_INFO, format, __VA_ARGS__ );	  \
          } \
-         else { \
-            fprintf(stderr, VDEV_WHERESTR "INFO: " format, VDEV_WHEREARG, __VA_ARGS__ ); fflush(stderr);\
-         } \
-      } \
-   } while(0)
+	else {								\
+	  fprintf(stderr, VDEV_WHERESTR "INFO: " format, VDEV_WHEREARG, __VA_ARGS__ ); fflush(stderr); \
+	}								\
+      }									\
+  } while(0)
 
    
 #define vdev_warn( format, ... ) \

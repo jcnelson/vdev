@@ -101,7 +101,7 @@ int vdev_signal_coldplug_finished( struct vdev_state* state, int status );
 int vdev_preseed_run( struct vdev_state* state );
 int vdev_remove_unplugged_devices( struct vdev_state* state );
 
-SGLIB_DEFINE_VECTOR_PROTOTYPES( cstr );
+SGLIB_DEFINE_VECTOR_PROTOTYPES( cstr )
 
 C_LINKAGE_END
 

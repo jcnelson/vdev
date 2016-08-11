@@ -1749,7 +1749,7 @@ int vdev_action_run_commands( struct vdev_device_request* vreq, struct vdev_acti
 // always succeeds
 int vdev_action_log_benchmarks( struct vdev_action* action ) {
    
-   int rc = 0;
+  //   int rc = 0;
    
    if( action->num_successful_calls > 0 ) {
       vdev_debug("Action '%s' (daemon=%d, async=%d): %lu successful calls; %lu millis total; %lf avg.\n",
