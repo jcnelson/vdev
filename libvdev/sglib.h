@@ -12,9 +12,7 @@
   under any other license conditions, contact the author.
 
 
-
 */
-
 
 #ifndef _SGLIB__h_
 #define _SGLIB__h_
@@ -22,13 +20,11 @@
 /* the assert is used exclusively to write unexpected error messages */
 #include <assert.h>
 
-
 /* ---------------------------------------------------------------------------- */
 /* ---------------------------------------------------------------------------- */
 /* -                            LEVEL - 0  INTERFACE                          - */
 /* ---------------------------------------------------------------------------- */
 /* ---------------------------------------------------------------------------- */
-
 
 /* ---------------------------------------------------------------------------- */
 /* ------------------------------ STATIC ARRAYS ------------------------------- */
@@ -78,7 +74,6 @@
     }\
   } while (_m_ != _i_);\
 }
-
 
 /*             QUICK - SORT   (level 0)          */
 
@@ -242,7 +237,6 @@
   SGLIB_HEAP_DELETE_FIRST(type, a, i, dim, comparator, SGLIB_ARRAY_ELEMENTS_EXCHANGER);\
 }
 
-
 /* ----------------- hashed table of pointers (in an array) -------------------- */
 
 /*
@@ -321,7 +315,6 @@
     if (iteratedVariable != NULL) {command;}\
   }\
 }
-
 
 /* ---------------------------------------------------------------------------- */
 /* ------------------------- DYNAMIC DATA STRUCTURES -------------------------- */
@@ -455,7 +448,6 @@
   this property.
 */
 
-
 #define SGLIB_SORTED_LIST_ADD(type, list, elem, comparator, next) {\
   type **_e_;\
   int  _cmpres_;\
@@ -522,7 +514,6 @@
 #define SGLIB_SORTED_LIST_MAP_ON_ELEMENTS(type, list, iteratedVariable, next, command) {\
   SGLIB_LIST_MAP_ON_ELEMENTS(type, list, iteratedVariable, next, command);\
 }
-
 
 /* ------------------------------- double linked list (level 0) ------------------------- */
 /*
@@ -720,9 +711,7 @@
   }\
 }
 
-
 /* ------------------------------- binary tree traversal (level 0) -------------------- */
-
 
 #define SGLIB___BIN_TREE_MAP_ON_ELEMENTS(type, tree, iteratedVariable, order, left, right, command) {\
   /* this is non-recursive implementation of tree traversal */\
@@ -799,8 +788,6 @@
 /* ---------------------------------------------------------------------------- */
 /* ---------------------------------------------------------------------------- */
 
-
-
 /* ---------------------------------------------------------------------------- */
 /* ------------------------------ STATIC ARRAYS ------------------------------- */
 /* ---------------------------------------------------------------------------- */
@@ -830,7 +817,6 @@
 /*  dim is the size of the array afield                                    */
 /* !!!!!!! This data structure is NOT documented, do not use it !!!!!!!!!! */
 
-
 #define SGLIB_DEFINE_QUEUE_PROTOTYPES(queue_type, elem_type, afield, ifield, jfield, dim) \
  extern void sglib_##queue_type##_init(queue_type *q); \
  extern int sglib_##queue_type##_is_empty(queue_type *q); \
@@ -841,7 +827,6 @@
  extern void sglib_##queue_type##_add(queue_type *q, elem_type elem); \
  extern void sglib_##queue_type##_delete_first(queue_type *q); \
  extern void sglib_##queue_type##_delete(queue_type *q);
-
 
 #define SGLIB_DEFINE_QUEUE_FUNCTIONS(queue_type, elem_type, afield, ifield, jfield, dim) \
  void sglib_##queue_type##_init(queue_type *q) {\
@@ -872,14 +857,12 @@
   SGLIB_QUEUE_DELETE_FIRST(elem_type, q->afield, q->ifield, q->jfield, dim);\
  }
 
-
 /* ------------------------ array heap (level 1) ------------------------- */
 /* sglib's heap is a priority queue implemented in a fixed sized array     */
 /* heap_type MUST be a structure containing fields:                        */
 /*  afield is the array of size dim storing elem_type                      */
 /*  ifield is the index of the first free element after the queue          */
 /* !!!!!!! This data structure is NOT documented, do not use it !!!!!!!!!! */
-
 
 #define SGLIB_DEFINE_HEAP_PROTOTYPES(heap_type, elem_type, afield, ifield, dim, comparator, elem_exchanger) \
  extern void sglib_##heap_type##_init(heap_type *q); \
@@ -920,7 +903,6 @@
  void sglib_##heap_type##_delete(heap_type *q) {\
   SGLIB_HEAP_DELETE_FIRST(elem_type, q->afield, q->ifield, dim, comparator, elem_exchanger);\
  }
-
 
 /* ------------------------ hashed table  (level 1) ------------------------- */
 /*
@@ -1004,7 +986,6 @@
     if (i<(dim)) return(table[i]);\
     return(NULL);\
   }
-
 
 /* ------------------- hashed container (only for level 1)  -------------------- */
 /* 
@@ -1104,13 +1085,9 @@
     return(e);\
   }
 
-
-
 /* ---------------------------------------------------------------------------- */
 /* ------------------------- DYNAMIC DATA STRUCTURES -------------------------- */
 /* ---------------------------------------------------------------------------- */
-
-
 
 /* ------------------------------------ list (level 1) -------------------------------- */
 
@@ -1135,7 +1112,6 @@
  extern type *sglib_##type##_it_init_on_equal(struct sglib_##type##_iterator *it, type *list, int (*subcomparator)(type *, type *), type *equalto); \
  extern type *sglib_##type##_it_current(struct sglib_##type##_iterator *it); \
  extern type *sglib_##type##_it_next(struct sglib_##type##_iterator *it);
-
 
 #define SGLIB_DEFINE_LIST_FUNCTIONS(type, comparator, next) \
  int sglib_##type##_is_member(type *list, type *elem) {\
@@ -1206,7 +1182,6 @@
 
 /* ----------------------------- sorted list (level 1) ----------------------------------- */
 
-
 #define SGLIB_DEFINE_SORTED_LIST_PROTOTYPES(type, comparator, next) \
  struct sglib_##type##_iterator {\
    type *currentelem;\
@@ -1226,7 +1201,6 @@
  extern type *sglib_##type##_it_init_on_equal(struct sglib_##type##_iterator *it, type *list, int (*subcomparator)(type *, type *), type *equalto); \
  extern type *sglib_##type##_it_current(struct sglib_##type##_iterator *it); \
  extern type *sglib_##type##_it_next(struct sglib_##type##_iterator *it);
-
 
 #define SGLIB_DEFINE_SORTED_LIST_FUNCTIONS(type, comparator, next) \
  int sglib_##type##_is_member(type *list, type *elem) {\
@@ -1291,9 +1265,7 @@
    return(ce);\
  }
 
-
 /* ----------------------------- double linked list (level 1) ------------------------------ */
-
 
 #define SGLIB_DEFINE_DL_LIST_PROTOTYPES(type, comparator, previous, next) \
  struct sglib_##type##_iterator {\
@@ -1323,7 +1295,6 @@
  extern type *sglib_##type##_it_init_on_equal(struct sglib_##type##_iterator *it, type *list, int (*subcomparator)(type *, type *), type *equalto); \
  extern type *sglib_##type##_it_current(struct sglib_##type##_iterator *it); \
  extern type *sglib_##type##_it_next(struct sglib_##type##_iterator *it);
-
 
 #define SGLIB_DEFINE_DL_LIST_FUNCTIONS(type, comparator, previous, next) \
  void sglib_##type##_add(type **list, type *elem) {\
@@ -1428,7 +1399,6 @@
    it->currentelem = ce;\
    return(ce);\
  }
-
 
 /* --------------------------------- red-black trees (level 1) -------------------------------- */
 
@@ -1599,7 +1569,6 @@ http://www.cis.ohio-state.edu/~gurari/course/cis680/cis680Ch11.html
     }\
   }\
 }
-
 
 #define SGLIB_DEFINE_RBTREE_FUNCTIONS_GENERAL(type, left, right, bits, comparator, RED, BLACK) \
 static void sglib___##type##_fix_left_insertion_discrepancy(type **tree) {\
@@ -1887,7 +1856,6 @@ void sglib___##type##_consistency_check(type *t) {\
   sglib___##type##_consistency_check_recursive(t, &pathDeep, 0);\
 }
 
-
 #define SGLIB_DEFINE_RBTREE_PROTOTYPES(type, left, right, colorbit, comparator) \
  struct sglib_##type##_iterator {\
     type *currentelem;\
@@ -1918,7 +1886,6 @@ void sglib___##type##_consistency_check(type *t) {\
 #define SGLIB_DEFINE_RBTREE_FUNCTIONS(type, left, right, colorbit, comparator) \
   SGLIB_DEFINE_RBTREE_FUNCTIONS_GENERAL(type, left, right, colorbit, comparator, 1, 0)
 
-
 /***********************************
  * vector implementation
  * Copyright (C) 2015  Jude Nelson
@@ -1941,7 +1908,6 @@ void sglib___##type##_consistency_check(type *t) {\
    extern type* sglib_##type##_vector_at_ref( struct sglib_##type##_vector* v, unsigned long i ); \
    extern unsigned long sglib_##type##_vector_size( struct sglib_##type##_vector* v ); \
    extern void sglib_##type##_vector_yoink( struct sglib_##type##_vector* v, type** buf, unsigned long* len );
-
 
 #define SGLIB_DEFINE_VECTOR_FUNCTIONS( type ) \
    \
@@ -2032,19 +1998,16 @@ void sglib___##type##_consistency_check(type *t) {\
    } \
    \
 
-  
-  
+
 /* ---------------------------------------------------------------------------- */
 /* ---------------------------------------------------------------------------- */
 /* -                          SUPPLEMENTARY DEFINITIONS                       - */
 /* ---------------------------------------------------------------------------- */
 /* ---------------------------------------------------------------------------- */
 
-
 #define SGLIB___GET_VALUE(x) (x)
 #define SGLIB___SET_VALUE(x, value) {(x) = (value);}
 #define SGLIB_ARRAY_ELEMENTS_EXCHANGER(type, a, i, j) {type _sgl_aee_tmp_; _sgl_aee_tmp_=(a)[(i)]; (a)[(i)]=(a)[(j)]; (a)[(j)]= _sgl_aee_tmp_;}
-
 
 #define SGLIB_SAFE_NUMERIC_COMPARATOR(x, y) (((x)>(y)?1:((x)<(y)?-1:0)))
 #define SGLIB_SAFE_REVERSE_NUMERIC_COMPARATOR(x, y) (((x)>(y)?-1:((x)<(y)?1:0)))
@@ -2058,8 +2021,8 @@ void sglib___##type##_consistency_check(type *t) {\
 #endif
 
 #ifndef SGLIB_HASH_TAB_SHIFT_CONSTANT
-#define SGLIB_HASH_TAB_SHIFT_CONSTANT 16381   /* should be a prime */
-/* #define SGLIB_HASH_TAB_SHIFT_CONSTANT 536870912*/   /* for large tables :) */
+#define SGLIB_HASH_TAB_SHIFT_CONSTANT 16381	/* should be a prime */
+						       /* #define SGLIB_HASH_TAB_SHIFT_CONSTANT 536870912*//* for large tables :) */
 #endif
 
-#endif /* _SGLIB__h_ */
+#endif				/* _SGLIB__h_ */

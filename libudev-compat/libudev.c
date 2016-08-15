@@ -50,11 +50,11 @@
  * Opaque object representing the library context.
  */
 struct udev {
-        int refcount;
-        void (*log_fn)(struct udev *udev,
-                       int priority, const char *file, int line, const char *fn,
-                       const char *format, va_list args);
-        void *userdata;
+	int refcount;
+	void (*log_fn) (struct udev * udev,
+			int priority, const char *file, int line,
+			const char *fn, const char *format, va_list args);
+	void *userdata;
 };
 
 /**
@@ -66,10 +66,11 @@ struct udev {
  *
  * Returns: stored userdata
  **/
-void *udev_get_userdata(struct udev *udev) {
-        if (udev == NULL)
-                return NULL;
-        return udev->userdata;
+void *udev_get_userdata(struct udev *udev)
+{
+	if (udev == NULL)
+		return NULL;
+	return udev->userdata;
 }
 
 /**
@@ -79,10 +80,11 @@ void *udev_get_userdata(struct udev *udev) {
  *
  * Store custom @userdata in the library context.
  **/
-void udev_set_userdata(struct udev *udev, void *userdata) {
-        if (udev == NULL)
-                return;
-        udev->userdata = userdata;
+void udev_set_userdata(struct udev *udev, void *userdata)
+{
+	if (udev == NULL)
+		return;
+	udev->userdata = userdata;
 }
 
 /**
@@ -96,94 +98,100 @@ void udev_set_userdata(struct udev *udev, void *userdata) {
  *
  * Returns: a new udev library context
  **/
-struct udev *udev_new(void) {
-        struct udev *udev;
-        _cleanup_fclose_ FILE *f = NULL;
+struct udev *udev_new(void)
+{
+	struct udev *udev;
+	_cleanup_fclose_ FILE *f = NULL;
 
-        udev = new0(struct udev, 1);
-        if (udev == NULL)
-                return NULL;
-        udev->refcount = 1;
+	udev = new0(struct udev, 1);
+	if (udev == NULL)
+		return NULL;
+	udev->refcount = 1;
 
-        f = fopen("/etc/udev/udev.conf", "re");
-        if (f != NULL) {
-                char line[UTIL_LINE_SIZE];
-                unsigned line_nr = 0;
+	f = fopen("/etc/udev/udev.conf", "re");
+	if (f != NULL) {
+		char line[UTIL_LINE_SIZE];
+		unsigned line_nr = 0;
 
-                while (fgets(line, sizeof(line), f)) {
-                        size_t len;
-                        char *key;
-                        char *val;
+		while (fgets(line, sizeof(line), f)) {
+			size_t len;
+			char *key;
+			char *val;
 
-                        line_nr++;
+			line_nr++;
 
-                        /* find key */
-                        key = line;
-                        while (isspace(key[0]))
-                                key++;
+			/* find key */
+			key = line;
+			while (isspace(key[0]))
+				key++;
 
-                        /* comment or empty line */
-                        if (key[0] == '#' || key[0] == '\0')
-                                continue;
+			/* comment or empty line */
+			if (key[0] == '#' || key[0] == '\0')
+				continue;
 
-                        /* split key/value */
-                        val = strchr(key, '=');
-                        if (val == NULL) {
-                                log_debug("/etc/udev/udev.conf:%u: missing assignment,  skipping line.", line_nr);
-                                continue;
-                        }
-                        val[0] = '\0';
-                        val++;
+			/* split key/value */
+			val = strchr(key, '=');
+			if (val == NULL) {
+				log_debug
+				    ("/etc/udev/udev.conf:%u: missing assignment,  skipping line.",
+				     line_nr);
+				continue;
+			}
+			val[0] = '\0';
+			val++;
 
-                        /* find value */
-                        while (isspace(val[0]))
-                                val++;
+			/* find value */
+			while (isspace(val[0]))
+				val++;
 
-                        /* terminate key */
-                        len = strlen(key);
-                        if (len == 0)
-                                continue;
-                        while (isspace(key[len-1]))
-                                len--;
-                        key[len] = '\0';
+			/* terminate key */
+			len = strlen(key);
+			if (len == 0)
+				continue;
+			while (isspace(key[len - 1]))
+				len--;
+			key[len] = '\0';
 
-                        /* terminate value */
-                        len = strlen(val);
-                        if (len == 0)
-                                continue;
-                        while (isspace(val[len-1]))
-                                len--;
-                        val[len] = '\0';
+			/* terminate value */
+			len = strlen(val);
+			if (len == 0)
+				continue;
+			while (isspace(val[len - 1]))
+				len--;
+			val[len] = '\0';
 
-                        if (len == 0)
-                                continue;
+			if (len == 0)
+				continue;
 
-                        /* unquote */
-                        if (val[0] == '"' || val[0] == '\'') {
-                                if (val[len-1] != val[0]) {
-                                        log_debug("/etc/udev/udev.conf:%u: inconsistent quoting, skipping line.", line_nr);
-                                        continue;
-                                }
-                                val[len-1] = '\0';
-                                val++;
-                        }
+			/* unquote */
+			if (val[0] == '"' || val[0] == '\'') {
+				if (val[len - 1] != val[0]) {
+					log_debug
+					    ("/etc/udev/udev.conf:%u: inconsistent quoting, skipping line.",
+					     line_nr);
+					continue;
+				}
+				val[len - 1] = '\0';
+				val++;
+			}
 
-                        if (streq(key, "udev_log")) {
-                                int prio;
+			if (streq(key, "udev_log")) {
+				int prio;
 
-                                prio = util_log_priority(val);
-                                if (prio < 0) {
-                                        log_debug("/etc/udev/udev.conf:%u: invalid log level '%s', ignoring.", line_nr, val);
-                                }
-                                else {
-                                        log_set_max_level(prio);
-                                }
-                                continue;
-                        }
-                }
-        }
+				prio = util_log_priority(val);
+				if (prio < 0) {
+					log_debug
+					    ("/etc/udev/udev.conf:%u: invalid log level '%s', ignoring.",
+					     line_nr, val);
+				} else {
+					log_set_max_level(prio);
+				}
+				continue;
+			}
+		}
+	}
 
-        return udev;
+	return udev;
 }
 
 /**
@@ -194,11 +202,12 @@ struct udev *udev_new(void) {
  *
  * Returns: the passed udev library context
  **/
-struct udev *udev_ref(struct udev *udev) {
-        if (udev == NULL)
-                return NULL;
-        udev->refcount++;
-        return udev;
+struct udev *udev_ref(struct udev *udev)
+{
+	if (udev == NULL)
+		return NULL;
+	udev->refcount++;
+	return udev;
 }
 
 /**
@@ -210,14 +219,15 @@ struct udev *udev_ref(struct udev *udev) {
  *
  * Returns: the passed udev library context if it has still an active reference, or #NULL otherwise.
  **/
-struct udev *udev_unref(struct udev *udev) {
-        if (udev == NULL)
-                return NULL;
-        udev->refcount--;
-        if (udev->refcount > 0)
-                return udev;
-        free(udev);
-        return NULL;
+struct udev *udev_unref(struct udev *udev)
+{
+	if (udev == NULL)
+		return NULL;
+	udev->refcount--;
+	if (udev->refcount > 0)
+		return udev;
+	free(udev);
+	return NULL;
 }
 
 /**
@@ -229,10 +239,12 @@ struct udev *udev_unref(struct udev *udev) {
  *
  **/
 void udev_set_log_fn(struct udev *udev,
-                     void (*log_fn)(struct udev *udev,
-                                    int priority, const char *file, int line, const char *fn,
-                                    const char *format, va_list args)) {
-        return;
+		     void (*log_fn) (struct udev * udev,
+				     int priority, const char *file, int line,
+				     const char *fn, const char *format,
+				     va_list args))
+{
+	return;
 }
 
 /**
@@ -242,8 +254,9 @@ void udev_set_log_fn(struct udev *udev,
  * This function is deprecated.
  *
  **/
-int udev_get_log_priority(struct udev *udev) {
-        return log_get_max_level();
+int udev_get_log_priority(struct udev *udev)
+{
+	return log_get_max_level();
 }
 
 /**
@@ -254,6 +267,7 @@ int udev_get_log_priority(struct udev *udev) {
  * This function is deprecated.
  *
  **/
-void udev_set_log_priority(struct udev *udev, int priority) {
-        log_set_max_level(priority);
+void udev_set_log_priority(struct udev *udev, int priority)
+{
+	log_set_max_level(priority);
 }

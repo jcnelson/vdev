@@ -25,7 +25,7 @@
 // build Linux-specific method implementations
 #ifdef _VDEV_OS_LINUX
 
-#define _GNU_SOURCE 
+#define _GNU_SOURCE
 
 #include "vdev.h"
 
@@ -48,33 +48,30 @@
 
 // connection to the linux kernel for hotplug
 struct vdev_linux_context {
-   
-   // netlink address
-   struct sockaddr_nl nl_addr;
-   
-   // poll on the netlink socket
-   struct pollfd pfd;
-   
-   // path to mounted sysfs 
-   char sysfs_mountpoint[ PATH_MAX+1 ];
-   
-   // ref to OS context 
-   struct vdev_os_context* os_ctx;
-   
-   // initial device requests 
-   pthread_mutex_t initial_requests_lock;
-   struct vdev_device_request* initial_requests;
-   struct vdev_device_request* initial_requests_tail;
+
+	// netlink address
+	struct sockaddr_nl nl_addr;
+
+	// poll on the netlink socket
+	struct pollfd pfd;
+
+	// path to mounted sysfs 
+	char sysfs_mountpoint[PATH_MAX + 1];
+
+	// ref to OS context 
+	struct vdev_os_context *os_ctx;
+
+	// initial device requests 
+	pthread_mutex_t initial_requests_lock;
+	struct vdev_device_request *initial_requests;
+	struct vdev_device_request *initial_requests_tail;
 };
 
-C_LINKAGE_BEGIN
+C_LINKAGE_BEGIN int vdev_os_init(struct vdev_os_context *ctx, void **cls);
+int vdev_os_shutdown(void *cls);
 
-int vdev_os_init( struct vdev_os_context* ctx, void** cls );
-int vdev_os_shutdown( void* cls );
-
-int vdev_os_next_device( struct vdev_device_request* request, void* cls );
+int vdev_os_next_device(struct vdev_device_request *request, void *cls);
 
 C_LINKAGE_END
-
 #endif
 #endif

@@ -26,31 +26,29 @@
 
 // connection to the OS's device notification system 
 struct vdev_os_context {
-   
-   void* os_cls;        // OS-specific data
-   
-   bool running;
-  
-   bool coldplug_only; 
-   bool coldplug_finished;
-   
-   // reference to global state
-   // ACCESS WITH CAUTION--ENSURE RELOAD SAFETY 
-   struct vdev_state* state;
+
+	void *os_cls;		// OS-specific data
+
+	bool running;
+
+	bool coldplug_only;
+	bool coldplug_finished;
+
+	// reference to global state
+	// ACCESS WITH CAUTION--ENSURE RELOAD SAFETY 
+	struct vdev_state *state;
 };
 
 C_LINKAGE_BEGIN
-
 // context management
-int vdev_os_context_init( struct vdev_os_context* vos, struct vdev_state* state );
-int vdev_os_context_free( struct vdev_os_context* vos );
+int vdev_os_context_init(struct vdev_os_context *vos, struct vdev_state *state);
+int vdev_os_context_free(struct vdev_os_context *vos);
 
 // signaling from the back-end to vdevd
-int vdev_os_context_signal_coldplug_finished( struct vdev_os_context* vos );
-bool vdev_os_context_is_coldplug_finished( struct vdev_os_context* vos );
+int vdev_os_context_signal_coldplug_finished(struct vdev_os_context *vos);
+bool vdev_os_context_is_coldplug_finished(struct vdev_os_context *vos);
 
-int vdev_os_main( struct vdev_os_context* vos );
+int vdev_os_main(struct vdev_os_context *vos);
 
 C_LINKAGE_END
-
-#endif 
+#endif

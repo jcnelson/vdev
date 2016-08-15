@@ -23,67 +23,72 @@
 #include "action.h"
 #include "libvdev/config.h"
 
-SGLIB_DEFINE_VECTOR_FUNCTIONS(cstr)
+SGLIB_DEFINE_VECTOR_FUNCTIONS (cstr)
 // context for removing unplugged device 
-struct vdev_device_unplug_context {
+     struct vdev_device_unplug_context
+     {
 
-	struct sglib_cstr_vector *device_paths;	// queue of device paths to search 
-	struct vdev_state *state;	// vdev state
-};
+       struct sglib_cstr_vector *device_paths;	// queue of device paths to search 
+       struct vdev_state *state;	// vdev state
+     };
 
 // get the instance of the vdevd program that made this device, given its device path 
 // instance_str must be at least VDEV_CONFIG_INSTANCE_NONCE_STRLEN bytes
 // return 0 on success
 // return -errno on failure to stat, open, or read
-static int vdev_device_read_vdevd_instance(char const *mountpoint,
-					   char const *dev_fullpath,
-					   char *instance_str)
+     static int vdev_device_read_vdevd_instance (char const *mountpoint,
+						 char const *dev_fullpath,
+						 char *instance_str)
 {
 
-	int rc = 0;
-	char const *devpath = dev_fullpath + strlen(mountpoint);
+  int rc = 0;
+  char const *devpath = dev_fullpath + strlen (mountpoint);
 
-	char *instance_attr_relpath =
-	    vdev_fullpath(VDEV_METADATA_PREFIX "/dev", devpath, NULL);
-	if (instance_attr_relpath == NULL) {
+  char *instance_attr_relpath =
+    vdev_fullpath (VDEV_METADATA_PREFIX "/dev", devpath, NULL);
+  if (instance_attr_relpath == NULL)
+    {
 
-		return -ENOMEM;
-	}
+      return -ENOMEM;
+    }
 
-	char *instance_attr_path =
-	    vdev_fullpath(mountpoint, instance_attr_relpath, NULL);
+  char *instance_attr_path =
+    vdev_fullpath (mountpoint, instance_attr_relpath, NULL);
 
-	free(instance_attr_relpath);
-	instance_attr_relpath = NULL;
+  free (instance_attr_relpath);
+  instance_attr_relpath = NULL;
 
-	if (instance_attr_path == NULL) {
+  if (instance_attr_path == NULL)
+    {
 
-		return -ENOMEM;
-	}
+      return -ENOMEM;
+    }
 
-	char *instance_path =
-	    vdev_fullpath(instance_attr_path, VDEV_METADATA_PARAM_INSTANCE,
-			  NULL);
+  char *instance_path =
+    vdev_fullpath (instance_attr_path, VDEV_METADATA_PARAM_INSTANCE,
+		   NULL);
 
-	free(instance_attr_path);
-	instance_attr_path = NULL;
+  free (instance_attr_path);
+  instance_attr_path = NULL;
 
-	if (instance_path == NULL) {
+  if (instance_path == NULL)
+    {
 
-		return -ENOMEM;
-	}
-	// read the instance string 
-	rc = vdev_read_file(instance_path, instance_str,
-			    VDEV_CONFIG_INSTANCE_NONCE_STRLEN - 1);
-	if (rc < 0) {
+      return -ENOMEM;
+    }
+  // read the instance string 
+  rc = vdev_read_file (instance_path, instance_str,
+		       VDEV_CONFIG_INSTANCE_NONCE_STRLEN - 1);
+  if (rc < 0)
+    {
 
-		vdev_error("vdev_read_file('%s') rc = %d\n", instance_path, rc);
-	}
+      vdev_error ("vdev_read_file('%s') rc = %d\n", instance_path, rc);
+    }
 
-	free(instance_path);
-	instance_path = NULL;
+  free (instance_path);
+  instance_path = NULL;
 
-	return rc;
+  return rc;
 }
 
 // scan callback for a directory.
@@ -91,464 +96,508 @@ static int vdev_device_read_vdevd_instance(char const *mountpoint,
 // return 0 on success
 // return -ENOMEM on OOM
 // NOTE: mask unlink() failures, but log them.
-static int vdev_remove_unplugged_device(char const *path, void *cls)
+static int
+vdev_remove_unplugged_device (char const *path, void *cls)
 {
 
-	int rc = 0;
-	struct stat sb;
-	char instance_str[VDEV_CONFIG_INSTANCE_NONCE_STRLEN + 1];
-	char basename[NAME_MAX + 1];
+  int rc = 0;
+  struct stat sb;
+  char instance_str[VDEV_CONFIG_INSTANCE_NONCE_STRLEN + 1];
+  char basename[NAME_MAX + 1];
 
-	memset(instance_str, 0, VDEV_CONFIG_INSTANCE_NONCE_STRLEN + 1);
+  memset (instance_str, 0, VDEV_CONFIG_INSTANCE_NONCE_STRLEN + 1);
 
-	// extract cls 
-	struct vdev_device_unplug_context *ctx =
-	    (struct vdev_device_unplug_context *)cls;
+  // extract cls 
+  struct vdev_device_unplug_context *ctx =
+    (struct vdev_device_unplug_context *) cls;
 
-	struct sglib_cstr_vector *device_paths = ctx->device_paths;
-	struct vdev_state *state = ctx->state;
+  struct sglib_cstr_vector *device_paths = ctx->device_paths;
+  struct vdev_state *state = ctx->state;
 
-	if (strlen(path) == 0) {
+  if (strlen (path) == 0)
+    {
 
-		// nothing to do 
-		return 0;
+      // nothing to do 
+      return 0;
+    }
+
+  vdev_basename (path, basename);
+
+  // is this . or ..?
+  if (strcmp (basename, ".") == 0 || strcmp (basename, "..") == 0)
+    {
+      return 0;
+    }
+  // what is this?
+  rc = lstat (path, &sb);
+  if (rc != 0)
+    {
+
+      vdev_error ("stat('%s') rc = %d\n", path, rc);
+
+      // mask
+      return 0;
+    }
+  // is this a directory?
+  if (S_ISDIR (sb.st_mode))
+    {
+
+      // skip the metadata dir 
+      if (strcmp (basename, "metadata") == 0)
+	{
+	  return 0;
+	}
+      // search this later 
+      char *path_dup = vdev_strdup_or_null (path);
+      if (path_dup == NULL)
+	{
+
+	  // really can't continue 
+	  return -ENOMEM;
 	}
 
-	vdev_basename(path, basename);
+      sglib_cstr_vector_push_back (device_paths, path_dup);
 
-	// is this . or ..?
-	if (strcmp(basename, ".") == 0 || strcmp(basename, "..") == 0) {
-		return 0;
+      return 0;
+    }
+  // is this a device file?
+  if (S_ISBLK (sb.st_mode) || S_ISCHR (sb.st_mode))
+    {
+
+      // what's the instance value?
+      rc = vdev_device_read_vdevd_instance (state->config->mountpoint,
+					    path, instance_str);
+      if (rc != 0)
+	{
+
+	  vdev_error
+	    ("vdev_device_read_vdevd_instance('%s') rc = %d\n", path, rc);
+
+	  // mask 
+	  return 0;
 	}
-	// what is this?
-	rc = lstat(path, &sb);
-	if (rc != 0) {
+      // does it match ours?
+      if (strcmp (state->config->instance_str, instance_str) != 0)
+	{
 
-		vdev_error("stat('%s') rc = %d\n", path, rc);
+	  struct vdev_device_request *to_delete = NULL;
+	  char const *device_path = NULL;
 
-		// mask
-		return 0;
+	  vdev_debug ("Remove unplugged device '%s'\n", path);
+
+	  device_path = path + strlen (state->config->mountpoint);
+
+	  to_delete = VDEV_CALLOC (struct vdev_device_request, 1);
+	  if (to_delete == NULL)
+	    {
+
+	      // OOM 
+	      return -ENOMEM;
+	    }
+
+	  rc = vdev_device_request_init (to_delete, state,
+					 VDEV_DEVICE_REMOVE, device_path);
+	  if (rc != 0)
+	    {
+
+	      // OOM 
+	      return rc;
+	    }
+	  // populate 
+	  vdev_device_request_set_dev (to_delete, sb.st_rdev);
+	  vdev_device_request_set_mode (to_delete,
+					S_ISBLK (sb.st_mode) ?
+					S_IFBLK : S_IFCHR);
+
+	  // remove it 
+	  rc = vdev_device_remove (to_delete);
+	  if (rc != 0)
+	    {
+
+	      vdev_warn ("vdev_device_remove('%s') rc = %d\n",
+			 device_path, rc);
+	      rc = 0;
+	    }
 	}
-	// is this a directory?
-	if (S_ISDIR(sb.st_mode)) {
+    }
 
-		// skip the metadata dir 
-		if (strcmp(basename, "metadata") == 0) {
-			return 0;
-		}
-		// search this later 
-		char *path_dup = vdev_strdup_or_null(path);
-		if (path_dup == NULL) {
-
-			// really can't continue 
-			return -ENOMEM;
-		}
-
-		sglib_cstr_vector_push_back(device_paths, path_dup);
-
-		return 0;
-	}
-	// is this a device file?
-	if (S_ISBLK(sb.st_mode) || S_ISCHR(sb.st_mode)) {
-
-		// what's the instance value?
-		rc = vdev_device_read_vdevd_instance(state->config->mountpoint,
-						     path, instance_str);
-		if (rc != 0) {
-
-			vdev_error
-			    ("vdev_device_read_vdevd_instance('%s') rc = %d\n",
-			     path, rc);
-
-			// mask 
-			return 0;
-		}
-		// does it match ours?
-		if (strcmp(state->config->instance_str, instance_str) != 0) {
-
-			struct vdev_device_request *to_delete = NULL;
-			char const *device_path = NULL;
-
-			vdev_debug("Remove unplugged device '%s'\n", path);
-
-			device_path = path + strlen(state->config->mountpoint);
-
-			to_delete = VDEV_CALLOC(struct vdev_device_request, 1);
-			if (to_delete == NULL) {
-
-				// OOM 
-				return -ENOMEM;
-			}
-
-			rc = vdev_device_request_init(to_delete, state,
-						      VDEV_DEVICE_REMOVE,
-						      device_path);
-			if (rc != 0) {
-
-				// OOM 
-				return rc;
-			}
-			// populate 
-			vdev_device_request_set_dev(to_delete, sb.st_rdev);
-			vdev_device_request_set_mode(to_delete,
-						     S_ISBLK(sb.st_mode) ?
-						     S_IFBLK : S_IFCHR);
-
-			// remove it 
-			rc = vdev_device_remove(to_delete);
-			if (rc != 0) {
-
-				vdev_warn("vdev_device_remove('%s') rc = %d\n",
-					  device_path, rc);
-				rc = 0;
-			}
-		}
-	}
-
-	return 0;
+  return 0;
 }
 
 // remove all devices that no longer exist--that is, the contents of the /dev/metadata/$DEVICE_PATH/dev_instance file 
 // does not match this vdev's instance nonce.
 // this is used when running with --once.
-int vdev_remove_unplugged_devices(struct vdev_state *state)
+int
+vdev_remove_unplugged_devices (struct vdev_state *state)
 {
 
-	int rc = 0;
-	struct sglib_cstr_vector device_paths;
-	char *devroot = vdev_strdup_or_null(state->config->mountpoint);
-	char *next_dir = NULL;
-	size_t next_dir_index = 0;
-	// sb ?
-	struct stat sb;
+  int rc = 0;
+  struct sglib_cstr_vector device_paths;
+  char *devroot = vdev_strdup_or_null (state->config->mountpoint);
+  char *next_dir = NULL;
+  size_t next_dir_index = 0;
+  // sb ?
+  struct stat sb;
 
-	struct vdev_device_unplug_context unplug_ctx;
+  struct vdev_device_unplug_context unplug_ctx;
 
-	unplug_ctx.state = state;
-	unplug_ctx.device_paths = &device_paths;
+  unplug_ctx.state = state;
+  unplug_ctx.device_paths = &device_paths;
 
-	if (devroot == NULL) {
-		return -ENOMEM;
+  if (devroot == NULL)
+    {
+      return -ENOMEM;
+    }
+
+  sglib_cstr_vector_init (&device_paths);
+
+  // walk /dev breadth-first
+  rc = sglib_cstr_vector_push_back (&device_paths, devroot);
+  if (rc != 0)
+    {
+
+      sglib_cstr_vector_free (&device_paths);
+      free (devroot);
+
+      return rc;
+    }
+
+  while (next_dir_index < sglib_cstr_vector_size (&device_paths))
+    {
+
+      // next path 
+      next_dir = sglib_cstr_vector_at (&device_paths, next_dir_index);
+      sglib_cstr_vector_set (&device_paths, NULL, next_dir_index);
+
+      next_dir_index++;
+
+      // scan this directory, and remove unplugged device files and remember the directories to search
+      rc = vdev_load_all (next_dir, vdev_remove_unplugged_device,
+			  &unplug_ctx);
+      if (rc != 0)
+	{
+
+	  vdev_error ("vdev_load_all('%s') rc = %d\n", next_dir, rc);
+
+	  free (next_dir);
+	  break;
 	}
 
-	sglib_cstr_vector_init(&device_paths);
+      free (next_dir);
+    }
 
-	// walk /dev breadth-first
-	rc = sglib_cstr_vector_push_back(&device_paths, devroot);
-	if (rc != 0) {
+  // free any unused vector space
+  while (next_dir_index < sglib_cstr_vector_size (&device_paths))
+    {
 
-		sglib_cstr_vector_free(&device_paths);
-		free(devroot);
+      next_dir = sglib_cstr_vector_at (&device_paths, next_dir_index);
+      sglib_cstr_vector_set (&device_paths, NULL, next_dir_index);
 
-		return rc;
-	}
+      next_dir_index++;
 
-	while (next_dir_index < sglib_cstr_vector_size(&device_paths)) {
+      free (next_dir);
+    }
 
-		// next path 
-		next_dir = sglib_cstr_vector_at(&device_paths, next_dir_index);
-		sglib_cstr_vector_set(&device_paths, NULL, next_dir_index);
+  sglib_cstr_vector_free (&device_paths);
 
-		next_dir_index++;
-
-		// scan this directory, and remove unplugged device files and remember the directories to search
-		rc = vdev_load_all(next_dir, vdev_remove_unplugged_device,
-				   &unplug_ctx);
-		if (rc != 0) {
-
-			vdev_error("vdev_load_all('%s') rc = %d\n", next_dir,
-				   rc);
-
-			free(next_dir);
-			break;
-		}
-
-		free(next_dir);
-	}
-
-	// free any unused vector space
-	while (next_dir_index < sglib_cstr_vector_size(&device_paths)) {
-
-		next_dir = sglib_cstr_vector_at(&device_paths, next_dir_index);
-		sglib_cstr_vector_set(&device_paths, NULL, next_dir_index);
-
-		next_dir_index++;
-
-		free(next_dir);
-	}
-
-	sglib_cstr_vector_free(&device_paths);
-
-	return rc;
+  return rc;
 }
 
 // create the path to the error FIFO
 // that helpers use to write error messages.
 // return 0 on success
 // return -EPERM on overflow
-int vdev_error_fifo_path(char const *mountpoint, char *path, size_t path_len)
+int
+vdev_error_fifo_path (char const *mountpoint, char *path, size_t path_len)
 {
 
-	int rc = 0;
-	rc = snprintf(path, path_len, "%s/%s/err.pipe", mountpoint,
-		      VDEV_METADATA_PREFIX);
-	if (rc >= path_len) {
-		return -EPERM;
-	}
+  int rc = 0;
+  rc = snprintf (path, path_len, "%s/%s/err.pipe", mountpoint,
+		 VDEV_METADATA_PREFIX);
+  if (rc >= path_len)
+    {
+      return -EPERM;
+    }
 
-	return 0;
+  return 0;
 }
 
 // get a handle to the error FIFO, creating the FIFO if it doesn't yet exist.
 // the handle will be in read/write mode
 // return 0 on success, and set *fd
 // return -errno on failure to create the FIFO 
-int vdev_error_fifo_get_or_create(char const *mountpoint, int *fd)
+int
+vdev_error_fifo_get_or_create (char const *mountpoint, int *fd)
 {
 
-	int rc = 0;
-	char fifo_path[PATH_MAX + 1];
-	struct stat sb;
-	memset(fifo_path, 0, PATH_MAX + 1);
+  int rc = 0;
+  char fifo_path[PATH_MAX + 1];
+  struct stat sb;
+  memset (fifo_path, 0, PATH_MAX + 1);
 
-	rc = vdev_error_fifo_path(mountpoint, fifo_path, PATH_MAX);
-	if (rc < 0) {
-		return rc;
+  rc = vdev_error_fifo_path (mountpoint, fifo_path, PATH_MAX);
+  if (rc < 0)
+    {
+      return rc;
+    }
+
+  rc = stat (fifo_path, &sb);
+  if (rc != 0)
+    {
+
+      rc = -errno;
+      if (rc != -ENOENT)
+	{
+
+	  vdev_error ("failed to create FIFO '%s': %s\n",
+		      fifo_path, strerror (-rc));
+	  return rc;
 	}
+      // create
+      rc = mkfifo (fifo_path, 0600);
+      if (rc != 0)
+	{
 
-	rc = stat(fifo_path, &sb);
-	if (rc != 0) {
-
-		rc = -errno;
-		if (rc != -ENOENT) {
-
-			vdev_error("failed to create FIFO '%s': %s\n",
-				   fifo_path, strerror(-rc));
-			return rc;
-		}
-		// create
-		rc = mkfifo(fifo_path, 0600);
-		if (rc != 0) {
-
-			rc = -errno;
-			vdev_error("mkfifo('%s'): %s\n", fifo_path,
-				   strerror(-rc));
-			return rc;
-		}
+	  rc = -errno;
+	  vdev_error ("mkfifo('%s'): %s\n", fifo_path, strerror (-rc));
+	  return rc;
 	}
+    }
 
-	*fd = open(fifo_path, O_RDWR);
-	if (*fd < 0) {
+  *fd = open (fifo_path, O_RDWR);
+  if (*fd < 0)
+    {
 
-		rc = -errno;
-		vdev_error("open('%s'): %s\n", fifo_path, strerror(-rc));
-		return rc;
-	}
+      rc = -errno;
+      vdev_error ("open('%s'): %s\n", fifo_path, strerror (-rc));
+      return rc;
+    }
 
-	return 0;
+  return 0;
 }
 
 // thread for gathering error messages from the helpers and forwarding
 // them to our logging system.
 // *arg is an int, which is the error pipe to read from
-void *vdev_error_thread_main(void *arg)
+void *
+vdev_error_thread_main (void *arg)
 {
 
-	int rc = 0;
-	int fd = *((int *)arg);
-	char buf[4096];
-	ssize_t nr = 0;
-	int flags = 0;
-	fd_set read_fds;
+  int rc = 0;
+  int fd = *((int *) arg);
+  char buf[4096];
+  ssize_t nr = 0;
+  int flags = 0;
+  fd_set read_fds;
 
-	// put into non-blocking mode
-	flags = fcntl(fd, F_GETFL, 0);
-	if (flags < 0) {
-		rc = -errno;
-		vdev_error("fcntl(%d, F_GETFL): %s\n", fd, strerror(-rc));
-		return NULL;
+  // put into non-blocking mode
+  flags = fcntl (fd, F_GETFL, 0);
+  if (flags < 0)
+    {
+      rc = -errno;
+      vdev_error ("fcntl(%d, F_GETFL): %s\n", fd, strerror (-rc));
+      return NULL;
+    }
+
+  rc = fcntl (fd, F_SETFL, flags | O_NONBLOCK);
+  if (rc < 0)
+    {
+      rc = -errno;
+      vdev_error ("fctnl(%d, F_SETFL): %s\n", fd, strerror (-rc));
+      return NULL;
+    }
+
+  while (1)
+    {
+
+      FD_ZERO (&read_fds);
+      FD_SET (fd, &read_fds);
+
+      rc = select (fd + 1, &read_fds, NULL, NULL, NULL);
+      if (rc == 0)
+	{
+
+	  // not ready
+	  continue;
 	}
 
-	rc = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-	if (rc < 0) {
-		rc = -errno;
-		vdev_error("fctnl(%d, F_SETFL): %s\n", fd, strerror(-rc));
-		return NULL;
+      if (rc < 0)
+	{
+
+	  // pipe closed 
+	  break;
 	}
 
-	while (1) {
+      nr = read (fd, buf, 4095);
+      if (nr <= 0)
+	{
 
-		FD_ZERO(&read_fds);
-		FD_SET(fd, &read_fds);
-
-		rc = select(fd + 1, &read_fds, NULL, NULL, NULL);
-		if (rc == 0) {
-
-			// not ready
-			continue;
-		}
-
-		if (rc < 0) {
-
-			// pipe closed 
-			break;
-		}
-
-		nr = read(fd, buf, 4095);
-		if (nr <= 0) {
-
-			// closed, invalidated, etc.
-			break;
-		}
-		// truncate and log
-		buf[nr] = 0;
-
-		vdev_error("%s", buf);
+	  // closed, invalidated, etc.
+	  break;
 	}
+      // truncate and log
+      buf[nr] = 0;
 
-	return NULL;
+      vdev_error ("%s", buf);
+    }
+
+  return NULL;
 }
 
 // start the error-listining thread 
 // return 0 on success, and set state->error_thread
 // return -errno on failure 
-int vdev_error_thread_start(struct vdev_state *vdev)
+int
+vdev_error_thread_start (struct vdev_state *vdev)
 {
 
-	int rc = 0;
-	pthread_attr_t attrs;
+  int rc = 0;
+  pthread_attr_t attrs;
 
-	rc = vdev_error_fifo_get_or_create(vdev->config->mountpoint,
-					   &vdev->error_fd);
-	if (rc < 0) {
+  rc = vdev_error_fifo_get_or_create (vdev->config->mountpoint,
+				      &vdev->error_fd);
+  if (rc < 0)
+    {
 
-		vdev_error("vdev_error_fifo_get_or_create: %s\n",
-			   strerror(-rc));
-		return rc;
-	}
+      vdev_error ("vdev_error_fifo_get_or_create: %s\n", strerror (-rc));
+      return rc;
+    }
 
-	rc = pthread_attr_init(&attrs);
-	if (rc != 0) {
+  rc = pthread_attr_init (&attrs);
+  if (rc != 0)
+    {
 
-		vdev_error("pthread_attr_init: %s\n", strerror(rc));
-		return -rc;
-	}
+      vdev_error ("pthread_attr_init: %s\n", strerror (rc));
+      return -rc;
+    }
 
-	vdev->error_thread_running = true;
+  vdev->error_thread_running = true;
 
-	rc = pthread_create(&vdev->error_thread, &attrs, vdev_error_thread_main,
-			    &vdev->error_fd);
-	if (rc != 0) {
+  rc = pthread_create (&vdev->error_thread, &attrs, vdev_error_thread_main,
+		       &vdev->error_fd);
+  if (rc != 0)
+    {
 
-		vdev->error_thread_running = false;
-		vdev_error("pthread_crate: %s\n", strerror(rc));
-		return -rc;
-	}
+      vdev->error_thread_running = false;
+      vdev_error ("pthread_crate: %s\n", strerror (rc));
+      return -rc;
+    }
 
-	return 0;
+  return 0;
 }
 
 // stop the error-listening thread 
 // return 0 on success 
-int vdev_error_thread_stop(struct vdev_state *vdev)
+int
+vdev_error_thread_stop (struct vdev_state *vdev)
 {
 
-	int rc = 0;
-	if (!vdev->error_thread_running) {
-		// already stopped
-		return 0;
-	}
+  int rc = 0;
+  if (!vdev->error_thread_running)
+    {
+      // already stopped
+      return 0;
+    }
 
-	if (vdev->error_fd >= 0) {
+  if (vdev->error_fd >= 0)
+    {
 
-		int fd = vdev->error_fd;
-		vdev->error_fd = -1;
+      int fd = vdev->error_fd;
+      vdev->error_fd = -1;
 
-		close(fd);
-	}
+      close (fd);
+    }
 
-	rc = pthread_cancel(vdev->error_thread);
-	if (rc != 0) {
+  rc = pthread_cancel (vdev->error_thread);
+  if (rc != 0)
+    {
 
-		vdev_error("pthread_cancel: %s\n", strerror(rc));
-	}
+      vdev_error ("pthread_cancel: %s\n", strerror (rc));
+    }
 
-	rc = pthread_join(vdev->error_thread, NULL);
-	if (rc != 0) {
+  rc = pthread_join (vdev->error_thread, NULL);
+  if (rc != 0)
+    {
 
-		vdev_error("pthread_join: %s\n", strerror(rc));
-	}
+      vdev_error ("pthread_join: %s\n", strerror (rc));
+    }
 
-	vdev->error_thread_running = false;
+  vdev->error_thread_running = false;
 
-	return 0;
+  return 0;
 }
 
 // start up the back-end
 // return 0 on success 
 // return -ENOMEM on OOM 
 // return negative if the OS-specific back-end fails to initialize
-int vdev_start(struct vdev_state *vdev)
+int
+vdev_start (struct vdev_state *vdev)
 {
 
-	int rc = 0;
+  int rc = 0;
 
-	// otherwise, it's already given
-	vdev->running = true;
+  // otherwise, it's already given
+  vdev->running = true;
 
-	// initialize OS-specific state, and start feeding requests
-	vdev->os = VDEV_CALLOC(struct vdev_os_context, 1);
+  // initialize OS-specific state, and start feeding requests
+  vdev->os = VDEV_CALLOC (struct vdev_os_context, 1);
 
-	if (vdev->os == NULL) {
+  if (vdev->os == NULL)
+    {
 
-		return -ENOMEM;
-	}
-	// set up error capture 
-	rc = vdev_error_thread_start(vdev);
-	if (rc != 0) {
+      return -ENOMEM;
+    }
+  // set up error capture 
+  rc = vdev_error_thread_start (vdev);
+  if (rc != 0)
+    {
 
-		vdev_error("vdev_error_thread_start: %s\n", strerror(-rc));
-		free(vdev->os);
-		vdev->os = NULL;
-		return rc;
-	}
-	// start processing requests 
-	rc = vdev_wq_start(&vdev->device_wq);
-	if (rc != 0) {
+      vdev_error ("vdev_error_thread_start: %s\n", strerror (-rc));
+      free (vdev->os);
+      vdev->os = NULL;
+      return rc;
+    }
+  // start processing requests 
+  rc = vdev_wq_start (&vdev->device_wq);
+  if (rc != 0)
+    {
 
-		vdev_error("vdev_wq_start: %s\n", strerror(-rc));
+      vdev_error ("vdev_wq_start: %s\n", strerror (-rc));
 
-		int erc = vdev_error_thread_stop(vdev);
-		if (erc != 0) {
+      int erc = vdev_error_thread_stop (vdev);
+      if (erc != 0)
+	{
 
-			vdev_error("vdev_error_thread_stop: %s\n",
-				   strerror(-erc));
-		}
-
-		free(vdev->os);
-		vdev->os = NULL;
-		return rc;
+	  vdev_error ("vdev_error_thread_stop: %s\n", strerror (-erc));
 	}
 
-	rc = vdev_os_context_init(vdev->os, vdev);
+      free (vdev->os);
+      vdev->os = NULL;
+      return rc;
+    }
 
-	if (rc != 0) {
+  rc = vdev_os_context_init (vdev->os, vdev);
 
-		vdev_error("vdev_os_context_init rc = %d\n", rc);
+  if (rc != 0)
+    {
 
-		int wqrc = vdev_wq_stop(&vdev->device_wq, false);
-		if (wqrc != 0) {
+      vdev_error ("vdev_os_context_init rc = %d\n", rc);
 
-			vdev_error("vdev_wq_stop rc = %d\n", wqrc);
-		}
+      int wqrc = vdev_wq_stop (&vdev->device_wq, false);
+      if (wqrc != 0)
+	{
 
-		vdev_error_thread_stop(vdev);
-		free(vdev->os);
-		vdev->os = NULL;
-		return rc;
+	  vdev_error ("vdev_wq_stop rc = %d\n", wqrc);
 	}
 
-	return 0;
+      vdev_error_thread_stop (vdev);
+      free (vdev->os);
+      vdev->os = NULL;
+      return rc;
+    }
+
+  return 0;
 }
 
 // process a single line of text into a device request
@@ -567,166 +616,184 @@ int vdev_start(struct vdev_state *vdev)
 // return -ENOENT if we're missing a parameter
 // return -EINVAL if the parameter is malformed
 // return -ENOMEM on OOM 
-int vdev_parse_device_request(struct vdev_state *state,
-			      struct vdev_device_request *vreq, char *line)
+int
+vdev_parse_device_request (struct vdev_state *state,
+			   struct vdev_device_request *vreq, char *line)
 {
 
-	int rc = 0;
-	int stat_rc;
-	char *tok = NULL;
-	char *tokstr = line;
-	char *tok_ctx = NULL;
-	char *tmp = NULL;
+  int rc = 0;
+  int stat_rc;
+  char *tok = NULL;
+  char *tokstr = line;
+  char *tok_ctx = NULL;
+  char *tmp = NULL;
 
-	mode_t mode = 0;
-	dev_t major = 0;
-	dev_t minor = 0;
-	char name[4097];
-	char fullpath[PATH_MAX + 1];
-	char keyvalue_buf[4097];
-	char *key = NULL;
-	char *value = NULL;
+  mode_t mode = 0;
+  dev_t major = 0;
+  dev_t minor = 0;
+  char name[4097];
+  char fullpath[PATH_MAX + 1];
+  char keyvalue_buf[4097];
+  char *key = NULL;
+  char *value = NULL;
 
-	struct stat sb;
+  struct stat sb;
 
-	// type 
-	tok = strtok_r(tokstr, " \t", &tok_ctx);
-	tokstr = NULL;
+  // type 
+  tok = strtok_r (tokstr, " \t", &tok_ctx);
+  tokstr = NULL;
 
-	if (tok == NULL) {
+  if (tok == NULL)
+    {
 
-		// no type 
-		fprintf(stderr, "Missing type\n");
-		return -ENOENT;
+      // no type 
+      fprintf (stderr, "Missing type\n");
+      return -ENOENT;
+    }
+
+  if (strlen (tok) != 1)
+    {
+
+      // invalid type 
+      fprintf (stderr,
+	       "Unrecognized type '%s'.  Expected 'c', 'b', or 'u'\n", tok);
+      return -EINVAL;
+    }
+
+  if (tok[0] != 'c' && tok[0] != 'b' && tok[0] != 'u')
+    {
+
+      // invalid type 
+      fprintf (stderr,
+	       "Unrecognized type '%s'.  Expected 'c', 'b', or 'u'\n", tok);
+      return -EINVAL;
+    }
+
+  if (tok[0] == 'c')
+    {
+      mode = S_IFCHR;
+    }
+  else if (tok[0] == 'b')
+    {
+      mode = S_IFBLK;
+    }
+  // name 
+  tok = strtok_r (tokstr, " \t", &tok_ctx);
+  if (tok == NULL)
+    {
+
+      // no name 
+      fprintf (stderr, "Missing name\n");
+      return -ENOENT;
+    }
+
+  strcpy (name, tok);
+
+  // major 
+  tok = strtok_r (tokstr, " \t", &tok_ctx);
+  if (tok == NULL)
+    {
+
+      // no major 
+      fprintf (stderr, "Missing major device number\n");
+      return -ENOENT;
+    }
+
+  major = (dev_t) strtoul (tok, &tmp, 10);
+  if (tmp == tok || *tmp != '\0')
+    {
+
+      // invalid major 
+      fprintf (stderr, "Invalid major device number '%s'\n", tok);
+      return -EINVAL;
+    }
+  // minor 
+  tok = strtok_r (tokstr, " \t", &tok_ctx);
+  if (tok == NULL)
+    {
+
+      // no minor 
+      fprintf (stderr, "Missing minor device number\n");
+      return -ENOENT;
+    }
+
+  minor = (dev_t) strtoul (tok, &tmp, 10);
+  if (tmp == tok || *tmp != '\0')
+    {
+
+      // invalid minor 
+      fprintf (stderr, "Invalid minor device number '%s'\n", tok);
+      return -EINVAL;
+    }
+  // set up the device... 
+  rc = vdev_device_request_init (vreq, state, VDEV_DEVICE_ADD, name);
+  if (rc != 0)
+    {
+
+      vdev_error ("vdev_device_request_init('%s') rc = %d\n", name, rc);
+      return rc;
+    }
+
+  vdev_device_request_set_type (vreq, VDEV_DEVICE_ADD);
+  vdev_device_request_set_mode (vreq, mode);
+  vdev_device_request_set_dev (vreq, makedev (major, minor));
+
+  // parameters 
+  while (tok != NULL)
+    {
+
+      tok = strtok_r (tokstr, " \t", &tok_ctx);
+      if (tok == NULL)
+	{
+	  break;
 	}
 
-	if (strlen(tok) != 1) {
+      if (strlen (tok) > 4096)
+	{
 
-		// invalid type 
-		fprintf(stderr,
-			"Unrecognized type '%s'.  Expected 'c', 'b', or 'u'\n",
-			tok);
-		return -EINVAL;
+	  // too big 
+	  fprintf (stderr, "OS parameter too long: '%s'\n", tok);
+	  vdev_device_request_free (vreq);
+	  return -EINVAL;
 	}
 
-	if (tok[0] != 'c' && tok[0] != 'b' && tok[0] != 'u') {
+      strcpy (keyvalue_buf, tok);
 
-		// invalid type 
-		fprintf(stderr,
-			"Unrecognized type '%s'.  Expected 'c', 'b', or 'u'\n",
-			tok);
-		return -EINVAL;
+      rc = vdev_keyvalue_next (keyvalue_buf, &key, &value);
+      if (rc < 0)
+	{
+
+	  // could not parse 
+	  fprintf (stderr, "Unparsible OS parameter: '%s'\n", tok);
+	  vdev_device_request_free (vreq);
+	  return -EINVAL;
 	}
 
-	if (tok[0] == 'c') {
-		mode = S_IFCHR;
-	} else if (tok[0] == 'b') {
-		mode = S_IFBLK;
+      rc = vdev_device_request_add_param (vreq, key, value);
+      if (rc != 0)
+	{
+
+	  vdev_device_request_free (vreq);
+	  return rc;
 	}
-	// name 
-	tok = strtok_r(tokstr, " \t", &tok_ctx);
-	if (tok == NULL) {
+    }
 
-		// no name 
-		fprintf(stderr, "Missing name\n");
-		return -ENOENT;
-	}
+  // finally, does this device exist already?
+  snprintf (fullpath, PATH_MAX, "%s/%s", state->config->mountpoint, name);
+  stat_rc = lstat (fullpath, &sb);
 
-	strcpy(name, tok);
+  if (stat_rc == 0)
+    {
 
-	// major 
-	tok = strtok_r(tokstr, " \t", &tok_ctx);
-	if (tok == NULL) {
+      vdev_device_request_set_exists (vreq, true);
+    }
+  else
+    {
 
-		// no major 
-		fprintf(stderr, "Missing major device number\n");
-		return -ENOENT;
-	}
+      vdev_device_request_set_exists (vreq, false);
+    }
 
-	major = (dev_t) strtoul(tok, &tmp, 10);
-	if (tmp == tok || *tmp != '\0') {
-
-		// invalid major 
-		fprintf(stderr, "Invalid major device number '%s'\n", tok);
-		return -EINVAL;
-	}
-	// minor 
-	tok = strtok_r(tokstr, " \t", &tok_ctx);
-	if (tok == NULL) {
-
-		// no minor 
-		fprintf(stderr, "Missing minor device number\n");
-		return -ENOENT;
-	}
-
-	minor = (dev_t) strtoul(tok, &tmp, 10);
-	if (tmp == tok || *tmp != '\0') {
-
-		// invalid minor 
-		fprintf(stderr, "Invalid minor device number '%s'\n", tok);
-		return -EINVAL;
-	}
-	// set up the device... 
-	rc = vdev_device_request_init(vreq, state, VDEV_DEVICE_ADD, name);
-	if (rc != 0) {
-
-		vdev_error("vdev_device_request_init('%s') rc = %d\n", name,
-			   rc);
-		return rc;
-	}
-
-	vdev_device_request_set_type(vreq, VDEV_DEVICE_ADD);
-	vdev_device_request_set_mode(vreq, mode);
-	vdev_device_request_set_dev(vreq, makedev(major, minor));
-
-	// parameters 
-	while (tok != NULL) {
-
-		tok = strtok_r(tokstr, " \t", &tok_ctx);
-		if (tok == NULL) {
-			break;
-		}
-
-		if (strlen(tok) > 4096) {
-
-			// too big 
-			fprintf(stderr, "OS parameter too long: '%s'\n", tok);
-			vdev_device_request_free(vreq);
-			return -EINVAL;
-		}
-
-		strcpy(keyvalue_buf, tok);
-
-		rc = vdev_keyvalue_next(keyvalue_buf, &key, &value);
-		if (rc < 0) {
-
-			// could not parse 
-			fprintf(stderr, "Unparsible OS parameter: '%s'\n", tok);
-			vdev_device_request_free(vreq);
-			return -EINVAL;
-		}
-
-		rc = vdev_device_request_add_param(vreq, key, value);
-		if (rc != 0) {
-
-			vdev_device_request_free(vreq);
-			return rc;
-		}
-	}
-
-	// finally, does this device exist already?
-	snprintf(fullpath, PATH_MAX, "%s/%s", state->config->mountpoint, name);
-	stat_rc = lstat(fullpath, &sb);
-
-	if (stat_rc == 0) {
-
-		vdev_device_request_set_exists(vreq, true);
-	} else {
-
-		vdev_device_request_set_exists(vreq, false);
-	}
-
-	return rc;
+  return rc;
 }
 
 // process a newline-delimited textual list of device events.
@@ -744,100 +811,111 @@ int vdev_parse_device_request(struct vdev_state *state,
 // NOTE: currently, we do not tolerate spaces in any of these fields.  Sorry.
 // return 0 on success 
 // return -ERANGE if a line exceeded 4096 characters
-int vdev_load_device_requests(struct vdev_state *state, char *text_buf,
-			      size_t text_buflen)
+int
+vdev_load_device_requests (struct vdev_state *state, char *text_buf,
+			   size_t text_buflen)
 {
 
-	int rc = 0;
-	char *cur_line = NULL;
-	char *next_line = NULL;
+  int rc = 0;
+  char *cur_line = NULL;
+  char *next_line = NULL;
 
-	struct vdev_device_request *vreq = NULL;
+  struct vdev_device_request *vreq = NULL;
 
-	size_t consumed = 0;
-	size_t line_len = 0;
-	char line_buf[4097];
-	char line_buf_dbg[4097];	// for debugging
+  size_t consumed = 0;
+  size_t line_len = 0;
+  char line_buf[4097];
+  char line_buf_dbg[4097];	// for debugging
 
-	dev_t major = 0;
-	dev_t minor = 0;
+  dev_t major = 0;
+  dev_t minor = 0;
 
-	cur_line = text_buf;
-	while (consumed < text_buflen && cur_line != NULL) {
+  cur_line = text_buf;
+  while (consumed < text_buflen && cur_line != NULL)
+    {
 
-		next_line = strchr(cur_line, '\n');
-		if (next_line == NULL) {
+      next_line = strchr (cur_line, '\n');
+      if (next_line == NULL)
+	{
 
-			line_len = strlen(cur_line);
+	  line_len = strlen (cur_line);
 
-			if (line_len == 0) {
-				// done 
-				break;
-			}
-			// last line
-			if (line_len < 4096) {
+	  if (line_len == 0)
+	    {
+	      // done 
+	      break;
+	    }
+	  // last line
+	  if (line_len < 4096)
+	    {
 
-				strcpy(line_buf, cur_line);
-			} else {
+	      strcpy (line_buf, cur_line);
+	    }
+	  else
+	    {
 
-				// too big
-				return -ERANGE;
-			}
-		} else {
+	      // too big
+	      return -ERANGE;
+	    }
+	}
+      else
+	{
 
-			// copy until '\n'
-			line_len =
-			    (size_t) (next_line - cur_line) / sizeof(char);
-			memcpy(line_buf, cur_line, line_len);
+	  // copy until '\n'
+	  line_len = (size_t) (next_line - cur_line) / sizeof (char);
+	  memcpy (line_buf, cur_line, line_len);
 
-			line_buf[line_len] = '\0';
-		}
-
-		vdev_debug("Preseed device: '%s'\n", line_buf);
-
-		strcpy(line_buf_dbg, line_buf);
-
-		vreq = VDEV_CALLOC(struct vdev_device_request, 1);
-		if (vreq == NULL) {
-
-			// OOM 
-			return -ENOMEM;
-		}
-		// consume the line 
-		rc = vdev_parse_device_request(state, vreq, line_buf);
-		if (rc != 0) {
-
-			fprintf(stderr, "Could not parse line '%s' (rc = %d)\n",
-				line_buf_dbg, rc);
-			vdev_error("vdev_parse_device_request('%s') rc = %d\n",
-				   line_buf_dbg, rc);
-
-			free(vreq);
-			return rc;
-		}
-		// enqueue the device!
-		rc = vdev_device_request_enqueue(&state->device_wq, vreq);
-		if (rc != 0) {
-
-			vdev_error
-			    ("vdev_device_request_enqueue('%s') rc = %d\n",
-			     line_buf_dbg, rc);
-
-			free(vreq);
-			return rc;
-		}
-		// next line 
-		cur_line = next_line;
-		consumed += strlen(next_line);
-
-		while (consumed < text_buflen && *cur_line == '\n') {
-
-			cur_line++;
-			consumed++;
-		}
+	  line_buf[line_len] = '\0';
 	}
 
-	return rc;
+      vdev_debug ("Preseed device: '%s'\n", line_buf);
+
+      strcpy (line_buf_dbg, line_buf);
+
+      vreq = VDEV_CALLOC (struct vdev_device_request, 1);
+      if (vreq == NULL)
+	{
+
+	  // OOM 
+	  return -ENOMEM;
+	}
+      // consume the line 
+      rc = vdev_parse_device_request (state, vreq, line_buf);
+      if (rc != 0)
+	{
+
+	  fprintf (stderr, "Could not parse line '%s' (rc = %d)\n",
+		   line_buf_dbg, rc);
+	  vdev_error ("vdev_parse_device_request('%s') rc = %d\n",
+		      line_buf_dbg, rc);
+
+	  free (vreq);
+	  return rc;
+	}
+      // enqueue the device!
+      rc = vdev_device_request_enqueue (&state->device_wq, vreq);
+      if (rc != 0)
+	{
+
+	  vdev_error
+	    ("vdev_device_request_enqueue('%s') rc = %d\n", line_buf_dbg, rc);
+
+	  free (vreq);
+	  return rc;
+	}
+      // next line 
+      cur_line = next_line;
+      consumed += strlen (next_line);
+
+      while (consumed < text_buflen && *cur_line == '\n')
+	{
+
+	  cur_line++;
+	  consumed++;
+	}
+    }
+
+  return rc;
 }
 
 // run the pre-seed command, if given 
@@ -845,442 +923,488 @@ int vdev_load_device_requests(struct vdev_state *state, char *text_buf,
 // return -ENOMEM on OOM 
 // return non-zero on non-zero exit status
 // TODO: "unlimited" output buffer space--like a pipe
-int vdev_preseed_run(struct vdev_state *vdev)
+int
+vdev_preseed_run (struct vdev_state *vdev)
 {
 
-	int rc = 0;
-	int exit_status = 0;
-	char *command = NULL;
+  int rc = 0;
+  int exit_status = 0;
+  char *command = NULL;
 
-	size_t output_len = 1024 * 1024;	// 1MB buffer for initial devices, just in case
-	char *output = NULL;
+  size_t output_len = 1024 * 1024;	// 1MB buffer for initial devices, just in case
+  char *output = NULL;
 
-	if (vdev->config->preseed_path == NULL) {
-		// nothing to do 
-		return 0;
-	}
+  if (vdev->config->preseed_path == NULL)
+    {
+      // nothing to do 
+      return 0;
+    }
 
-	output = VDEV_CALLOC(char, output_len);
-	if (output == NULL) {
+  output = VDEV_CALLOC (char, output_len);
+  if (output == NULL)
+    {
 
-		// OOM 
-		return -ENOMEM;
-	}
+      // OOM 
+      return -ENOMEM;
+    }
 
-	command =
-	    VDEV_CALLOC(char,
-			strlen(vdev->config->preseed_path) + 2 +
-			strlen(vdev->config->mountpoint) + 2 +
-			strlen(vdev->config->config_path) + 1);
-	if (command == NULL) {
+  command =
+    VDEV_CALLOC (char,
+		 strlen (vdev->config->preseed_path) + 2 +
+		 strlen (vdev->config->mountpoint) + 2 +
+		 strlen (vdev->config->config_path) + 1);
+  if (command == NULL)
+    {
 
-		// OOM
-		free(output);
-		return -ENOMEM;
-	}
+      // OOM
+      free (output);
+      return -ENOMEM;
+    }
 
-	sprintf(command, "%s %s %s", vdev->config->preseed_path,
-		vdev->config->mountpoint, vdev->config->config_path);
+  sprintf (command, "%s %s %s", vdev->config->preseed_path,
+	   vdev->config->mountpoint, vdev->config->config_path);
 
-	rc = vdev_subprocess(command, NULL, &output, output_len, -1,
-			     &exit_status, true);
-	if (rc != 0) {
+  rc = vdev_subprocess (command, NULL, &output, output_len, -1,
+			&exit_status, true);
+  if (rc != 0)
+    {
 
-		vdev_error("vdev_subprocess('%s') rc = %d\n", command, rc);
-	} else if (exit_status != 0) {
+      vdev_error ("vdev_subprocess('%s') rc = %d\n", command, rc);
+    }
+  else if (exit_status != 0)
+    {
 
-		vdev_error("vdev_subprocess('%s') exit status %d\n", command,
-			   exit_status);
-		rc = exit_status;
-	}
+      vdev_error ("vdev_subprocess('%s') exit status %d\n", command,
+		  exit_status);
+      rc = exit_status;
+    }
 
-	free(command);
-	command = NULL;
+  free (command);
+  command = NULL;
 
-	if (rc != 0) {
+  if (rc != 0)
+    {
 
-		free(output);
-		return rc;
-	}
-	// process the preseed devices...
-	rc = vdev_load_device_requests(vdev, output, output_len);
-	if (rc != 0) {
+      free (output);
+      return rc;
+    }
+  // process the preseed devices...
+  rc = vdev_load_device_requests (vdev, output, output_len);
+  if (rc != 0)
+    {
 
-		vdev_error("vdev_load_device_requests rc = %d\n", rc);
-	}
+      vdev_error ("vdev_load_device_requests rc = %d\n", rc);
+    }
 
-	free(output);
-	output = NULL;
+  free (output);
+  output = NULL;
 
-	return rc;
+  return rc;
 }
 
 // global vdev initialization 
-int vdev_init(struct vdev_state *vdev, int argc, char **argv)
+int
+vdev_init (struct vdev_state *vdev, int argc, char **argv)
 {
 
-	int rc = 0;
+  int rc = 0;
 
-	// global setup 
-	vdev_setup_global();
+  // global setup 
+  vdev_setup_global ();
 
-	pthread_mutex_init(&vdev->reload_lock, NULL);
-	vdev->error_fd = -1;
-	vdev->coldplug_finished_fd = -1;
+  pthread_mutex_init (&vdev->reload_lock, NULL);
+  vdev->error_fd = -1;
+  vdev->coldplug_finished_fd = -1;
 
-	// config...
-	vdev->config = VDEV_CALLOC(struct vdev_config, 1);
-	if (vdev->config == NULL) {
+  // config...
+  vdev->config = VDEV_CALLOC (struct vdev_config, 1);
+  if (vdev->config == NULL)
+    {
 
-		return -ENOMEM;
+      return -ENOMEM;
+    }
+  // config init
+  rc = vdev_config_init (vdev->config);
+  if (rc != 0)
+    {
+
+      vdev_error ("vdev_config_init rc = %d\n", rc);
+      return rc;
+    }
+  // parse config options from command-line 
+  rc = vdev_config_load_from_args (vdev->config, argc, argv, NULL, NULL);
+  // help is not an error
+  if (rc == -2)
+    {
+
+      vdev_config_usage (argv[0]);
+
+      return 0;
+
+    }
+
+  if (rc != 0)
+    {
+
+      vdev_error ("vdev_config_load_from_argv rc = %d\n", rc);
+
+      vdev_config_usage (argv[0]);
+
+      return rc;
+    }
+  // if we didn't get a config file, use the default one
+  if (vdev->config->config_path == NULL)
+    {
+
+      vdev->config->config_path = vdev_strdup_or_null (VDEV_CONFIG_FILE);
+      if (vdev->config->config_path == NULL)
+	{
+
+	  // OOM 
+	  return -ENOMEM;
 	}
-	// config init
-	rc = vdev_config_init(vdev->config);
-	if (rc != 0) {
+    }
 
-		vdev_error("vdev_config_init rc = %d\n", rc);
-		return rc;
-	}
-	// parse config options from command-line 
-	rc = vdev_config_load_from_args(vdev->config, argc, argv, NULL, NULL);
-	// help is not an error
-	if (rc == -2) {
+  vdev_set_debug_level (vdev->config->debug_level);
+  vdev_set_error_level (vdev->config->error_level);
 
-		vdev_config_usage(argv[0]);
+  vdev_info ("Config file:      '%s'\n", vdev->config->config_path);
+  vdev_info ("Log debug level:  '%s'\n",
+	     (vdev->config->debug_level ==
+	      VDEV_LOGLEVEL_DEBUG ? "debug" : (vdev->config->debug_level ==
+					       VDEV_LOGLEVEL_INFO ? "info"
+					       : "none")));
+  vdev_info ("Log error level:  '%s'\n",
+	     (vdev->config->error_level ==
+	      VDEV_LOGLEVEL_WARN ? "warning" : (vdev->config->error_level ==
+						VDEV_LOGLEVEL_ERROR ?
+						"error" : "none")));
 
-		return 0;
+  // load from file...
+  rc = vdev_config_load (vdev->config->config_path, vdev->config);
+  if (rc != 0)
+    {
 
-	}
+      vdev_error ("vdev_config_load('%s') rc = %d\n",
+		  vdev->config->config_path, rc);
 
-	if (rc != 0) {
+      return rc;
+    }
+  // if no command-line loglevel is given, then take it from the config file (if given)
+  if (vdev->config->debug_level != VDEV_LOGLEVEL_NONE)
+    {
 
-		vdev_error("vdev_config_load_from_argv rc = %d\n", rc);
+      vdev_set_debug_level (vdev->config->debug_level);
+    }
 
-		vdev_config_usage(argv[0]);
+  if (vdev->config->error_level != VDEV_LOGLEVEL_NONE)
+    {
 
-		return rc;
-	}
-	// if we didn't get a config file, use the default one
-	if (vdev->config->config_path == NULL) {
+      vdev_set_error_level (vdev->config->error_level);
+    }
 
-		vdev->config->config_path =
-		    vdev_strdup_or_null(VDEV_CONFIG_FILE);
-		if (vdev->config->config_path == NULL) {
+  vdev_info ("vdev actions dir: '%s'\n", vdev->config->acts_dir);
+  vdev_info ("helpers dir:      '%s'\n", vdev->config->helpers_dir);
+  vdev_info ("logfile path:     '%s'\n", vdev->config->logfile_path);
+  vdev_info ("pidfile path:     '%s'\n", vdev->config->pidfile_path);
+  vdev_info ("default mode:      0%o\n", vdev->config->default_mode);
+  vdev_info ("preseed script:   '%s'\n", vdev->config->preseed_path);
 
-			// OOM 
-			return -ENOMEM;
-		}
-	}
+  vdev->mountpoint = vdev_strdup_or_null (vdev->config->mountpoint);
+  vdev->coldplug_only = vdev->config->coldplug_only;
 
-	vdev_set_debug_level(vdev->config->debug_level);
-	vdev_set_error_level(vdev->config->error_level);
+  if (vdev->mountpoint == NULL)
+    {
 
-	vdev_info("Config file:      '%s'\n", vdev->config->config_path);
-	vdev_info("Log debug level:  '%s'\n",
-		  (vdev->config->debug_level ==
-		   VDEV_LOGLEVEL_DEBUG ? "debug" : (vdev->config->debug_level ==
-						    VDEV_LOGLEVEL_INFO ? "info"
-						    : "none")));
-	vdev_info("Log error level:  '%s'\n",
-		  (vdev->config->error_level ==
-		   VDEV_LOGLEVEL_WARN ? "warning" : (vdev->
-						     config->error_level ==
-						     VDEV_LOGLEVEL_ERROR ?
-						     "error" : "none")));
+      vdev_error
+	("Failed to set mountpoint, config->mountpount = '%s'\n",
+	 vdev->config->mountpoint);
 
-	// load from file...
-	rc = vdev_config_load(vdev->config->config_path, vdev->config);
-	if (rc != 0) {
+      return -EINVAL;
+    }
+  else
+    {
 
-		vdev_error("vdev_config_load('%s') rc = %d\n",
-			   vdev->config->config_path, rc);
+      vdev_info ("mountpoint:       '%s'\n", vdev->mountpoint);
+    }
 
-		return rc;
-	}
-	// if no command-line loglevel is given, then take it from the config file (if given)
-	if (vdev->config->debug_level != VDEV_LOGLEVEL_NONE) {
+  vdev->argc = argc;
+  vdev->argv = argv;
 
-		vdev_set_debug_level(vdev->config->debug_level);
-	}
+  // load actions 
+  rc = vdev_action_load_all (vdev->config, &vdev->acts, &vdev->num_acts);
+  if (rc != 0)
+    {
 
-	if (vdev->config->error_level != VDEV_LOGLEVEL_NONE) {
+      vdev_error ("vdev_action_load_all('%s') rc = %d\n",
+		  vdev->config->acts_dir, rc);
 
-		vdev_set_error_level(vdev->config->error_level);
-	}
+      return rc;
+    }
+  // initialize request work queue 
+  rc = vdev_wq_init (&vdev->device_wq, vdev);
+  if (rc != 0)
+    {
 
-	vdev_info("vdev actions dir: '%s'\n", vdev->config->acts_dir);
-	vdev_info("helpers dir:      '%s'\n", vdev->config->helpers_dir);
-	vdev_info("logfile path:     '%s'\n", vdev->config->logfile_path);
-	vdev_info("pidfile path:     '%s'\n", vdev->config->pidfile_path);
-	vdev_info("default mode:      0%o\n", vdev->config->default_mode);
-	vdev_info("preseed script:   '%s'\n", vdev->config->preseed_path);
+      vdev_error ("vdev_wq_init rc = %d\n", rc);
 
-	vdev->mountpoint = vdev_strdup_or_null(vdev->config->mountpoint);
-	vdev->coldplug_only = vdev->config->coldplug_only;
+      return rc;
+    }
 
-	if (vdev->mountpoint == NULL) {
-
-		vdev_error
-		    ("Failed to set mountpoint, config->mountpount = '%s'\n",
-		     vdev->config->mountpoint);
-
-		return -EINVAL;
-	} else {
-
-		vdev_info("mountpoint:       '%s'\n", vdev->mountpoint);
-	}
-
-	vdev->argc = argc;
-	vdev->argv = argv;
-
-	// load actions 
-	rc = vdev_action_load_all(vdev->config, &vdev->acts, &vdev->num_acts);
-	if (rc != 0) {
-
-		vdev_error("vdev_action_load_all('%s') rc = %d\n",
-			   vdev->config->acts_dir, rc);
-
-		return rc;
-	}
-	// initialize request work queue 
-	rc = vdev_wq_init(&vdev->device_wq, vdev);
-	if (rc != 0) {
-
-		vdev_error("vdev_wq_init rc = %d\n", rc);
-
-		return rc;
-	}
-
-	return 0;
+  return 0;
 }
 
 // main loop for the back-end 
 // takes a file descriptor to be written to once coldplug processing has finished.
 // return 0 on success
 // return -errno on failure to daemonize, or abnormal OS-specific back-end failure
-int vdev_main(struct vdev_state *vdev, int coldplug_finished_fd)
+int
+vdev_main (struct vdev_state *vdev, int coldplug_finished_fd)
 {
 
-	int rc = 0;
+  int rc = 0;
 
-	vdev->coldplug_finished_fd = coldplug_finished_fd;
+  vdev->coldplug_finished_fd = coldplug_finished_fd;
 
-	char *metadata_dir =
-	    vdev_device_metadata_fullpath(vdev->mountpoint, "");
-	if (metadata_dir == NULL) {
+  char *metadata_dir = vdev_device_metadata_fullpath (vdev->mountpoint, "");
+  if (metadata_dir == NULL)
+    {
 
-		return -ENOMEM;
-	}
-	// create metadata directory 
-	rc = vdev_mkdirs(metadata_dir, 0, 0755);
+      return -ENOMEM;
+    }
+  // create metadata directory 
+  rc = vdev_mkdirs (metadata_dir, 0, 0755);
 
-	if (rc != 0) {
+  if (rc != 0)
+    {
 
-		vdev_error("vdev_mkdirs('%s') rc = %d\n", metadata_dir, rc);
+      vdev_error ("vdev_mkdirs('%s') rc = %d\n", metadata_dir, rc);
 
-		free(metadata_dir);
-		return rc;
-	}
+      free (metadata_dir);
+      return rc;
+    }
 
-	free(metadata_dir);
+  free (metadata_dir);
 
-	rc = vdev_os_main(vdev->os);
+  rc = vdev_os_main (vdev->os);
 
-	return rc;
+  return rc;
 }
 
 // signal that we've processed all coldplug devices
-int vdev_signal_coldplug_finished(struct vdev_state *vdev, int status)
+int
+vdev_signal_coldplug_finished (struct vdev_state *vdev, int status)
 {
 
-	if (vdev->coldplug_finished_fd > 0) {
-		write(vdev->coldplug_finished_fd, &status, sizeof(status));
-		close(vdev->coldplug_finished_fd);
-		vdev->coldplug_finished_fd = -1;
-	}
+  if (vdev->coldplug_finished_fd > 0)
+    {
+      write (vdev->coldplug_finished_fd, &status, sizeof (status));
+      close (vdev->coldplug_finished_fd);
+      vdev->coldplug_finished_fd = -1;
+    }
 
-	return 0;
+  return 0;
 }
 
 // prevent reload
-int vdev_reload_lock(struct vdev_state *vdev)
+int
+vdev_reload_lock (struct vdev_state *vdev)
 {
-	return pthread_mutex_lock(&vdev->reload_lock);
+  return pthread_mutex_lock (&vdev->reload_lock);
 }
 
 // allow reload 
-int vdev_reload_unlock(struct vdev_state *vdev)
+int
+vdev_reload_unlock (struct vdev_state *vdev)
 {
-	return pthread_mutex_unlock(&vdev->reload_lock);
+  return pthread_mutex_unlock (&vdev->reload_lock);
 }
 
 // do a reload 
 // return 0 on success, and replace the config and actions, atomically
 // return -errno on failure, and do nothing to vdev
-int vdev_reload(struct vdev_state *vdev)
+int
+vdev_reload (struct vdev_state *vdev)
 {
 
-	int rc = 0;
-	struct vdev_config *config = NULL;
-	struct vdev_action *acts = NULL;
-	size_t num_acts = 0;
+  int rc = 0;
+  struct vdev_config *config = NULL;
+  struct vdev_action *acts = NULL;
+  size_t num_acts = 0;
 
-	struct vdev_config *old_config = NULL;
-	struct vdev_action *old_acts = NULL;
-	size_t old_num_acts = 0;
+  struct vdev_config *old_config = NULL;
+  struct vdev_action *old_acts = NULL;
+  size_t old_num_acts = 0;
 
-	config = VDEV_CALLOC(struct vdev_config, 1);
-	if (config == NULL) {
-		return -ENOMEM;
+  config = VDEV_CALLOC (struct vdev_config, 1);
+  if (config == NULL)
+    {
+      return -ENOMEM;
+    }
+  // config init
+  rc = vdev_config_init (config);
+  if (rc != 0)
+    {
+
+      vdev_error ("vdev_config_init rc = %d\n", rc);
+      return rc;
+    }
+
+  if (config->config_path == NULL)
+    {
+      // default 
+      config->config_path = vdev_strdup_or_null (VDEV_CONFIG_FILE);
+      if (config->config_path == NULL)
+	{
+
+	  vdev_config_free (config);
+	  free (config);
+	  return -ENOMEM;
 	}
-	// config init
-	rc = vdev_config_init(config);
-	if (rc != 0) {
+    }
+  // parse config options from command-line 
+  rc = vdev_config_load_from_args (config, vdev->argc, vdev->argv, NULL,
+				   NULL);
+  if (rc != 0)
+    {
 
-		vdev_error("vdev_config_init rc = %d\n", rc);
-		return rc;
-	}
+      vdev_error ("vdev_config_load_from_argv rc = %d\n", rc);
+      return rc;
+    }
+  // load from file...
+  rc = vdev_config_load (config->config_path, config);
+  if (rc != 0)
+    {
 
-	if (config->config_path == NULL) {
-		// default 
-		config->config_path = vdev_strdup_or_null(VDEV_CONFIG_FILE);
-		if (config->config_path == NULL) {
+      vdev_error ("vdev_config_load('%s') rc = %d\n",
+		  config->config_path, rc);
 
-			vdev_config_free(config);
-			free(config);
-			return -ENOMEM;
-		}
-	}
-	// parse config options from command-line 
-	rc = vdev_config_load_from_args(config, vdev->argc, vdev->argv, NULL,
-					NULL);
-	if (rc != 0) {
+      vdev_config_free (config);
+      free (config);
+      return rc;
+    }
+  // load actions
+  rc = vdev_action_load_all (config, &acts, &num_acts);
+  if (rc != 0)
+    {
 
-		vdev_error("vdev_config_load_from_argv rc = %d\n", rc);
-		return rc;
-	}
-	// load from file...
-	rc = vdev_config_load(config->config_path, config);
-	if (rc != 0) {
+      vdev_error ("vdev_action_load_all('%s') rc = %d\n",
+		  config->acts_dir, rc);
 
-		vdev_error("vdev_config_load('%s') rc = %d\n",
-			   config->config_path, rc);
+      vdev_config_free (config);
+      free (config);
+      return rc;
+    }
+  // install them
+  vdev_reload_lock (vdev);
 
-		vdev_config_free(config);
-		free(config);
-		return rc;
-	}
-	// load actions
-	rc = vdev_action_load_all(config, &acts, &num_acts);
-	if (rc != 0) {
+  old_config = vdev->config;
+  vdev->config = config;
 
-		vdev_error("vdev_action_load_all('%s') rc = %d\n",
-			   config->acts_dir, rc);
+  old_acts = vdev->acts;
+  old_num_acts = vdev->num_acts;
+  vdev->acts = acts;
+  vdev->num_acts = num_acts;
 
-		vdev_config_free(config);
-		free(config);
-		return rc;
-	}
-	// install them
-	vdev_reload_lock(vdev);
+  vdev_reload_unlock (vdev);
 
-	old_config = vdev->config;
-	vdev->config = config;
+  // free old state
+  vdev_config_free (old_config);
+  free (old_config);
 
-	old_acts = vdev->acts;
-	old_num_acts = vdev->num_acts;
-	vdev->acts = acts;
-	vdev->num_acts = num_acts;
+  vdev_action_free_all (old_acts, old_num_acts);
 
-	vdev_reload_unlock(vdev);
-
-	// free old state
-	vdev_config_free(old_config);
-	free(old_config);
-
-	vdev_action_free_all(old_acts, old_num_acts);
-
-	return rc;
+  return rc;
 }
 
 // stop vdev 
 // NOTE: if this fails, there's not really a way to recover
 // return 0 on success
 // return non-zero if we failed to stop the work queue
-int vdev_stop(struct vdev_state *vdev)
+int
+vdev_stop (struct vdev_state *vdev)
 {
 
-	int rc = 0;
-	bool wait_for_empty = false;
+  int rc = 0;
+  bool wait_for_empty = false;
 
-	if (!vdev->running) {
-		return -EINVAL;
-	}
+  if (!vdev->running)
+    {
+      return -EINVAL;
+    }
 
-	vdev->running = false;
-	wait_for_empty = vdev->coldplug_only;	// wait for the queue to drain if running coldplug only
+  vdev->running = false;
+  wait_for_empty = vdev->coldplug_only;	// wait for the queue to drain if running coldplug only
 
-	// stop processing requests 
-	rc = vdev_wq_stop(&vdev->device_wq, wait_for_empty);
-	if (rc != 0) {
+  // stop processing requests 
+  rc = vdev_wq_stop (&vdev->device_wq, wait_for_empty);
+  if (rc != 0)
+    {
 
-		vdev_error("vdev_wq_stop: %s\n", strerror(-rc));
-		return rc;
-	}
-	// stop all actions' daemonlets
-	vdev_action_daemonlet_stop_all(vdev->acts, vdev->num_acts);
-	return rc;
+      vdev_error ("vdev_wq_stop: %s\n", strerror (-rc));
+      return rc;
+    }
+  // stop all actions' daemonlets
+  vdev_action_daemonlet_stop_all (vdev->acts, vdev->num_acts);
+  return rc;
 }
 
 // free up vdev.
 // only call after vdev_stop().
 // return 0 on success, and print out benchmarks 
 // return -EINVAL if we're still running.
-int vdev_shutdown(struct vdev_state *vdev, bool unlink_pidfile)
+int
+vdev_shutdown (struct vdev_state *vdev, bool unlink_pidfile)
 {
 
-	if (vdev->running) {
-		return -EINVAL;
-	}
+  if (vdev->running)
+    {
+      return -EINVAL;
+    }
 
-	vdev_debug("%s", "vdev shutdown\n");
+  vdev_debug ("%s", "vdev shutdown\n");
 
-	// stop error thread--all daemonlets should be dead anyway 
-	int erc = vdev_error_thread_stop(vdev);
-	if (erc != 0) {
+  // stop error thread--all daemonlets should be dead anyway 
+  int erc = vdev_error_thread_stop (vdev);
+  if (erc != 0)
+    {
 
-		vdev_error("vdev_error_thread_stop: %s\n", strerror(-erc));
-	}
-	// remove the PID file, if we have one 
-	if (vdev->config->pidfile_path != NULL && unlink_pidfile) {
-		unlink(vdev->config->pidfile_path);
-	}
+      vdev_error ("vdev_error_thread_stop: %s\n", strerror (-erc));
+    }
+  // remove the PID file, if we have one 
+  if (vdev->config->pidfile_path != NULL && unlink_pidfile)
+    {
+      unlink (vdev->config->pidfile_path);
+    }
 
-	vdev_action_free_all(vdev->acts, vdev->num_acts);
+  vdev_action_free_all (vdev->acts, vdev->num_acts);
 
-	vdev->acts = NULL;
-	vdev->num_acts = 0;
+  vdev->acts = NULL;
+  vdev->num_acts = 0;
 
-	if (vdev->os != NULL) {
-		vdev_os_context_free(vdev->os);
-		free(vdev->os);
-		vdev->os = NULL;
-	}
+  if (vdev->os != NULL)
+    {
+      vdev_os_context_free (vdev->os);
+      free (vdev->os);
+      vdev->os = NULL;
+    }
 
-	if (vdev->config != NULL) {
-		vdev_config_free(vdev->config);
-		free(vdev->config);
-		vdev->config = NULL;
-	}
+  if (vdev->config != NULL)
+    {
+      vdev_config_free (vdev->config);
+      free (vdev->config);
+      vdev->config = NULL;
+    }
 
-	vdev_wq_free(&vdev->device_wq);
+  vdev_wq_free (&vdev->device_wq);
 
-	if (vdev->mountpoint != NULL) {
-		free(vdev->mountpoint);
-		vdev->mountpoint = NULL;
-	}
+  if (vdev->mountpoint != NULL)
+    {
+      free (vdev->mountpoint);
+      vdev->mountpoint = NULL;
+    }
 
-	pthread_mutex_destroy(&vdev->reload_lock);
+  pthread_mutex_destroy (&vdev->reload_lock);
 
-	return 0;
+  return 0;
 }

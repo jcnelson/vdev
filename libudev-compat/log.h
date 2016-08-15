@@ -41,6 +41,6 @@
 void log_set_max_level(int level);
 int log_get_max_level(void);
 
-void log_impl( int level, char const* fmt, ... );
-  
+void log_impl(int level, char const *fmt, ...);
+
 #endif
