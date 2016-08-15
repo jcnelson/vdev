@@ -29,7 +29,7 @@
 #ifndef _LIBUDEV_COMPAT_DEVICE_NODES_H_
 #define _LIBUDEV_COMPAT_DEVICE_NODES_H_
 
-int encode_devnode_name(const char *str, char *str_enc, size_t len);
-int whitelisted_char_for_devnode(char c, const char *additional);
+int encode_devnode_name (const char *str, char *str_enc, size_t len);
+int whitelisted_char_for_devnode (char c, const char *additional);
 
 #endif

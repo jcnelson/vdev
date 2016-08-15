@@ -171,46 +171,48 @@ typedef int (*vdev_dirent_loader_at_t) (int, struct dirent * dent, void *);
 
 C_LINKAGE_BEGIN
 // debug functions
-void vdev_set_debug_level(int d);
-void vdev_set_error_level(int e);
-int vdev_get_debug_level();
-int vdev_get_error_level();
-int vdev_enable_syslog();
+void vdev_set_debug_level (int d);
+void vdev_set_error_level (int e);
+int vdev_get_debug_level ();
+int vdev_get_error_level ();
+int vdev_enable_syslog ();
 
 // system functions 
-int vdev_daemonize(void);
-int vdev_subprocess(char const *cmd, char *const env[], char **output,
-		    size_t max_output, int stderr_fd, int *exit_status,
-		    bool use_shell);
-int vdev_log_redirect(char const *logfile_path);
-int vdev_pidfile_write(char const *pidfile_path);
+int vdev_daemonize (void);
+int vdev_subprocess (char const *cmd, char *const env[], char **output,
+		     size_t max_output, int stderr_fd, int *exit_status,
+		     bool use_shell);
+int vdev_log_redirect (char const *logfile_path);
+int vdev_pidfile_write (char const *pidfile_path);
 
 // parser functions 
-int vdev_keyvalue_next(char *keyvalue, char **key, char **value);
-uint64_t vdev_parse_uint64(char const *uint64_str, bool * success);
+int vdev_keyvalue_next (char *keyvalue, char **key, char **value);
+uint64_t vdev_parse_uint64 (char const *uint64_str, bool * success);
 
 // I/O functions 
-ssize_t vdev_read_uninterrupted(int fd, char *buf, size_t len);
-ssize_t vdev_write_uninterrupted(int fd, char const *buf, size_t len);
-int vdev_read_file(char const *path, char *buf, size_t len);
-int vdev_write_file(char const *path, char const *buf, size_t len, int flags,
-		    mode_t mode);
+ssize_t vdev_read_uninterrupted (int fd, char *buf, size_t len);
+ssize_t vdev_write_uninterrupted (int fd, char const *buf, size_t len);
+int vdev_read_file (char const *path, char *buf, size_t len);
+int vdev_write_file (char const *path, char const *buf, size_t len, int flags,
+		     mode_t mode);
 
 // directory I/O
-int vdev_load_all(char const *dir_path, vdev_dirent_loader_t loader, void *cls);
-int vdev_load_all_at(int dirfd, vdev_dirent_loader_at_t loader_at, void *cls);
-int vdev_mkdirs(char const *dirp, int start, mode_t mode);
-int vdev_rmdirs(char const *dirp);
+int vdev_load_all (char const *dir_path, vdev_dirent_loader_t loader,
+		   void *cls);
+int vdev_load_all_at (int dirfd, vdev_dirent_loader_at_t loader_at,
+		      void *cls);
+int vdev_mkdirs (char const *dirp, int start, mode_t mode);
+int vdev_rmdirs (char const *dirp);
 
 // misc 
-char *vdev_fullpath(char const *root, char const *path, char *dest);
-char *vdev_dirname(char const *path, char *dest);
-size_t vdev_basename_len(char const *path);
-char *vdev_basename(char const *path, char *dest);
-unsigned long long int vdev_pthread_self(void);
+char *vdev_fullpath (char const *root, char const *path, char *dest);
+char *vdev_dirname (char const *path, char *dest);
+size_t vdev_basename_len (char const *path);
+char *vdev_basename (char const *path, char *dest);
+unsigned long long int vdev_pthread_self (void);
 
 // setup 
-void vdev_setup_global(void);
+void vdev_setup_global (void);
 
 C_LINKAGE_END
 #endif

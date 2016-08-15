@@ -36,24 +36,26 @@
 
 typedef vector < struct vdev_device_request *>vdev_test_device_list_t;
 
-struct vdev_test_context {
+struct vdev_test_context
+{
 
-	vdev_test_device_list_t *devlist;
+  vdev_test_device_list_t *devlist;
 
-	pthread_mutex_t devlist_lock;
-	sem_t devlist_sem;
+  pthread_mutex_t devlist_lock;
+  sem_t devlist_sem;
 
-	char *events_dir;
+  char *events_dir;
 };
 
-extern "C" {
+extern "C"
+{
 
-	int vdev_os_init(struct vdev_os_context *ctx, void **cls);
-	int vdev_os_start(void *cls);
-	int vdev_os_stop(void *cls);
-	int vdev_os_shutdown(void *cls);
+  int vdev_os_init (struct vdev_os_context *ctx, void **cls);
+  int vdev_os_start (void *cls);
+  int vdev_os_stop (void *cls);
+  int vdev_os_shutdown (void *cls);
 
-	int vdev_os_next_device(struct vdev_device_request *request, void *cls);
+  int vdev_os_next_device (struct vdev_device_request *request, void *cls);
 
 }
 #endif

@@ -2022,7 +2022,7 @@ void sglib___##type##_consistency_check(type *t) {\
 
 #ifndef SGLIB_HASH_TAB_SHIFT_CONSTANT
 #define SGLIB_HASH_TAB_SHIFT_CONSTANT 16381	/* should be a prime */
-						       /* #define SGLIB_HASH_TAB_SHIFT_CONSTANT 536870912*//* for large tables :) */
+																										     /* #define SGLIB_HASH_TAB_SHIFT_CONSTANT 536870912 *//* for large tables :) */
 #endif
 
-#endif				/* _SGLIB__h_ */
+#endif /* _SGLIB__h_ */

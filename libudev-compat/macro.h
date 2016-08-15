@@ -112,25 +112,27 @@
 #define ALIGN4_PTR(p) ((void*) ALIGN4((unsigned long) (p)))
 #define ALIGN8_PTR(p) ((void*) ALIGN8((unsigned long) (p)))
 
-static inline size_t ALIGN_TO(size_t l, size_t ali)
+static inline size_t
+ALIGN_TO (size_t l, size_t ali)
 {
-	return ((l + ali - 1) & ~(ali - 1));
+  return ((l + ali - 1) & ~(ali - 1));
 }
 
 #define ALIGN_TO_PTR(p, ali) ((void*) ALIGN_TO((unsigned long) (p), (ali)))
 
 /* align to next higher power-of-2 (except for: 0 => 0, overflow => 0) */
-static inline unsigned long ALIGN_POWER2(unsigned long u)
+static inline unsigned long
+ALIGN_POWER2 (unsigned long u)
 {
-	/* clz(0) is undefined */
-	if (u == 1)
-		return 1;
+  /* clz(0) is undefined */
+  if (u == 1)
+    return 1;
 
-	/* left-shift overflow is undefined */
-	if (__builtin_clzl(u - 1UL) < 1)
-		return 0;
+  /* left-shift overflow is undefined */
+  if (__builtin_clzl (u - 1UL) < 1)
+    return 0;
 
-	return 1UL << (sizeof(u) * 8 - __builtin_clzl(u - 1UL));
+  return 1UL << (sizeof (u) * 8 - __builtin_clzl (u - 1UL));
 }
 
 #define ELEMENTSOF(x) (sizeof(x)/sizeof((x)[0]))
@@ -313,34 +315,37 @@ static inline unsigned long ALIGN_POWER2(unsigned long u)
                 _i->iov_len = strlen(_s);       \
         } while(false)
 
-static inline size_t IOVEC_TOTAL_SIZE(const struct iovec *i, unsigned n)
+static inline size_t
+IOVEC_TOTAL_SIZE (const struct iovec *i, unsigned n)
 {
-	unsigned j;
-	size_t r = 0;
+  unsigned j;
+  size_t r = 0;
 
-	for (j = 0; j < n; j++)
-		r += i[j].iov_len;
+  for (j = 0; j < n; j++)
+    r += i[j].iov_len;
 
-	return r;
+  return r;
 }
 
-static inline size_t IOVEC_INCREMENT(struct iovec *i, unsigned n, size_t k)
+static inline size_t
+IOVEC_INCREMENT (struct iovec *i, unsigned n, size_t k)
 {
-	unsigned j;
+  unsigned j;
 
-	for (j = 0; j < n; j++) {
-		size_t sub;
+  for (j = 0; j < n; j++)
+    {
+      size_t sub;
 
-		if (_unlikely_(k <= 0))
-			break;
+      if (_unlikely_ (k <= 0))
+	break;
 
-		sub = MIN(i[j].iov_len, k);
-		i[j].iov_len -= sub;
-		i[j].iov_base = (uint8_t *) i[j].iov_base + sub;
-		k -= sub;
-	}
+      sub = MIN (i[j].iov_len, k);
+      i[j].iov_len -= sub;
+      i[j].iov_base = (uint8_t *) i[j].iov_base + sub;
+      k -= sub;
+    }
 
-	return k;
+  return k;
 }
 
 #define VA_FORMAT_ADVANCE(format, ap)                                   \

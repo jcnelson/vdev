@@ -22,27 +22,29 @@
 #include "main.h"
 
 // run! 
-int main(int argc, char **argv)
+int
+main (int argc, char **argv)
 {
 
-	int rc = 0;
-	pid_t pid = 0;
-	struct vdevfs vdev;
+  int rc = 0;
+  pid_t pid = 0;
+  struct vdevfs vdev;
 
-	memset(&vdev, 0, sizeof(struct vdevfs));
+  memset (&vdev, 0, sizeof (struct vdevfs));
 
-	// set up global vdev state
-	rc = vdevfs_init(&vdev, argc, argv);
-	if (rc != 0) {
+  // set up global vdev state
+  rc = vdevfs_init (&vdev, argc, argv);
+  if (rc != 0)
+    {
 
-		vdev_error("vdevfs_init rc = %d\n", rc);
+      vdev_error ("vdevfs_init rc = %d\n", rc);
 
-		exit(1);
-	}
-	// run!
-	rc = vdevfs_main(&vdev, vdev.fuse_argc, vdev.fuse_argv);
+      exit (1);
+    }
+  // run!
+  rc = vdevfs_main (&vdev, vdev.fuse_argc, vdev.fuse_argv);
 
-	vdevfs_shutdown(&vdev);
+  vdevfs_shutdown (&vdev);
 
-	return rc;
+  return rc;
 }

@@ -34,15 +34,15 @@
 #include "test.h"
 #endif
 
-C_LINKAGE_BEGIN int vdev_os_init(struct vdev_os_context *ctx, void **cls);
-int vdev_os_shutdown(void *cls);
+C_LINKAGE_BEGIN int vdev_os_init (struct vdev_os_context *ctx, void **cls);
+int vdev_os_shutdown (void *cls);
 
 // yield the next device
 // return 0 on success
 // return positive to exit successfully
 // return -EAGAIN if vdevd should try again 
 // return negative on fatal error (causes vdevd to exit).
-int vdev_os_next_device(struct vdev_device_request *request, void *cls);
+int vdev_os_next_device (struct vdev_device_request *request, void *cls);
 
 C_LINKAGE_END
 #endif

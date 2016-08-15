@@ -53,71 +53,73 @@
 #define vdev_config_set_OS_quirk( quirk_field, quirk ) quirk_field |= (quirk)
 
 // structure for both file configuration and command-line options
-struct vdev_config {
+struct vdev_config
+{
 
-	// config file path (used by opts)
-	char *config_path;
+  // config file path (used by opts)
+  char *config_path;
 
-	// preseed script 
-	char *preseed_path;
+  // preseed script 
+  char *preseed_path;
 
-	// ACLs directory 
-	char *acls_dir;
+  // ACLs directory 
+  char *acls_dir;
 
-	// actions directory 
-	char *acts_dir;
+  // actions directory 
+  char *acts_dir;
 
-	// helpers directory 
-	char *helpers_dir;
+  // helpers directory 
+  char *helpers_dir;
 
-	// default policy (0 for deny, 1 for allow)
-	int default_policy;
+  // default policy (0 for deny, 1 for allow)
+  int default_policy;
 
-	// debug level
-	int debug_level;
+  // debug level
+  int debug_level;
 
-	// error level 
-	int error_level;
+  // error level 
+  int error_level;
 
-	// PID file path 
-	char *pidfile_path;
+  // PID file path 
+  char *pidfile_path;
 
-	// logfile path (set to "syslog" to send directly to syslog)
-	char *logfile_path;
+  // logfile path (set to "syslog" to send directly to syslog)
+  char *logfile_path;
 
-	// path to where /dev lives 
-	char *mountpoint;
+  // path to where /dev lives 
+  char *mountpoint;
 
-	// coldplug only?
-	bool coldplug_only;
+  // coldplug only?
+  bool coldplug_only;
 
-	// run in the foreground 
-	bool foreground;
+  // run in the foreground 
+  bool foreground;
 
-	// OS-specific configuration (for keys under "OS")
-	vdev_params *os_config;
+  // OS-specific configuration (for keys under "OS")
+  vdev_params *os_config;
 
-	// default permission bits for mknod 
-	mode_t default_mode;
+  // default permission bits for mknod 
+  mode_t default_mode;
 
-	// printable 256-bit instance nonce--randomly generated and unique per execution 
-	char instance_str[VDEV_CONFIG_INSTANCE_NONCE_STRLEN];
+  // printable 256-bit instance nonce--randomly generated and unique per execution 
+  char instance_str[VDEV_CONFIG_INSTANCE_NONCE_STRLEN];
 
-	// bitfield of OS-specific quirks 
-	uint64_t OS_quirks;
+  // bitfield of OS-specific quirks 
+  uint64_t OS_quirks;
 
-	//  help holder
-	char help;
+  //  help holder
+  char help;
 };
 
-C_LINKAGE_BEGIN int vdev_config_init(struct vdev_config *conf);
-int vdev_config_load(char const *path, struct vdev_config *conf);
-int vdev_config_load_file(FILE * file, struct vdev_config *conf);
-int vdev_config_free(struct vdev_config *conf);
-int vdev_config_usage(char const *progname);
-int vdev_config_load_from_args(struct vdev_config *config, int argc,
-			       char **argv, int *fuse_argc, char **fuse_argv);
-int vdev_config_fullpaths(struct vdev_config *config);
+C_LINKAGE_BEGIN int vdev_config_init (struct vdev_config *conf);
+int vdev_config_load (char const *path, struct vdev_config *conf);
+int vdev_config_load_file (FILE * file, struct vdev_config *conf);
+int vdev_config_free (struct vdev_config *conf);
+int vdev_config_usage (char const *progname);
+int vdev_config_load_from_args (struct vdev_config *config, int argc,
+				char **argv, int *fuse_argc,
+				char **fuse_argv);
+int vdev_config_fullpaths (struct vdev_config *config);
 
 C_LINKAGE_END
 #endif

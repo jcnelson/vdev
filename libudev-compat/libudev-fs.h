@@ -66,9 +66,9 @@
 
 #include "libudev-private.h"
 
-int udev_monitor_fs_setup(struct udev_monitor *monitor);
-int udev_monitor_fs_destroy(struct udev_monitor *monitor);
-int udev_monitor_fs_shutdown(struct udev_monitor *monitor);
-int udev_monitor_fs_push_events(struct udev_monitor *monitor);
+int udev_monitor_fs_setup (struct udev_monitor *monitor);
+int udev_monitor_fs_destroy (struct udev_monitor *monitor);
+int udev_monitor_fs_shutdown (struct udev_monitor *monitor);
+int udev_monitor_fs_push_events (struct udev_monitor *monitor);
 
 #endif

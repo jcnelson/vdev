@@ -768,8 +768,8 @@ vdev_device_put_metadata (struct vdev_device_request *req)
 	  // try to update instead
 	  rc = vdev_device_put_metadata_item (base_dir,
 					      VDEV_METADATA_PARAM_INSTANCE,
-					      req->state->
-					      config->instance_str,
+					      req->state->config->
+					      instance_str,
 					      O_WRONLY | O_TRUNC, 0644);
 	}
 
@@ -1079,8 +1079,8 @@ vdev_device_add (struct vdev_device_request *req)
 
 		      // file is not expected to exist
 		      rc = mknod (fp,
-				  req->mode | req->state->
-				  config->default_mode, req->dev);
+				  req->mode | req->state->config->
+				  default_mode, req->dev);
 		    }
 		  else
 		    {

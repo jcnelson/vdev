@@ -41,91 +41,99 @@
 // get drive capabilities from an open device node, using the Linux-specific CDROM_GET_CAPABILITY ioctl.
 // return 0 on success
 // return negative errno on error
-static int stat_optical_get_caps(int fd)
+static int
+stat_optical_get_caps (int fd)
 {
 
-	int caps = 0;
-	int rc = 0;
+  int caps = 0;
+  int rc = 0;
 
-	// get the cpability 
-	caps = ioctl(fd, CDROM_GET_CAPABILITY, NULL);
-	if (caps < 0) {
+  // get the cpability 
+  caps = ioctl (fd, CDROM_GET_CAPABILITY, NULL);
+  if (caps < 0)
+    {
 
-		rc = -errno;
-		fprintf(stderr,
-			"[ERROR] optical: CDROM_GET_CAPABILITY ioctl failed, rc = %d\n",
-			rc);
-		return rc;
-	}
+      rc = -errno;
+      fprintf (stderr,
+	       "[ERROR] optical: CDROM_GET_CAPABILITY ioctl failed, rc = %d\n",
+	       rc);
+      return rc;
+    }
 
-	return caps;
+  return caps;
 }
 
 // print out optical capabilities as environment variables 
-static int stat_optical_print_caps(int capabilities)
+static int
+stat_optical_print_caps (int capabilities)
 {
 
-	vdev_property_add("VDEV_OPTICAL_CD_R",
-			  (capabilities & CDC_CD_R) == 0 ? "0" : "1");
-	vdev_property_add("VDEV_OPTICAL_CD_RW",
-			  (capabilities & CDC_CD_R) == 0 ? "0" : "1");
-	vdev_property_add("VDEV_OPTICAL_DVD",
-			  (capabilities & CDC_DVD) == 0 ? "0" : "1");
-	vdev_property_add("VDEV_OPTICAL_DVD_R",
-			  (capabilities & CDC_DVD_R) == 0 ? "0" : "1");
-	vdev_property_add("VDEV_OPTICAL_DVD_RAM",
-			  (capabilities & CDC_DVD_RAM) == 0 ? "0" : "1");
+  vdev_property_add ("VDEV_OPTICAL_CD_R",
+		     (capabilities & CDC_CD_R) == 0 ? "0" : "1");
+  vdev_property_add ("VDEV_OPTICAL_CD_RW",
+		     (capabilities & CDC_CD_R) == 0 ? "0" : "1");
+  vdev_property_add ("VDEV_OPTICAL_DVD",
+		     (capabilities & CDC_DVD) == 0 ? "0" : "1");
+  vdev_property_add ("VDEV_OPTICAL_DVD_R",
+		     (capabilities & CDC_DVD_R) == 0 ? "0" : "1");
+  vdev_property_add ("VDEV_OPTICAL_DVD_RAM",
+		     (capabilities & CDC_DVD_RAM) == 0 ? "0" : "1");
 
-	vdev_property_print();
-	vdev_property_free_all();
+  vdev_property_print ();
+  vdev_property_free_all ();
 
-	return 0;
+  return 0;
 }
 
 // usage statement
-static int usage(char const *prog_name)
+static int
+usage (char const *prog_name)
 {
 
-	fprintf(stderr, "[ERROR] %s: Usage: %s /path/to/optical/device\n",
-		prog_name, prog_name);
-	return 0;
+  fprintf (stderr, "[ERROR] %s: Usage: %s /path/to/optical/device\n",
+	   prog_name, prog_name);
+  return 0;
 }
 
 // entry point 
-int main(int argc, char **argv)
+int
+main (int argc, char **argv)
 {
 
-	int rc = 0;
-	int fd = 0;
-	int capabilities = 0;
+  int rc = 0;
+  int fd = 0;
+  int capabilities = 0;
 
-	if (argc != 2) {
+  if (argc != 2)
+    {
 
-		usage(argv[0]);
-		exit(1);
-	}
-	// get the device node 
-	fd = open(argv[1], O_RDONLY | O_NONBLOCK);
-	if (fd < 0) {
+      usage (argv[0]);
+      exit (1);
+    }
+  // get the device node 
+  fd = open (argv[1], O_RDONLY | O_NONBLOCK);
+  if (fd < 0)
+    {
 
-		rc = -errno;
-		fprintf(stderr, "[ERROR] %s: open('%s') rc = %d\n", argv[0],
-			argv[1], rc);
-		exit(2);
-	}
+      rc = -errno;
+      fprintf (stderr, "[ERROR] %s: open('%s') rc = %d\n", argv[0],
+	       argv[1], rc);
+      exit (2);
+    }
 
-	capabilities = stat_optical_get_caps(fd);
+  capabilities = stat_optical_get_caps (fd);
 
-	close(fd);
+  close (fd);
 
-	if (capabilities < 0) {
+  if (capabilities < 0)
+    {
 
-		fprintf(stderr,
-			"[ERROR] %s: stat_optical_get_caps('%s') rc = %d\n",
-			argv[0], argv[1], rc);
-		exit(4);
-	}
+      fprintf (stderr,
+	       "[ERROR] %s: stat_optical_get_caps('%s') rc = %d\n",
+	       argv[0], argv[1], rc);
+      exit (4);
+    }
 
-	stat_optical_print_caps(capabilities);
-	return 0;
+  stat_optical_print_caps (capabilities);
+  return 0;
 }
