@@ -1,4 +1,6 @@
 #!/bin/sh -e
+# posix shell or maybe dash only
+#debug# set -x
 
 PREREQS=""
 
@@ -11,29 +13,41 @@ case "$1" in
     ;;
 esac
 
-. /usr/share/initramfs-tools/hook-functions
+. /usr/share/initramfs-tools/hook-functions 
+
+# Needed for keyboard or most mice
+# see: /dev/input/*
+
+force_load evdev
+if [ $? != 0 ]; then
+    echo "WARNING:[Xorg] eventfs _may_ not present X with keyboard or mouse devices"
+    sleep 2;
+fi
 
 # helper programs
-mkdir -p $DESTDIR/lib/vdev
-for prog in /lib/vdev/*; do
 
+mkdir -vp $DESTDIR/lib/vdev 
+
+for prog in /lib/vdev/*; do
    # shell script or library?
    if [ -z "${prog#*.sh}" ]; then 
-
       cp -a $prog $DESTDIR/lib/vdev/
    else
-
       # binary?
       if [ -f $prog -a -x $prog ]; then 
-
          copy_exec $prog /lib/vdev
       fi
    fi
 done
 
+# libudev-compat
+if [ -f /lib/libudev.so.1 ] ; then
+    copy_exec /lib/libudev.so.1
+fi
+
 # config 
-mkdir -p $DESTDIR/etc/vdev
-cp -a /etc/vdev/* $DESTDIR/etc/vdev/
+mkdir -pv $DESTDIR/etc/vdev
+cp -avf /etc/vdev/* $DESTDIR/etc/vdev/
 
 # the daemon itself 
 copy_exec /sbin/vdevd
@@ -42,39 +56,51 @@ copy_exec /sbin/vdevd
 if [ -f /sbin/blkid ]; then 
    copy_exec /sbin/blkid
 else
-   echo "WARN: could not find blkid in /sbin/blkid.  /dev/disk symlinks will not be created."
+    echo "WARN: could not find blkid in /sbin/blkid."
+    echo "      /dev/disk symlinks will not be created."
 fi
 
 # lvm tools (needed by vdevd's helpers)
 if [ -f /sbin/lvs ]; then
    copy_exec /sbin/lvs
 else
-   echo "WARN: could not find lvs in /sbin/lvs.  Logical volume symlinks will not be created."
+    echo "WARN: could not find lvs in /sbin/lvs."
+    echo "    Logical volume symlinks will not be created."
 fi
 
 if [ -f /sbin/pvs ]; then 
    copy_exec /sbin/pvs
 else
-   echo "WARN: could not find pvs in /sbin/pvs.  Physical volume symlinks will not be created."
+   echo "WARN: could not find pvs in /sbin/pvs."
+   echo "    Physical volume symlinks will not be created."
 fi
 
 if [ -f /sbin/lvm ]; then 
    copy_exec /sbin/lvm
 else
-   echo "WARN: could not find lvm in /sbin/lvm.  Logical volume symlinks will not be created."
+    echo "WARN: could not find lvm in /sbin/lvm."
+    echo "    Logical volume symlinks will not be created."
+fi
+#
+# network tools (needed by vdevd's helpers)
+# busy box may provide alternatives
+# for human uses. (?)
+#
+if ! [ -f /sbin/ip ] && ! [ -f /bin/ip ]; then 
+    echo "WARN: could not find iproute2 in /bin/ip or /sbin/ip."
+    echo "    Networking may not be available"
 fi
 
-# network tools (needed by vdevd's helpers)
 if [ -f /bin/ip ]; then
    copy_exec /bin/ip
 fi
 
 if [ -f /sbin/ip ]; then 
    copy_exec /sbin/ip
-fi
-
-if ! [ -f /sbin/ip ] && ! [ -f /bin/ip ]; then 
-   echo "WARN: could not find iproute2 in /bin/ip or /sbin/ip.  Network interfaces will not be configured."
+else [ -f /sbin/ifconfig ]; then
+# try the classical tool
+    copy_exec /sbin/ifconfig 
+    echo "NOTE: installing /sbin/ifconfig as networking tool"
 fi
 
 # SELinux tools
@@ -83,23 +109,31 @@ if [ -f /sbin/restorecon ]; then
 fi
 
 # device tools
+# prefer most current 
 if [ -f /sbin/MAKEDEV ]; then 
-   copy_exec /sbin/MAKEDEV || true
+    copy_exec /sbin/MAKEDEV
+else
+    echo "WARNING: No MAKEDEV found to install"
+    echo "vdev --once  may be your best alternative"
 fi
 
 # device mapper tools
 if [ -f /sbin/dmsetup ]; then 
    copy_exec /sbin/dmsetup 
 else
-   echo "WARN: could not find dmsetup in /sbin/dmsetup.  Device mapper symlinks will not be created."
+    echo "WARN: could not find dmsetup in /sbin/dmsetup."
+    echo "   Device mapper symlinks will not be created."
 fi
 
 # hardware database 
 if [ -f /lib/vdev/hwdb/hwdb.squashfs ]; then 
+   copy_exec /sbin/losetup
    mkdir -p $DESTDIR/lib/vdev/hwdb
    cp -a /lib/vdev/hwdb/hwdb.squashfs $DESTDIR/lib/vdev/hwdb
 else
-   echo "WARN: could not find hardware database in /lib/vdev/hwdb.  Some hardware metadata may not be generated."
+    echo "WARN: could not find hardware database in /lib/vdev/hwdb."
+    echo "Some hardware metadata may not be generated."
+    sleep 2
 fi
 
 # GNU tools (not the busybox equivalents)
@@ -112,19 +146,42 @@ copy_exec /bin/egrep
 copy_exec /bin/kmod 
 
 # users and groups databases
-cp -a /etc/passwd $DESTDIR/etc/passwd
-cp -a /etc/group $DESTDIR/etc/group
+cp -va /etc/passwd $DESTDIR/etc/passwd
+cp -va /etc/group $DESTDIR/etc/group
 
-# extra libc goodies 
-copy_exec /lib/x86_64-linux-gnu/libc.so.6
-copy_exec /lib/x86_64-linux-gnu/libnss_compat.so.2
-copy_exec /lib/x86_64-linux-gnu/libnsl.so.1
-copy_exec /lib/x86_64-linux-gnu/libnss_nis.so.2
-copy_exec /lib/x86_64-linux-gnu/libnss_files.so.2
+#
+# extra libc goodies
+# Falling to i386 if i686 is the uname machine type
+# and the i686 libc version is not found.
+# 
+#
+if [ -d /lib/$(arch)-linux-gnu ]; then
+    LIBC=/lib/$(arch)-linux-gnu
+elif [ -d /lib/i386-linux-gnu ]; then
+    LIBC=/lib/i386-linux-gnu
+else
+    # make noise and trigger -e if set
+    echo "Unable to find libc shared object files for $(arch)"
+    sleep 1
+    echo "Please check dependancies or package install order"
+    sleep 2
+    /bin/false
+fi
 
-# since vdevd is multi-threaded, libpthread will dynamically load libgcc_s
+copy_exec $LIBC/libc.so.6 || echo "$LIBC/libc.so.6 (still) not found"  
+copy_exec $LIBC/libnss_compat.so.2 
+copy_exec $LIBC/libnsl.so.1
+copy_exec $LIBC/libnss_nis.so.2
+copy_exec $LIBC/libnss_files.so.2
+#
+# since vdevd is multi-threaded,
+# libpthread will need to dynamically load libgcc_s
 # (and copy_exec won't detect this)
-copy_exec /lib/`gcc -print-multiarch`/libgcc_s.so.1
+#
+copy_exec $LIBC/libgcc_s.so.1 || echo "libpthread needs libgcc_s"
 
 # until we're confident that the scripts work with busybox's sh, use dash
 copy_exec /bin/dash
+
+# be polite
+exit 

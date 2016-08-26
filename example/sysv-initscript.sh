@@ -3,8 +3,8 @@
 # Provides:          udev
 # Required-Start:    mountkernfs 
 # Required-Stop:     
-# Default-Start:     S
-# Default-Stop:
+# Default-Start:     S 
+# Default-Stop:      
 # Short-Description: Start vdevd, populate /dev and load drivers.
 ### END INIT INFO
 
@@ -33,7 +33,7 @@ source_ini_file() {
    
    FILE_PATH=$1
    NAMESPACE=$2
-   
+   # convert [ini style header] to ""
    /bin/cat $FILE_PATH | /bin/sed "s/.*\[.*\].*//g" | \
    while read line; do 
    
@@ -41,8 +41,7 @@ source_ini_file() {
       VALUE=$(echo $line | /bin/sed "s/^.*=\(.*\)$/\1/g");
       
       if [ -n "$KEY" ]; then 
-      
-         echo "${NAMESPACE}${KEY}=${VALUE}"
+          echo "${NAMESPACE}${KEY}=${VALUE}"
       fi
    done
 }
@@ -79,7 +78,7 @@ eval $(source_ini_file $VDEV_CONFIG "vdev_config_")
 # config sanity check 
 if [ -z "$vdev_config_pidfile" ]; then 
    log_warning_msg "No PID file defined in $VDEV_CONFIG.  Please set the pidfile= directive."
-   log_warning_msg "You will be unable stop or restart vdevd with this script."
+   log_warning_msg "You will be unable control vdevd with this init script."
 fi
 
 
@@ -119,12 +118,13 @@ vdevd_start() {
    
    # start vdev
    if "$VDEV_BIN" -c "$VDEV_CONFIG" $@ "$VDEV_MOUNTPOINT"; then
-      log_end_msg $?
-   
+       log_end_msg $?
+       
    else
-      log_warning_msg $?
-      log_warning_msg "Waiting 15 seconds and trying to continue anyway"
-      sleep 15
+       log_warning_msg $?
+       log_warning_msg "Errors when starting \"$VDEV_BIN\" -c \"$VDEV_CONFIG\" "
+       log_warning_msg "Waiting 15 seconds and trying to continue anyway"
+       sleep 15
    fi
    
    return 0

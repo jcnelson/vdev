@@ -39,89 +39,102 @@
 
 #include "common.h"
 
-int main(int argc, char *argv[]) {
-   static const struct option options[] = {
-      { "help", no_argument, NULL, 'h' },
-      {}
-   };
-   
-   int fd = 0;
-   char *device;
-   struct v4l2_capability v2cap;
-   char cap_str[4097];
-   
-   memset( cap_str, 0, 4097 );
+int
+main (int argc, char *argv[])
+{
+  static const struct option options[] = {
+    {"help", no_argument, NULL, 'h'},
+    {}
+  };
 
-   for (;;) {
+  int fd = 0;
+  char *device;
+  struct v4l2_capability v2cap;
+  char cap_str[4097];
+
+  memset (cap_str, 0, 4097);
+
+  for (;;)
+    {
       int option;
 
-      option = getopt_long(argc, argv, "h", options, NULL);
-      if (option == -1) {
-         break;
-      }
+      option = getopt_long (argc, argv, "h", options, NULL);
+      if (option == -1)
+	{
+	  break;
+	}
 
-      switch (option) {
-      case 'h':
-         printf("%s [-h,--help] <device file>\n\n"
-                  "Video4Linux device identification.\n\n"
-                  "  -h  Print this message\n"
-                  , argv[0]);
-         return 0;
-      default:
-         return 1;
-      }
-   }
-   
-   device = argv[optind];
+      switch (option)
+	{
+	case 'h':
+	  printf ("%s [-h,--help] <device file>\n\n"
+		  "Video4Linux device identification.\n\n"
+		  "  -h  Print this message\n", argv[0]);
+	  return 0;
+	default:
+	  return 1;
+	}
+    }
 
-   if (device == NULL) {
+  device = argv[optind];
+
+  if (device == NULL)
+    {
       return 2;
-   }
-   
-   fd = open(device, O_RDONLY);
-   if (fd < 0) {
+    }
+
+  fd = open (device, O_RDONLY);
+  if (fd < 0)
+    {
       return 3;
-   }
+    }
 
-   if (ioctl(fd, VIDIOC_QUERYCAP, &v2cap) == 0) {
-      
-      vdev_property_add("VDEV_V4L_VERSION", "2");
-      vdev_property_add("VDEV_V4L_PRODUCT", (char*)v2cap.card );
-      
-      strcat( cap_str, ":" );
-      
-      if ((v2cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) > 0) {
-         
-         strcat( cap_str, "capture:" );
-      }
-      if ((v2cap.capabilities & V4L2_CAP_VIDEO_OUTPUT) > 0) {
-         
-         strcat( cap_str, "video_output:" );
-      }
-      if ((v2cap.capabilities & V4L2_CAP_VIDEO_OVERLAY) > 0) {
-         
-         strcat( cap_str, "video_overlay:" );
-      }
-      if ((v2cap.capabilities & V4L2_CAP_AUDIO) > 0) {
-         
-         strcat( cap_str, "audio:" );
-      }
-      if ((v2cap.capabilities & V4L2_CAP_TUNER) > 0) {
-         
-         strcat( cap_str, "tuner:" );
-      }
-      if ((v2cap.capabilities & V4L2_CAP_RADIO) > 0) {
-         
-         strcat( cap_str, "radio:" );
-      }
-      
-      vdev_property_add( "VDEV_V4L_CAPABILITIES", cap_str );
-   }
+  if (ioctl (fd, VIDIOC_QUERYCAP, &v2cap) == 0)
+    {
 
-   close( fd );
-   
-   vdev_property_print();
-   vdev_property_free_all();
-   
-   return 0;
+      vdev_property_add ("VDEV_V4L_VERSION", "2");
+      vdev_property_add ("VDEV_V4L_PRODUCT", (char *) v2cap.card);
+
+      strcat (cap_str, ":");
+
+      if ((v2cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) > 0)
+	{
+
+	  strcat (cap_str, "capture:");
+	}
+      if ((v2cap.capabilities & V4L2_CAP_VIDEO_OUTPUT) > 0)
+	{
+
+	  strcat (cap_str, "video_output:");
+	}
+      if ((v2cap.capabilities & V4L2_CAP_VIDEO_OVERLAY) > 0)
+	{
+
+	  strcat (cap_str, "video_overlay:");
+	}
+      if ((v2cap.capabilities & V4L2_CAP_AUDIO) > 0)
+	{
+
+	  strcat (cap_str, "audio:");
+	}
+      if ((v2cap.capabilities & V4L2_CAP_TUNER) > 0)
+	{
+
+	  strcat (cap_str, "tuner:");
+	}
+      if ((v2cap.capabilities & V4L2_CAP_RADIO) > 0)
+	{
+
+	  strcat (cap_str, "radio:");
+	}
+
+      vdev_property_add ("VDEV_V4L_CAPABILITIES", cap_str);
+    }
+
+  close (fd);
+
+  vdev_property_print ();
+  vdev_property_free_all ();
+
+  return 0;
 }

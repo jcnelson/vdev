@@ -25,17 +25,17 @@
 
 #ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 200809L
-#endif 
+#endif
 
 #ifndef _XOPEN_SOURCE
 #define _XOPEN_SOURCE 700
-#endif 
+#endif
 
 #ifndef _BSD_SOURCE
 #define _BSD_SOURCE
 #endif
 
-#ifndef _GNU_SOURCE 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
 
@@ -66,9 +66,9 @@
 
 #include "libudev-private.h"
 
-int udev_monitor_fs_setup( struct udev_monitor* monitor );
-int udev_monitor_fs_destroy( struct udev_monitor* monitor );
-int udev_monitor_fs_shutdown( struct udev_monitor* monitor );
-int udev_monitor_fs_push_events( struct udev_monitor* monitor );
+int udev_monitor_fs_setup (struct udev_monitor *monitor);
+int udev_monitor_fs_destroy (struct udev_monitor *monitor);
+int udev_monitor_fs_shutdown (struct udev_monitor *monitor);
+int udev_monitor_fs_push_events (struct udev_monitor *monitor);
 
 #endif

@@ -26,15 +26,14 @@
 
 #include <regex.h>
 
+C_LINKAGE_BEGIN int vdev_match_regex_init (regex_t * regex, char const *str);
+int vdev_match_regex_append (char ***strings, regex_t ** regexes,
+			     size_t * len, char const *next);
+int vdev_match_regexes_free (char **regex_strs, regex_t * regexes,
+			     size_t len);
+int vdev_match_regex (char const *path, regex_t * regex);
+int vdev_match_first_regex (char const *path, regex_t * regexes,
+			    size_t num_regexes);
 
-C_LINKAGE_BEGIN
-
-int vdev_match_regex_init( regex_t* regex, char const* str );
-int vdev_match_regex_append( char*** strings, regex_t** regexes, size_t* len, char const* next );
-int vdev_match_regexes_free( char** regex_strs, regex_t* regexes, size_t len );
-int vdev_match_regex( char const* path, regex_t* regex );
-int vdev_match_first_regex( char const* path, regex_t* regexes, size_t num_regexes );
-   
 C_LINKAGE_END
-
-#endif 
+#endif

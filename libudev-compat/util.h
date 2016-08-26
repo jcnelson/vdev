@@ -56,7 +56,7 @@
 #include <string.h>
 #include <errno.h>
 #include <syslog.h>
-#include <sys/syscall.h>        // for gettid()
+#include <sys/syscall.h>	// for gettid()
 
 #include "log.h"
 
@@ -83,7 +83,7 @@
 
 #define streq(a,b) (strcmp((a),(b)) == 0)
 
-bool streq_ptr(const char *a, const char *b);
+bool streq_ptr (const char *a, const char *b);
 
 #define strneq(a, b, n) (strncmp((a), (b), (n)) == 0)
 
@@ -136,9 +136,10 @@ struct file_handle
 };
 #endif
 
-union file_handle_union {
-        struct file_handle handle;
-        char padding[sizeof(struct file_handle) + MAX_HANDLE_SZ];
+union file_handle_union
+{
+  struct file_handle handle;
+  char padding[sizeof (struct file_handle) + MAX_HANDLE_SZ];
 };
 #define FILE_HANDLE_INIT { .handle.handle_bytes = MAX_HANDLE_SZ }
 
@@ -150,20 +151,24 @@ union file_handle_union {
                         }                                       \
                         break;                                  \
                 } else
-                   
 
-static inline size_t ALIGN_TO(size_t l, size_t ali) {
-   return ((l + ali - 1) & ~(ali - 1));
+static inline size_t
+ALIGN_TO (size_t l, size_t ali)
+{
+  return ((l + ali - 1) & ~(ali - 1));
 }
 
-size_t page_size(void) _pure_;
+size_t
+page_size (void)
+  _pure_;
 #define PAGE_ALIGN(l) ALIGN_TO((l), page_size())
-                   
+
 ////////// reference counting 
 
-typedef struct {
-        volatile unsigned _value;
-} RefCount;
+     typedef struct
+     {
+       volatile unsigned _value;
+     } RefCount;
 
 #define REFCNT_GET(r) ((r)._value)
 #define REFCNT_INC(r) (__sync_add_and_fetch(&(r)._value, 1))
@@ -173,8 +178,8 @@ typedef struct {
 
 ////////// time functions 
 
-typedef uint64_t usec_t;
-typedef uint64_t nsec_t;
+     typedef uint64_t usec_t;
+     typedef uint64_t nsec_t;
 
 #define NSEC_FMT "%" PRIu64
 #define USEC_FMT "%" PRIu64
@@ -189,20 +194,21 @@ typedef uint64_t nsec_t;
 #define NSEC_PER_MSEC ((nsec_t) 1000000ULL)
 #define NSEC_PER_USEC ((nsec_t) 1000ULL)
 
-usec_t now(clockid_t clock);
-usec_t timespec_load(const struct timespec *ts);
-struct timespec *timespec_store(struct timespec *ts, usec_t u);
+     usec_t now (clockid_t clock);
+     usec_t timespec_load (const struct timespec *ts);
+     struct timespec *timespec_store (struct timespec *ts, usec_t u);
 
 ////////// string functions 
 
-static inline char *startswith(const char *s, const char *prefix) {
-        size_t l;
+     static inline char *startswith (const char *s, const char *prefix)
+{
+  size_t l;
 
-        l = strlen(prefix);
-        if (strncmp(s, prefix, l) == 0)
-                return (char*) s + l;
+  l = strlen (prefix);
+  if (strncmp (s, prefix, l) == 0)
+    return (char *) s + l;
 
-        return NULL;
+  return NULL;
 }
 
 #define strjoina(a, ...)                                                \
@@ -230,17 +236,18 @@ static inline char *startswith(const char *s, const char *prefix) {
             sizeof(type) <= 4 ? 10 :                                    \
             sizeof(type) <= 8 ? 20 : sizeof(int[-2*(sizeof(type) > 8)])))
 
-char* dirname_malloc(const char *path);
-char hexchar(int x) _const_;
-int unhexchar(char c) _const_;
+char *dirname_malloc (const char *path);
+char
+hexchar (int x)
+  _const_;
+     int unhexchar (char c) _const_;
 
 #define NULSTR_FOREACH(i, l)                                    \
         for ((i) = (l); (i) && *(i); (i) = strchr((i), 0)+1)
 
 #define STRV_FOREACH(s, l)                      \
         for ((s) = (l); (s) && *(s); (s)++)
-           
-           
+
 //////////// memory functions
 
 #define _cleanup_(x) __attribute__((cleanup(x)))
@@ -252,11 +259,10 @@ int unhexchar(char c) _const_;
         }                                                       \
         struct __useless_struct_to_allow_trailing_semicolon__
 
-
-DEFINE_TRIVIAL_CLEANUP_FUNC(FILE*, fclose);
-DEFINE_TRIVIAL_CLEANUP_FUNC(FILE*, pclose);
-DEFINE_TRIVIAL_CLEANUP_FUNC(DIR*, closedir);
-DEFINE_TRIVIAL_CLEANUP_FUNC(FILE*, endmntent);
+DEFINE_TRIVIAL_CLEANUP_FUNC (FILE *, fclose);
+DEFINE_TRIVIAL_CLEANUP_FUNC (FILE *, pclose);
+DEFINE_TRIVIAL_CLEANUP_FUNC (DIR *, closedir);
+DEFINE_TRIVIAL_CLEANUP_FUNC (FILE *, endmntent);
 
 #define _cleanup_free_ _cleanup_(freep)
 #define _cleanup_close_ _cleanup_(closep)
@@ -268,20 +274,23 @@ DEFINE_TRIVIAL_CLEANUP_FUNC(FILE*, endmntent);
 #define _cleanup_endmntent_ _cleanup_(endmntentp)
 #define _cleanup_close_pair_ _cleanup_(close_pairp)
 
-_malloc_  _alloc_(1, 2) static inline void *malloc_multiply(size_t a, size_t b) {
-        if (_unlikely_(b != 0 && a > ((size_t) -1) / b))
-                return NULL;
+     _malloc_ _alloc_ (1, 2)
+     static inline void *malloc_multiply (size_t a, size_t b)
+{
+  if (_unlikely_ (b != 0 && a > ((size_t) - 1) / b))
+    return NULL;
 
-        return malloc(a * b);
+  return malloc (a * b);
 }
 
-_alloc_(2, 3) static inline void *realloc_multiply(void *p, size_t a, size_t b) {
-        if (_unlikely_(b != 0 && a > ((size_t) -1) / b))
-                return NULL;
+_alloc_ (2, 3)
+     static inline void *realloc_multiply (void *p, size_t a, size_t b)
+{
+  if (_unlikely_ (b != 0 && a > ((size_t) - 1) / b))
+    return NULL;
 
-        return realloc(p, a * b);
+  return realloc (p, a * b);
 }
-
 
 ////////// sanity checks
 
@@ -293,21 +302,19 @@ _alloc_(2, 3) static inline void *realloc_multiply(void *p, size_t a, size_t b) 
                 }                                                       \
         } while (false)
 
-
 #define assert_se(expr)                                                 \
         do {                                                            \
                 if (_unlikely_(!(expr)))                                \
                         log_error("Assertion failure: '%s'", #expr); \
-        } while (false)  
-      
-        
+        } while (false)
+
 #define DISABLE_WARNING_DECLARATION_AFTER_STATEMENT                     \
         _Pragma("GCC diagnostic push");                                 \
         _Pragma("GCC diagnostic ignored \"-Wdeclaration-after-statement\"")
-        
+
 #define REENABLE_WARNING                                                \
         _Pragma("GCC diagnostic pop")
-        
+
 #if defined(static_assert)
 /* static_assert() is sometimes defined in a way that trips up
  * -Wdeclaration-after-statement, hence let's temporarily turn off
@@ -329,7 +336,7 @@ _alloc_(2, 3) static inline void *realloc_multiply(void *p, size_t a, size_t b) 
         do {                                                            \
                 log_error("Not reached: %s", t); \
         } while (false)
-        
+
 ////////// type functions 
 
 #define MIN( a, b ) ((a) < (b) ? (a) : (b))
@@ -350,50 +357,58 @@ _alloc_(2, 3) static inline void *realloc_multiply(void *p, size_t a, size_t b) 
 
 ///////// misc inline functions 
 
-
 /**
  * Normal qsort requires base to be nonnull. Here were require
  * that only if nmemb > 0.
  */
-static inline void qsort_safe(void *base, size_t nmemb, size_t size,
-                              int (*compar)(const void *, const void *)) {
-        if (nmemb) {
-                assert(base);
-                qsort(base, nmemb, size, compar);
-        }
+static inline void
+qsort_safe (void *base, size_t nmemb, size_t size,
+	    int (*compar) (const void *, const void *))
+{
+  if (nmemb)
+    {
+      assert (base);
+      qsort (base, nmemb, size, compar);
+    }
 }
 
-static inline void *mempset(void *s, int c, size_t n) {
-        memset(s, c, n);
-        return (uint8_t*)s + n;
+static inline void *
+mempset (void *s, int c, size_t n)
+{
+  memset (s, c, n);
+  return (uint8_t *) s + n;
 }
 
-static inline unsigned log2u(unsigned x) {
-        assert(x > 0);
+static inline unsigned
+log2u (unsigned x)
+{
+  assert (x > 0);
 
-        return sizeof(unsigned) * 8 - __builtin_clz(x) - 1;
+  return sizeof (unsigned) * 8 - __builtin_clz (x) - 1;
 }
 
-static inline unsigned log2u_round_up(unsigned x) {
-        assert(x > 0);
+static inline unsigned
+log2u_round_up (unsigned x)
+{
+  assert (x > 0);
 
-        if (x == 1)
-                return 0;
+  if (x == 1)
+    return 0;
 
-        return log2u(x - 1) + 1;
+  return log2u (x - 1) + 1;
 }
 
 ///////// misc functions 
-int chmod_and_chown(const char *path, mode_t mode, uid_t uid, gid_t gid);
-int is_dir(const char *path, bool follow);
-int close_nointr(int fd);
-int flush_fd(int fd);
-int safe_close(int fd);
+int chmod_and_chown (const char *path, mode_t mode, uid_t uid, gid_t gid);
+int is_dir (const char *path, bool follow);
+int close_nointr (int fd);
+int flush_fd (int fd);
+int safe_close (int fd);
 
-int dev_urandom(void *p, size_t n);
-void initialize_srand(void);
-void random_bytes(void *p, size_t n);
+int dev_urandom (void *p, size_t n);
+void initialize_srand (void);
+void random_bytes (void *p, size_t n);
 
-bool is_main_thread(void);
+bool is_main_thread (void);
 
 #endif

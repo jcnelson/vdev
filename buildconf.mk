@@ -22,7 +22,7 @@ INCLUDEDIR     ?= $(INCLUDE_PREFIX)/include
 ETCDIR         ?= $(PREFIX)/etc
 ETCDIR_VDEV    ?= $(ETCDIR)/vdev
 SHAREDIR       ?= $(PREFIX)/share
-PKGCONFIG	   ?= $(INCLUDE_PREFIX)/share/pkgconfig
+PKGCONFIG      ?= $(INCLUDE_PREFIX)/share/pkgconfig
 RUNDIR         ?= $(PREFIX)/run
 RUNDIR_VDEV    ?= $(RUNDIR)/vdev
 LOGDIR         ?= $(PREFIX)/var/log
@@ -68,8 +68,12 @@ BUILD_HWDB := $(BUILD_LIBDIR)/vdev/hwdb
 BUILD_HWDB_DIRS := $(BUILD_HWDB)
 INSTALL_HWDB := $(DESTDIR)$(LIBDIR)/vdev/hwdb
 
-# compiler
-CFLAGS     := -Wall -std=c99 -g -fPIC -fstack-protector -fstack-protector-all -pthread -Wno-unused-variable -Wno-unused-but-set-variable
+# compiler original settings
+#CFLAGS     := -Wall -std=c99 -g -fPIC -fstack-protector -fstack-protector-all -pthread -Wno-unused-variable -Wno-unused-but-set-variable
+# compiler : headers also set some C standards though perhaps boiler plate ?
+# noiser settings for hair shirted types and deeper testing and analysis.
+CFLAGS     := -g -fPIC -fstack-protector -fstack-protector-all -pthread\
+ -Wall -Wextra  -std=c11 #-pedantic-errors 
 LDFLAGS    :=
 INC      := -I. -I$(ROOT_DIR) -I$(BUILD_INCLUDEDIR)
 DEFS     := -D_THREAD_SAFE -D__STDC_FORMAT_MACROS -D_VDEV_OS_$(OS) -D_XOPEN_SOURCE=700

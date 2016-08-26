@@ -35,7 +35,7 @@
 
 // Other compilers
 
-#else	// defined(_MSC_VER)
+#else // defined(_MSC_VER)
 
 #define BIG_CONSTANT(x) (x##LLU)
 
@@ -43,7 +43,8 @@
 
 //-----------------------------------------------------------------------------
 
-uint32_t MurmurHash2 ( const void * key, int len, uint32_t seed )
+uint32_t
+MurmurHash2 (const void *key, int len, uint32_t seed)
 {
   // 'm' and 'r' are mixing constants generated offline.
   // They're not really 'magic', they just happen to work well.
@@ -57,32 +58,35 @@ uint32_t MurmurHash2 ( const void * key, int len, uint32_t seed )
 
   // Mix 4 bytes at a time into the hash
 
-  const unsigned char * data = (const unsigned char *)key;
+  const unsigned char *data = (const unsigned char *) key;
 
-  while(len >= 4)
-  {
-    uint32_t k = *(uint32_t*)data;
+  while (len >= 4)
+    {
+      uint32_t k = *(uint32_t *) data;
 
-    k *= m;
-    k ^= k >> r;
-    k *= m;
+      k *= m;
+      k ^= k >> r;
+      k *= m;
 
-    h *= m;
-    h ^= k;
+      h *= m;
+      h ^= k;
 
-    data += 4;
-    len -= 4;
-  }
+      data += 4;
+      len -= 4;
+    }
 
   // Handle the last few bytes of the input array
 
-  switch(len)
-  {
-  case 3: h ^= data[2] << 16;
-  case 2: h ^= data[1] << 8;
-  case 1: h ^= data[0];
+  switch (len)
+    {
+    case 3:
+      h ^= data[2] << 16;
+    case 2:
+      h ^= data[1] << 8;
+    case 1:
+      h ^= data[0];
       h *= m;
-  };
+    };
 
   // Do a few final mixes of the hash to ensure the last few
   // bytes are well-incorporated.

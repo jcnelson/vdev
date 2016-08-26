@@ -38,9 +38,9 @@
 #define log_debug( fmt, ... ) log_impl( LOG_DEBUG, LIBUDEV_COMPAT_WHERESTR fmt "\n", (int)getpid(), __FILE__, __LINE__, __func__, __VA_ARGS__ )
 #define log_error( fmt, ... ) log_impl( LOG_ERR, LIBUDEV_COMPAT_WHERESTR fmt "\n", (int)getpid(), __FILE__, __LINE__, __func__, __VA_ARGS__ )
 
-void log_set_max_level(int level);
-int log_get_max_level(void);
+void log_set_max_level (int level);
+int log_get_max_level (void);
 
-void log_impl( int level, char const* fmt, ... );
-  
+void log_impl (int level, char const *fmt, ...);
+
 #endif
