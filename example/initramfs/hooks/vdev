@@ -1,6 +1,6 @@
 #!/bin/sh -e
-
-## set -x
+# posix shell or maybe dash only
+#debug# set -x
 
 PREREQS=""
 
@@ -15,16 +15,20 @@ esac
 
 . /usr/share/initramfs-tools/hook-functions 
 
-# Needed for keyboard
+# Needed for keyboard or most mice
+# see: /dev/input/*
 
-force_load evdev || echo "eventfs (mod evdev ?) not preloaded" && sleep 2
+force_load evdev
+if [ $? != 0 ]; then
+    echo "WARNING:[Xorg] eventfs _may_ not present X with keyboard or mouse devices"
+    sleep 2;
+fi
 
 # helper programs
 
 mkdir -vp $DESTDIR/lib/vdev 
 
 for prog in /lib/vdev/*; do
-
    # shell script or library?
    if [ -z "${prog#*.sh}" ]; then 
       cp -a $prog $DESTDIR/lib/vdev/
@@ -43,7 +47,7 @@ fi
 
 # config 
 mkdir -pv $DESTDIR/etc/vdev
-cp -a /etc/vdev/* $DESTDIR/etc/vdev/
+cp -avf /etc/vdev/* $DESTDIR/etc/vdev/
 
 # the daemon itself 
 copy_exec /sbin/vdevd
@@ -52,26 +56,30 @@ copy_exec /sbin/vdevd
 if [ -f /sbin/blkid ]; then 
    copy_exec /sbin/blkid
 else
-   echo "WARN: could not find blkid in /sbin/blkid.  /dev/disk symlinks will not be created."
+    echo "WARN: could not find blkid in /sbin/blkid."
+    echo "      /dev/disk symlinks will not be created."
 fi
 
 # lvm tools (needed by vdevd's helpers)
 if [ -f /sbin/lvs ]; then
    copy_exec /sbin/lvs
 else
-   echo "WARN: could not find lvs in /sbin/lvs.  Logical volume symlinks will not be created."
+    echo "WARN: could not find lvs in /sbin/lvs."
+    echo "    Logical volume symlinks will not be created."
 fi
 
 if [ -f /sbin/pvs ]; then 
    copy_exec /sbin/pvs
 else
-   echo "WARN: could not find pvs in /sbin/pvs.  Physical volume symlinks will not be created."
+   echo "WARN: could not find pvs in /sbin/pvs."
+   echo "    Physical volume symlinks will not be created."
 fi
 
 if [ -f /sbin/lvm ]; then 
    copy_exec /sbin/lvm
 else
-   echo "WARN: could not find lvm in /sbin/lvm.  Logical volume symlinks will not be created."
+    echo "WARN: could not find lvm in /sbin/lvm."
+    echo "    Logical volume symlinks will not be created."
 fi
 #
 # network tools (needed by vdevd's helpers)
@@ -80,7 +88,7 @@ fi
 #
 if ! [ -f /sbin/ip ] && ! [ -f /bin/ip ]; then 
     echo "WARN: could not find iproute2 in /bin/ip or /sbin/ip."
-    echo "Network interfaces will not be configured."
+    echo "    Networking may not be available"
 fi
 
 if [ -f /bin/ip ]; then
@@ -92,9 +100,8 @@ if [ -f /sbin/ip ]; then
 else [ -f /sbin/ifconfig ]; then
 # try the classical tool
     copy_exec /sbin/ifconfig 
-    echo "installing /sbin/ifconfig as networking tool"
+    echo "NOTE: installing /sbin/ifconfig as networking tool"
 fi
-
 
 # SELinux tools
 if [ -f /sbin/restorecon ]; then 
@@ -102,18 +109,20 @@ if [ -f /sbin/restorecon ]; then
 fi
 
 # device tools
+# prefer most current 
 if [ -f /sbin/MAKEDEV ]; then 
     copy_exec /sbin/MAKEDEV
 else
     echo "WARNING: No MAKEDEV found to install"
-    echo "vdev --once    may be your best alterenative"
+    echo "vdev --once  may be your best alternative"
 fi
 
 # device mapper tools
 if [ -f /sbin/dmsetup ]; then 
    copy_exec /sbin/dmsetup 
 else
-   echo "WARN: could not find dmsetup in /sbin/dmsetup.  Device mapper symlinks will not be created."
+    echo "WARN: could not find dmsetup in /sbin/dmsetup."
+    echo "   Device mapper symlinks will not be created."
 fi
 
 # hardware database 
@@ -122,7 +131,8 @@ if [ -f /lib/vdev/hwdb/hwdb.squashfs ]; then
    mkdir -p $DESTDIR/lib/vdev/hwdb
    cp -a /lib/vdev/hwdb/hwdb.squashfs $DESTDIR/lib/vdev/hwdb
 else
-    echo "WARN: could not find hardware database in /lib/vdev/hwdb.  Some hardware metadata may not be generated."
+    echo "WARN: could not find hardware database in /lib/vdev/hwdb."
+    echo "Some hardware metadata may not be generated."
     sleep 2
 fi
 
